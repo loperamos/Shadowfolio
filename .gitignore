@@ -14,3 +14,6 @@ __pycache__/
 # Tooling caches
 .mypy_cache/
 .ruff_cache/
+
+# Local database
+*.db
