@@ -19,5 +19,9 @@ class WalletRepository(ABC):
         """The wallet with its operations, oldest first."""
 
     @abstractmethod
+    def delete(self, wallet_id: UUID) -> None:
+        """Remove the wallet and its operations. Does nothing if it does not exist."""
+
+    @abstractmethod
     def list_by_owner(self, owner_id: str) -> list[Wallet]:
         """The owner's wallets, in the order they were added."""

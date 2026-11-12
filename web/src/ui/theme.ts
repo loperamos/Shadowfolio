@@ -7,3 +7,6 @@ export const theme = createTheme({
   defaultRadius: "md",
   fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
 });
+
+// Size of icons inside buttons and menus, in px.
+export const ICON_SIZE = 16;

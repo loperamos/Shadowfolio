@@ -75,6 +75,11 @@ class SqliteWalletRepository(WalletRepository):
             operations=tuple(_operation_from_row(op) for op in operation_rows),
         )
 
+    def delete(self, wallet_id: UUID) -> None:
+        with closing(self._connect()) as conn, conn:
+            conn.execute("DELETE FROM operations WHERE wallet_id = ?", (str(wallet_id),))
+            conn.execute("DELETE FROM wallets WHERE id = ?", (str(wallet_id),))
+
     def list_by_owner(self, owner_id: str) -> list[Wallet]:
         with closing(self._connect()) as conn:
             rows = conn.execute("SELECT id FROM wallets WHERE owner_id = ? ORDER BY rowid", (owner_id,)).fetchall()

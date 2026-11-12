@@ -1,8 +1,29 @@
-"""HTTP errors shared by the routers."""
+"""HTTP errors shared by the routers, and how they are documented in the API schema."""
+
+from typing import Any
 
 from fastapi import HTTPException
+from pydantic import BaseModel
 
 from shadowfolio.domain.errors import DomainError
+
+
+class FieldError(BaseModel):
+    """One problem in a malformed request, as FastAPI reports it."""
+
+    loc: list[str | int]
+    msg: str
+    type: str
+
+
+class ErrorResponse(BaseModel):
+    # A message for a missing resource or a broken business rule; a list of field errors when the request is malformed.
+    detail: str | list[FieldError]
+
+
+# Documented responses, attached to the routes that can return them.
+NOT_FOUND: dict[int | str, dict[str, Any]] = {404: {"model": ErrorResponse, "description": "Not found"}}
+INVALID: dict[int | str, dict[str, Any]] = {422: {"model": ErrorResponse, "description": "Malformed request or broken business rule"}}
 
 
 def wallet_not_found() -> HTTPException:

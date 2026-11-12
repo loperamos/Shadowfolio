@@ -5,7 +5,7 @@ from uuid import UUID
 from fastapi import APIRouter
 
 from shadowfolio.domain.errors import DomainError
-from shadowfolio.interfaces.web.errors import rule_violation, wallet_not_found
+from shadowfolio.interfaces.web.errors import INVALID, NOT_FOUND, rule_violation, wallet_not_found
 from shadowfolio.interfaces.web.schemas import ValuationResponse
 from shadowfolio.usecases.valuation import Valuation
 
@@ -13,7 +13,7 @@ from shadowfolio.usecases.valuation import Valuation
 def valuation_router(valuation: Valuation) -> APIRouter:
     router = APIRouter()
 
-    @router.get("/wallets/{wallet_id}/valuation")
+    @router.get("/wallets/{wallet_id}/valuation", responses=NOT_FOUND | INVALID)
     def current_valuation(wallet_id: UUID) -> ValuationResponse:
         try:
             result = valuation.current(wallet_id)

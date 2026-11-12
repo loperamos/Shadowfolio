@@ -67,5 +67,20 @@ def test_list_by_owner_returns_only_their_wallets_in_order(make_repository: Repo
     assert make_repository().list_by_owner("owner-1") == [first, second]
 
 
+def test_delete_removes_the_wallet_and_its_operations(make_repository: RepositoryFactory) -> None:
+    deleted, kept = a_wallet(), a_wallet()
+    make_repository().add(deleted)
+    make_repository().add(kept)
+
+    make_repository().delete(deleted.id)
+
+    assert make_repository().get(deleted.id) is None
+    assert make_repository().list_by_owner("owner-1") == [kept]
+    # Re-adding the same id without history must not bring the old operations back.
+    empty = replace(deleted, operations=())
+    make_repository().add(empty)
+    assert make_repository().get(deleted.id) == empty
+
+
 def test_unknown_wallet_is_none(make_repository: RepositoryFactory) -> None:
     assert make_repository().get(uuid4()) is None

@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { CreateWalletData, CreateWalletErrors, CreateWalletResponses, CurrentValuationData, CurrentValuationErrors, CurrentValuationResponses, DepositData, DepositErrors, DepositResponses, GetWalletData, GetWalletErrors, GetWalletResponses, LatestQuoteData, LatestQuoteErrors, LatestQuoteResponses, ListOperationsData, ListOperationsErrors, ListOperationsResponses, ListWalletsData, ListWalletsResponses, RecordBuyData, RecordBuyErrors, RecordBuyResponses, RecordSellData, RecordSellErrors, RecordSellResponses, WithdrawData, WithdrawErrors, WithdrawResponses } from './types.gen';
+import type { CopyWalletData, CopyWalletErrors, CopyWalletResponses, CreateWalletData, CreateWalletErrors, CreateWalletResponses, CurrentValuationData, CurrentValuationErrors, CurrentValuationResponses, DeleteWalletData, DeleteWalletErrors, DeleteWalletResponses, DepositData, DepositErrors, DepositResponses, GetWalletData, GetWalletErrors, GetWalletResponses, LatestQuoteData, LatestQuoteErrors, LatestQuoteResponses, ListOperationsData, ListOperationsErrors, ListOperationsResponses, ListWalletsData, ListWalletsResponses, RecordBuyData, RecordBuyErrors, RecordBuyResponses, RecordSellData, RecordSellErrors, RecordSellResponses, WithdrawData, WithdrawErrors, WithdrawResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -34,6 +34,23 @@ export const createWallet = <ThrowOnError extends boolean = false>(options: Opti
         ...options.headers
     }
 });
+
+/**
+ * Copy Wallet
+ */
+export const copyWallet = <ThrowOnError extends boolean = false>(options: Options<CopyWalletData, ThrowOnError>): RequestResult<CopyWalletResponses, CopyWalletErrors, ThrowOnError> => (options.client ?? client).post<CopyWalletResponses, CopyWalletErrors, ThrowOnError>({
+    url: '/wallets/{wallet_id}/copies',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Delete Wallet
+ */
+export const deleteWallet = <ThrowOnError extends boolean = false>(options: Options<DeleteWalletData, ThrowOnError>): RequestResult<DeleteWalletResponses, DeleteWalletErrors, ThrowOnError> => (options.client ?? client).delete<DeleteWalletResponses, DeleteWalletErrors, ThrowOnError>({ url: '/wallets/{wallet_id}', ...options });
 
 /**
  * Get Wallet

@@ -1,5 +1,6 @@
 """Wallet: a timeline of operations owned by a user. Cash and holdings are derived from it."""
 
+from collections.abc import Callable
 from dataclasses import dataclass, replace
 from datetime import datetime
 from decimal import Decimal
@@ -27,6 +28,12 @@ class Wallet:
     def holdings(self) -> dict[str, Decimal]:
         """Shares held per symbol. Symbols sold out entirely are left out."""
         return _replay(self.operations)
+
+    def copy(self, wallet_id: UUID, name: str, new_operation_id: Callable[[], UUID]) -> Self:
+        """A new wallet with the same owner, currency and history. Every operation gets a new id,
+        so the copy's history can change independently."""
+        operations = tuple(replace(op, id=new_operation_id()) for op in self.operations)
+        return replace(self, id=wallet_id, name=name, operations=operations)
 
     def deposit(self, operation_id: UUID, amount: Decimal, at: datetime) -> Self:
         _require_positive(amount, "amount")

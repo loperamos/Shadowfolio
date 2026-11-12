@@ -1,14 +1,10 @@
-import type { ValidationError } from "./generated";
-
-// What the backend returns on errors: a message for broken business rules, or FastAPI's list of
-// validation errors for malformed requests.
-type ErrorBody = { detail?: string | ValidationError[] };
+import type { ErrorResponse } from "./generated";
 
 const FALLBACK_MESSAGE = "Something went wrong.";
 
-/** A readable message from an error response of the API. */
+/** A readable message from an error response of the API (see ErrorResponse in the backend). */
 export function apiErrorMessage(error: unknown): string {
-  const detail = (error as ErrorBody | undefined)?.detail;
+  const detail = (error as ErrorResponse | undefined)?.detail;
   if (typeof detail === "string") {
     return detail;
   }

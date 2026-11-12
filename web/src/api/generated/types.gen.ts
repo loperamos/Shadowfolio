@@ -15,6 +15,16 @@ export type AmountRequest = {
 };
 
 /**
+ * CopyWalletRequest
+ */
+export type CopyWalletRequest = {
+    /**
+     * Name
+     */
+    name: string;
+};
+
+/**
  * CreateWalletRequest
  */
 export type CreateWalletRequest = {
@@ -54,6 +64,36 @@ export type DepositRequest = {
 };
 
 /**
+ * ErrorResponse
+ */
+export type ErrorResponse = {
+    /**
+     * Detail
+     */
+    detail: string | Array<FieldError>;
+};
+
+/**
+ * FieldError
+ *
+ * One problem in a malformed request, as FastAPI reports it.
+ */
+export type FieldError = {
+    /**
+     * Loc
+     */
+    loc: Array<string | number>;
+    /**
+     * Msg
+     */
+    msg: string;
+    /**
+     * Type
+     */
+    type: string;
+};
+
+/**
  * FxRateResponse
  */
 export type FxRateResponse = {
@@ -65,16 +105,6 @@ export type FxRateResponse = {
      * As Of
      */
     as_of: string;
-};
-
-/**
- * HTTPValidationError
- */
-export type HttpValidationError = {
-    /**
-     * Detail
-     */
-    detail?: Array<ValidationError>;
 };
 
 /**
@@ -211,34 +241,6 @@ export type TradeRequest = {
 };
 
 /**
- * ValidationError
- */
-export type ValidationError = {
-    /**
-     * Location
-     */
-    loc: Array<string | number>;
-    /**
-     * Message
-     */
-    msg: string;
-    /**
-     * Error Type
-     */
-    type: string;
-    /**
-     * Input
-     */
-    input?: unknown;
-    /**
-     * Context
-     */
-    ctx?: {
-        [key: string]: unknown;
-    };
-};
-
-/**
  * ValuationResponse
  */
 export type ValuationResponse = {
@@ -309,9 +311,9 @@ export type CreateWalletData = {
 
 export type CreateWalletErrors = {
     /**
-     * Validation Error
+     * Malformed request or broken business rule
      */
-    422: HttpValidationError;
+    422: ErrorResponse;
 };
 
 export type CreateWalletError = CreateWalletErrors[keyof CreateWalletErrors];
@@ -324,6 +326,74 @@ export type CreateWalletResponses = {
 };
 
 export type CreateWalletResponse = CreateWalletResponses[keyof CreateWalletResponses];
+
+export type CopyWalletData = {
+    body: CopyWalletRequest;
+    path: {
+        /**
+         * Wallet Id
+         */
+        wallet_id: string;
+    };
+    query?: never;
+    url: '/wallets/{wallet_id}/copies';
+};
+
+export type CopyWalletErrors = {
+    /**
+     * Not found
+     */
+    404: ErrorResponse;
+    /**
+     * Malformed request or broken business rule
+     */
+    422: ErrorResponse;
+};
+
+export type CopyWalletError = CopyWalletErrors[keyof CopyWalletErrors];
+
+export type CopyWalletResponses = {
+    /**
+     * Successful Response
+     */
+    201: WalletResponse;
+};
+
+export type CopyWalletResponse = CopyWalletResponses[keyof CopyWalletResponses];
+
+export type DeleteWalletData = {
+    body?: never;
+    path: {
+        /**
+         * Wallet Id
+         */
+        wallet_id: string;
+    };
+    query?: never;
+    url: '/wallets/{wallet_id}';
+};
+
+export type DeleteWalletErrors = {
+    /**
+     * Not found
+     */
+    404: ErrorResponse;
+    /**
+     * Malformed request or broken business rule
+     */
+    422: ErrorResponse;
+};
+
+export type DeleteWalletError = DeleteWalletErrors[keyof DeleteWalletErrors];
+
+export type DeleteWalletResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type DeleteWalletResponse = DeleteWalletResponses[keyof DeleteWalletResponses];
 
 export type GetWalletData = {
     body?: never;
@@ -339,9 +409,13 @@ export type GetWalletData = {
 
 export type GetWalletErrors = {
     /**
-     * Validation Error
+     * Not found
      */
-    422: HttpValidationError;
+    404: ErrorResponse;
+    /**
+     * Malformed request or broken business rule
+     */
+    422: ErrorResponse;
 };
 
 export type GetWalletError = GetWalletErrors[keyof GetWalletErrors];
@@ -369,9 +443,13 @@ export type ListOperationsData = {
 
 export type ListOperationsErrors = {
     /**
-     * Validation Error
+     * Not found
      */
-    422: HttpValidationError;
+    404: ErrorResponse;
+    /**
+     * Malformed request or broken business rule
+     */
+    422: ErrorResponse;
 };
 
 export type ListOperationsError = ListOperationsErrors[keyof ListOperationsErrors];
@@ -401,9 +479,13 @@ export type DepositData = {
 
 export type DepositErrors = {
     /**
-     * Validation Error
+     * Not found
      */
-    422: HttpValidationError;
+    404: ErrorResponse;
+    /**
+     * Malformed request or broken business rule
+     */
+    422: ErrorResponse;
 };
 
 export type DepositError = DepositErrors[keyof DepositErrors];
@@ -431,9 +513,13 @@ export type WithdrawData = {
 
 export type WithdrawErrors = {
     /**
-     * Validation Error
+     * Not found
      */
-    422: HttpValidationError;
+    404: ErrorResponse;
+    /**
+     * Malformed request or broken business rule
+     */
+    422: ErrorResponse;
 };
 
 export type WithdrawError = WithdrawErrors[keyof WithdrawErrors];
@@ -461,9 +547,13 @@ export type RecordBuyData = {
 
 export type RecordBuyErrors = {
     /**
-     * Validation Error
+     * Not found
      */
-    422: HttpValidationError;
+    404: ErrorResponse;
+    /**
+     * Malformed request or broken business rule
+     */
+    422: ErrorResponse;
 };
 
 export type RecordBuyError = RecordBuyErrors[keyof RecordBuyErrors];
@@ -491,9 +581,13 @@ export type RecordSellData = {
 
 export type RecordSellErrors = {
     /**
-     * Validation Error
+     * Not found
      */
-    422: HttpValidationError;
+    404: ErrorResponse;
+    /**
+     * Malformed request or broken business rule
+     */
+    422: ErrorResponse;
 };
 
 export type RecordSellError = RecordSellErrors[keyof RecordSellErrors];
@@ -521,9 +615,13 @@ export type CurrentValuationData = {
 
 export type CurrentValuationErrors = {
     /**
-     * Validation Error
+     * Not found
      */
-    422: HttpValidationError;
+    404: ErrorResponse;
+    /**
+     * Malformed request or broken business rule
+     */
+    422: ErrorResponse;
 };
 
 export type CurrentValuationError = CurrentValuationErrors[keyof CurrentValuationErrors];
@@ -551,9 +649,13 @@ export type LatestQuoteData = {
 
 export type LatestQuoteErrors = {
     /**
-     * Validation Error
+     * Not found
      */
-    422: HttpValidationError;
+    404: ErrorResponse;
+    /**
+     * Malformed request or broken business rule
+     */
+    422: ErrorResponse;
 };
 
 export type LatestQuoteError = LatestQuoteErrors[keyof LatestQuoteErrors];

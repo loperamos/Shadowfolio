@@ -228,10 +228,47 @@ def test_invalid_buy_is_rejected(client: TestClient, change: dict[str, str]) -> 
     assert response.status_code == 422
 
 
+def test_copy_has_the_same_history_under_a_new_id(client: TestClient) -> None:
+    wallet_id = create_wallet(client, "0")
+    fund_in_the_past(client, wallet_id, "1000")
+    client.post(f"/wallets/{wallet_id}/buys", json=NVDA_BUY)
+
+    response = client.post(f"/wallets/{wallet_id}/copies", json={"name": "What if"})
+    assert response.status_code == 201
+    copy = response.json()
+    assert copy["id"] != wallet_id
+    assert (copy["name"], copy["currency"], copy["cash"], copy["holdings"]) == ("What if", "EUR", "90.32", {"NVDA": "8"})
+    original_ops = client.get(f"/wallets/{wallet_id}/operations").json()
+    copy_ops = client.get(f"/wallets/{copy['id']}/operations").json()
+    assert [(op["type"], op["timestamp"], op["amount"]) for op in copy_ops] == [
+        (op["type"], op["timestamp"], op["amount"]) for op in original_ops
+    ]
+    assert {op["id"] for op in copy_ops}.isdisjoint(op["id"] for op in original_ops)
+
+
+def test_copy_changes_independently_of_the_original(client: TestClient) -> None:
+    wallet_id = create_wallet(client, "100")
+    copy_id = client.post(f"/wallets/{wallet_id}/copies", json={"name": "Copy"}).json()["id"]
+
+    client.post(f"/wallets/{copy_id}/deposits", json={"amount": "50"})
+    assert client.get(f"/wallets/{copy_id}").json()["cash"] == "150"
+    assert client.get(f"/wallets/{wallet_id}").json()["cash"] == "100"
+
+
+def test_deleted_wallet_is_gone(client: TestClient) -> None:
+    kept, deleted = create_wallet(client, "10"), create_wallet(client, "20")
+
+    assert client.delete(f"/wallets/{deleted}").status_code == 204
+    assert client.get(f"/wallets/{deleted}").status_code == 404
+    assert [w["id"] for w in client.get("/wallets").json()] == [kept]
+
+
 @pytest.mark.parametrize(
     ("method", "path"),
     [
         ("GET", "/wallets/{id}"),
+        ("DELETE", "/wallets/{id}"),
+        ("POST", "/wallets/{id}/copies"),
         ("GET", "/wallets/{id}/operations"),
         ("POST", "/wallets/{id}/deposits"),
         ("POST", "/wallets/{id}/withdrawals"),
@@ -240,6 +277,6 @@ def test_invalid_buy_is_rejected(client: TestClient, change: dict[str, str]) -> 
     ],
 )
 def test_unknown_wallet_returns_404(client: TestClient, method: str, path: str) -> None:
-    body = NVDA_BUY if path.endswith(("buys", "sells")) else {"amount": "10"}
+    body = NVDA_BUY if path.endswith(("buys", "sells")) else {"name": "Copy"} if path.endswith("copies") else {"amount": "10"}
     response = client.request(method, path.format(id=uuid4()), json=body)
     assert response.status_code == 404
