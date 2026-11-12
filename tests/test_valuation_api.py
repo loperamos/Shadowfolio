@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from uuid import uuid4
 
@@ -6,8 +6,9 @@ import pytest
 from fastapi.testclient import TestClient
 
 from shadowfolio.adapters.fixed_clock import FixedClock
+from shadowfolio.adapters.in_memory_fx_rates import InMemoryFxRates
 from shadowfolio.adapters.in_memory_price_data import InMemoryPriceData
-from shadowfolio.domain.money import Currency
+from shadowfolio.domain.money import Currency, FxRate
 from shadowfolio.domain.valuation import Quote
 from shadowfolio.wiring.test import build_test_app
 
@@ -21,8 +22,13 @@ def prices() -> InMemoryPriceData:
 
 
 @pytest.fixture
-def client(prices: InMemoryPriceData) -> TestClient:
-    return TestClient(build_test_app(clock=FixedClock(NOW), prices=prices))
+def fx_rates() -> InMemoryFxRates:
+    return InMemoryFxRates()
+
+
+@pytest.fixture
+def client(prices: InMemoryPriceData, fx_rates: InMemoryFxRates) -> TestClient:
+    return TestClient(build_test_app(clock=FixedClock(NOW), prices=prices, fx_rates=fx_rates))
 
 
 def wallet_holding(client: TestClient, *trades: dict[str, str]) -> str:
@@ -58,22 +64,28 @@ def test_cash_only_wallet_is_worth_its_cash(client: TestClient) -> None:
 
     response = client.get(f"/wallets/{wallet_id}/valuation")
     assert response.status_code == 200
-    assert response.json() == {"holdings": [], "totals": {"EUR": "3000"}}
+    assert response.json() == {"currency": "EUR", "cash": "3000", "holdings": [], "total": "3000"}
 
 
-def test_holdings_are_valued_at_latest_prices_and_totalled_per_currency(client: TestClient, prices: InMemoryPriceData) -> None:
+def test_holdings_are_valued_at_latest_prices_and_converted_into_the_wallet_currency(
+    client: TestClient, prices: InMemoryPriceData, fx_rates: InMemoryFxRates
+) -> None:
     wallet_id = wallet_holding(client, NVDA_BUY, TSLA_BUY)  # cash left: 3000 - 909.68 - 1479.15 = 611.17 EUR
     prices.set("NVDA", Quote(Decimal("135.50"), Currency.USD, QUOTE_TIME))
     prices.set("TSLA", Quote(Decimal("310.00"), Currency.EUR, QUOTE_TIME))
+    fx_rates.set(FxRate(Currency.USD, Currency.EUR, Decimal("0.9025"), date(2026, 3, 2)))
 
     valuation = client.get(f"/wallets/{wallet_id}/valuation").json()
-    assert [(h["symbol"], h["quantity"], h["price"], h["currency"], h["value"]) for h in valuation["holdings"]] == [
-        ("NVDA", "8", "135.50", "USD", "1084.00"),
-        ("TSLA", "5", "310.00", "EUR", "1550.00"),
-    ]
-    assert valuation["holdings"][0]["as_of"] == "2026-03-02T14:59:00Z"
-    # USD is not converted into EUR yet: each currency has its own total.
-    assert valuation["totals"] == {"EUR": "2161.17", "USD": "1084.00"}
+    nvda, tsla = valuation["holdings"]
+    assert (nvda["symbol"], nvda["value"], nvda["fx_rate"], nvda["value_in_wallet_currency"]) == (
+        "NVDA",
+        "1084.00",
+        {"rate": "0.9025", "as_of": "2026-03-02"},
+        "978.31",
+    )
+    assert (tsla["symbol"], tsla["value"], tsla["fx_rate"], tsla["value_in_wallet_currency"]) == ("TSLA", "1550.00", None, "1550.00")
+    assert nvda["as_of"] == "2026-03-02T14:59:00Z"
+    assert (valuation["cash"], valuation["total"]) == ("611.17", "3139.48")  # 611.17 + 978.31 + 1550.00
 
 
 def test_missing_price_fails_the_valuation(client: TestClient, prices: InMemoryPriceData) -> None:
@@ -83,6 +95,15 @@ def test_missing_price_fails_the_valuation(client: TestClient, prices: InMemoryP
     response = client.get(f"/wallets/{wallet_id}/valuation")
     assert response.status_code == 422
     assert response.json()["detail"] == "no price for NVDA"
+
+
+def test_missing_exchange_rate_fails_the_valuation(client: TestClient, prices: InMemoryPriceData) -> None:
+    wallet_id = wallet_holding(client, NVDA_BUY)
+    prices.set("NVDA", Quote(Decimal("135.50"), Currency.USD, QUOTE_TIME))
+
+    response = client.get(f"/wallets/{wallet_id}/valuation")
+    assert response.status_code == 422
+    assert response.json()["detail"] == "no USD→EUR rate"
 
 
 def test_unknown_wallet_valuation_returns_404(client: TestClient) -> None:

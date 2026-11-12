@@ -1,12 +1,14 @@
-"""Valuation: what a wallet is worth, given market prices. No FX yet, so values stay in each price's currency."""
+"""Valuation: what a wallet is worth, in its own currency, given market prices and exchange rates."""
 
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
-from decimal import Decimal
+from decimal import ROUND_HALF_EVEN, Decimal
 
-from shadowfolio.domain.money import Currency
+from shadowfolio.domain.money import Currency, FxRate
 from shadowfolio.domain.wallet import Wallet
+
+CENT = Decimal("0.01")
 
 
 @dataclass(frozen=True)
@@ -23,30 +25,43 @@ class HoldingValue:
     symbol: str
     quantity: Decimal
     quote: Quote
+    fx_rate: FxRate | None  # from the quote's currency into the wallet's; None when they are the same
 
     @property
     def value(self) -> Decimal:
         """Worth of the holding, in the quote's currency."""
         return self.quantity * self.quote.price
 
+    @property
+    def value_in_wallet_currency(self) -> Decimal:
+        """Worth of the holding in the wallet's currency; converted values are rounded to cents."""
+        if self.fx_rate is None:
+            return self.value
+        return (self.value * self.fx_rate.rate).quantize(CENT, rounding=ROUND_HALF_EVEN)
+
 
 @dataclass(frozen=True)
 class WalletValuation:
+    currency: Currency
     cash: Decimal
-    cash_currency: Currency
     holdings: tuple[HoldingValue, ...]  # sorted by symbol
 
     @property
-    def totals(self) -> dict[Currency, Decimal]:
-        """Cash plus holdings, summed per currency. Different currencies are not added together."""
-        totals = {self.cash_currency: self.cash}
-        for holding in self.holdings:
-            currency = holding.quote.currency
-            totals[currency] = totals.get(currency, Decimal(0)) + holding.value
-        return totals
+    def total(self) -> Decimal:
+        """Cash plus all holdings, in the wallet's currency."""
+        return self.cash + sum((h.value_in_wallet_currency for h in self.holdings), Decimal(0))
 
 
-def value_wallet(wallet: Wallet, quotes: Mapping[str, Quote]) -> WalletValuation:
-    """Value the wallet's current holdings. `quotes` must have a quote for every symbol held."""
-    holdings = tuple(HoldingValue(symbol, quantity, quotes[symbol]) for symbol, quantity in sorted(wallet.holdings.items()))
-    return WalletValuation(cash=wallet.cash, cash_currency=wallet.currency, holdings=holdings)
+def value_wallet(wallet: Wallet, quotes: Mapping[str, Quote], rates: Mapping[Currency, FxRate]) -> WalletValuation:
+    """Value the wallet's current holdings.
+
+    `quotes` must have a quote for every symbol held, and `rates` a rate from every quote currency
+    other than the wallet's into the wallet's currency.
+    """
+    holdings = tuple(
+        HoldingValue(
+            symbol, quantity, quotes[symbol], None if quotes[symbol].currency is wallet.currency else rates[quotes[symbol].currency]
+        )
+        for symbol, quantity in sorted(wallet.holdings.items())
+    )
+    return WalletValuation(currency=wallet.currency, cash=wallet.cash, holdings=holdings)

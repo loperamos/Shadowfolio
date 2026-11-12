@@ -1,5 +1,6 @@
 """Request and response bodies of the HTTP API."""
 
+from datetime import date
 from decimal import Decimal
 from uuid import UUID
 
@@ -85,30 +86,47 @@ class OperationResponse(BaseModel):
                 )
 
 
+class FxRateResponse(BaseModel):
+    rate: Decimal  # units of the wallet's currency per unit of the price's currency
+    as_of: date
+
+
 class HoldingValueResponse(BaseModel):
     symbol: str
     quantity: Decimal
     price: Decimal
     currency: Currency
     as_of: AwareDatetime
-    value: Decimal
+    value: Decimal  # in the price's currency
+    fx_rate: FxRateResponse | None  # null when the price is already in the wallet's currency
+    value_in_wallet_currency: Decimal
 
 
 class ValuationResponse(BaseModel):
+    currency: Currency
+    cash: Decimal
     holdings: list[HoldingValueResponse]
-    # Cash plus holdings, summed per currency; different currencies are not converted yet.
-    totals: dict[Currency, Decimal]
+    total: Decimal  # cash plus holdings, in the wallet's currency
 
     @classmethod
     def from_valuation(cls, valuation: WalletValuation) -> "ValuationResponse":
         return cls(
+            currency=valuation.currency,
+            cash=valuation.cash,
             holdings=[
                 HoldingValueResponse(
-                    symbol=h.symbol, quantity=h.quantity, price=h.quote.price, currency=h.quote.currency, as_of=h.quote.as_of, value=h.value
+                    symbol=h.symbol,
+                    quantity=h.quantity,
+                    price=h.quote.price,
+                    currency=h.quote.currency,
+                    as_of=h.quote.as_of,
+                    value=h.value,
+                    fx_rate=FxRateResponse(rate=h.fx_rate.rate, as_of=h.fx_rate.as_of) if h.fx_rate else None,
+                    value_in_wallet_currency=h.value_in_wallet_currency,
                 )
                 for h in valuation.holdings
             ],
-            totals=valuation.totals,
+            total=valuation.total,
         )
 
 

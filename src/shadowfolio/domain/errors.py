@@ -27,3 +27,7 @@ class FutureTimestampError(DomainError):
 
 class PriceUnavailableError(DomainError):
     """There is no market price for a symbol that needs one."""
+
+
+class FxRateUnavailableError(DomainError):
+    """There is no exchange rate for a currency pair that needs one."""

@@ -6,6 +6,7 @@ from pathlib import Path
 from fastapi import FastAPI
 
 from shadowfolio.adapters.alpaca_price_data import AlpacaConfig, AlpacaPriceData
+from shadowfolio.adapters.ecb_fx_rates import EcbFxRates
 from shadowfolio.adapters.sqlite_wallet_repository import SqliteWalletRepository
 from shadowfolio.adapters.system_clock import SystemClock
 from shadowfolio.interfaces.web.app import create_app
@@ -28,6 +29,6 @@ def build_local_app(config: LocalConfig) -> FastAPI:
     return create_app(
         wallets=Wallets(wallet_repository, clock),
         history=History(wallet_repository, clock),
-        valuation=Valuation(wallet_repository, prices),
+        valuation=Valuation(wallet_repository, prices, EcbFxRates()),
         market=Market(prices),
     )
