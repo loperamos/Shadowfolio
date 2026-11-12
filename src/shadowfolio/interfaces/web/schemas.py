@@ -110,3 +110,10 @@ class ValuationResponse(BaseModel):
             ],
             totals=valuation.totals,
         )
+
+
+class QuoteResponse(BaseModel):
+    symbol: str
+    price: Decimal
+    currency: Currency
+    as_of: AwareDatetime

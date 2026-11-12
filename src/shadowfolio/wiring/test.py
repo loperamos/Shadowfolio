@@ -11,6 +11,7 @@ from shadowfolio.interfaces.web.app import create_app
 from shadowfolio.ports.clock import Clock
 from shadowfolio.ports.price_data import PriceData
 from shadowfolio.usecases.history import History
+from shadowfolio.usecases.market import Market
 from shadowfolio.usecases.valuation import Valuation
 from shadowfolio.usecases.wallets import Wallets
 
@@ -23,5 +24,8 @@ def build_test_app(clock: Clock | None = None, prices: PriceData | None = None) 
     prices = prices or InMemoryPriceData()
     wallet_repository = InMemoryWalletRepository()
     return create_app(
-        wallets=Wallets(wallet_repository, clock), history=History(wallet_repository, clock), valuation=Valuation(wallet_repository, prices)
+        wallets=Wallets(wallet_repository, clock),
+        history=History(wallet_repository, clock),
+        valuation=Valuation(wallet_repository, prices),
+        market=Market(prices),
     )
