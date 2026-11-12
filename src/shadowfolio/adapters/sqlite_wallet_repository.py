@@ -8,7 +8,15 @@ from pathlib import Path
 from uuid import UUID
 
 from shadowfolio.domain.money import Currency
-from shadowfolio.domain.operations import Operation, OperationType, Trade
+from shadowfolio.domain.operations import (
+    Buy,
+    Deposit,
+    Operation,
+    OperationType,
+    Sell,
+    Trade,
+    Withdrawal,
+)
 from shadowfolio.domain.wallet import Wallet
 from shadowfolio.ports.wallet_repository import WalletRepository
 
@@ -100,14 +108,19 @@ def _insert_new_operations(conn: sqlite3.Connection, wallet: Wallet) -> None:
 
 
 def _operation_to_row(wallet_id: UUID, op: Operation) -> tuple[str | None, ...]:
-    trade = op.trade
+    """One row per operation; trade columns are NULL for cash operations."""
+    match op:
+        case Deposit() | Withdrawal():
+            amount, fees, trade = op.amount, Decimal(0), None
+        case Buy() | Sell():
+            amount, fees, trade = op.settled_amount, op.fees, op.trade
     return (
         str(op.id),
         str(wallet_id),
         op.type.value,
         op.timestamp.astimezone(UTC).isoformat(),
-        str(op.amount),
-        str(op.fees),
+        str(amount),
+        str(fees),
         trade.symbol if trade else None,
         str(trade.quantity) if trade else None,
         str(trade.price) if trade else None,
@@ -118,15 +131,14 @@ def _operation_to_row(wallet_id: UUID, op: Operation) -> tuple[str | None, ...]:
 def _operation_from_row(row: tuple[str | None, ...]) -> Operation:
     op_id, op_type, timestamp, amount, fees, symbol, quantity, price, price_currency = row
     assert op_id and op_type and timestamp and amount and fees
-    trade = None
-    if symbol is not None:
-        assert quantity and price and price_currency
-        trade = Trade(symbol, Decimal(quantity), Decimal(price), Currency(price_currency))
-    return Operation(
-        id=UUID(op_id),
-        type=OperationType(op_type),
-        timestamp=datetime.fromisoformat(timestamp),
-        amount=Decimal(amount),
-        fees=Decimal(fees),
-        trade=trade,
-    )
+    id_, at, value = UUID(op_id), datetime.fromisoformat(timestamp), Decimal(amount)
+    match OperationType(op_type):
+        case OperationType.DEPOSIT:
+            return Deposit(id_, at, value)
+        case OperationType.WITHDRAWAL:
+            return Withdrawal(id_, at, value)
+        case OperationType.BUY | OperationType.SELL as kind:
+            assert symbol and quantity and price and price_currency
+            trade = Trade(symbol, Decimal(quantity), Decimal(price), Currency(price_currency))
+            trade_class = Buy if kind is OperationType.BUY else Sell
+            return trade_class(id_, at, trade, value, Decimal(fees))

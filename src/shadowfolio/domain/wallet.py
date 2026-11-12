@@ -13,7 +13,7 @@ from shadowfolio.domain.errors import (
     MissingSettledAmountError,
 )
 from shadowfolio.domain.money import Currency
-from shadowfolio.domain.operations import Operation, OperationType, Trade
+from shadowfolio.domain.operations import Buy, Deposit, Operation, Sell, Trade, Withdrawal
 
 
 @dataclass(frozen=True)
@@ -35,11 +35,11 @@ class Wallet:
 
     def deposit(self, operation_id: UUID, amount: Decimal, at: datetime) -> Self:
         _require_positive(amount, "amount")
-        return self._with(Operation(operation_id, OperationType.DEPOSIT, at, amount))
+        return self._with(Deposit(operation_id, at, amount))
 
     def withdraw(self, operation_id: UUID, amount: Decimal, at: datetime) -> Self:
         _require_positive(amount, "amount")
-        return self._with(Operation(operation_id, OperationType.WITHDRAWAL, at, amount))
+        return self._with(Withdrawal(operation_id, at, amount))
 
     def buy(
         self,
@@ -50,7 +50,7 @@ class Wallet:
         fees: Decimal = Decimal(0),
     ) -> Self:
         """Record a buy. `settled_amount` is what left the wallet before fees, in its currency."""
-        return self._trade(OperationType.BUY, operation_id, trade, at, settled_amount, fees)
+        return self._trade(Buy, operation_id, trade, at, settled_amount, fees)
 
     def sell(
         self,
@@ -62,11 +62,11 @@ class Wallet:
     ) -> Self:
         """Record a sell. `settled_amount` is what entered the wallet before fees, in its
         currency."""
-        return self._trade(OperationType.SELL, operation_id, trade, at, settled_amount, fees)
+        return self._trade(Sell, operation_id, trade, at, settled_amount, fees)
 
     def _trade(
         self,
-        type: OperationType,
+        kind: type[Buy] | type[Sell],
         operation_id: UUID,
         trade: Trade,
         at: datetime,
@@ -86,7 +86,7 @@ class Wallet:
                 )
             settled_amount = trade.quantity * trade.price
         _require_positive(settled_amount, "settled amount")
-        return self._with(Operation(operation_id, type, at, settled_amount, fees, trade))
+        return self._with(kind(operation_id, at, trade, settled_amount, fees))
 
     def _with(self, operation: Operation) -> Self:
         """Insert the operation at its timestamp and check the whole timeline.
@@ -107,9 +107,10 @@ def _replay(timeline: tuple[Operation, ...]) -> dict[str, Decimal]:
         cash += op.cash_delta
         if cash < 0:
             raise InsufficientCashError(f"cash would be {cash} on {op.timestamp.isoformat()}")
-        if op.trade is not None:
-            symbol = op.trade.symbol
-            quantity = held.get(symbol, Decimal(0)) + op.share_delta
+        change = op.holding_change
+        if change is not None:
+            symbol, delta = change
+            quantity = held.get(symbol, Decimal(0)) + delta
             if quantity < 0:
                 raise InsufficientSharesError(
                     f"would hold {quantity} {symbol} on {op.timestamp.isoformat()}"
