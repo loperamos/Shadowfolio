@@ -17,3 +17,7 @@ class WalletRepository(ABC):
     @abstractmethod
     def get(self, wallet_id: UUID) -> Wallet | None:
         """The wallet with its operations, oldest first."""
+
+    @abstractmethod
+    def list_by_owner(self, owner_id: str) -> list[Wallet]:
+        """The owner's wallets, in the order they were added."""

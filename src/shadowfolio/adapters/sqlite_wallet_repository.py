@@ -7,7 +7,7 @@ from decimal import Decimal
 from pathlib import Path
 from uuid import UUID
 
-from shadowfolio.domain.wallet import Currency, Operation, OperationType, Wallet
+from shadowfolio.domain.wallet import Currency, Operation, OperationType, Trade, Wallet
 from shadowfolio.ports.wallet_repository import WalletRepository
 
 _SCHEMA = """
@@ -22,7 +22,12 @@ CREATE TABLE IF NOT EXISTS operations (
     wallet_id TEXT NOT NULL REFERENCES wallets (id),
     type TEXT NOT NULL,
     timestamp TEXT NOT NULL,
-    amount TEXT NOT NULL
+    amount TEXT NOT NULL,
+    fees TEXT NOT NULL,
+    symbol TEXT,
+    quantity TEXT,
+    price TEXT,
+    price_currency TEXT
 );
 """
 
@@ -59,8 +64,8 @@ class SqliteWalletRepository(WalletRepository):
             if row is None:
                 return None
             operation_rows = conn.execute(
-                "SELECT id, type, timestamp, amount FROM operations "
-                "WHERE wallet_id = ? ORDER BY timestamp, rowid",
+                "SELECT id, type, timestamp, amount, fees, symbol, quantity, price, price_currency "
+                "FROM operations WHERE wallet_id = ? ORDER BY timestamp, rowid",
                 (str(wallet_id),),
             ).fetchall()
         return Wallet(
@@ -68,16 +73,16 @@ class SqliteWalletRepository(WalletRepository):
             owner_id=row[1],
             name=row[2],
             currency=Currency(row[3]),
-            operations=tuple(
-                Operation(
-                    id=UUID(op[0]),
-                    type=OperationType(op[1]),
-                    timestamp=datetime.fromisoformat(op[2]),
-                    amount=Decimal(op[3]),
-                )
-                for op in operation_rows
-            ),
+            operations=tuple(_operation_from_row(op) for op in operation_rows),
         )
+
+    def list_by_owner(self, owner_id: str) -> list[Wallet]:
+        with closing(self._connect()) as conn:
+            rows = conn.execute(
+                "SELECT id FROM wallets WHERE owner_id = ? ORDER BY rowid", (owner_id,)
+            ).fetchall()
+        wallets = [self.get(UUID(row[0])) for row in rows]
+        return [wallet for wallet in wallets if wallet is not None]
 
     def _connect(self) -> sqlite3.Connection:
         return sqlite3.connect(self._path)
@@ -86,16 +91,40 @@ class SqliteWalletRepository(WalletRepository):
 def _insert_new_operations(conn: sqlite3.Connection, wallet: Wallet) -> None:
     """Operations are never changed once stored, so already-stored ones are skipped."""
     conn.executemany(
-        "INSERT OR IGNORE INTO operations (id, wallet_id, type, timestamp, amount) "
-        "VALUES (?, ?, ?, ?, ?)",
-        [
-            (
-                str(op.id),
-                str(wallet.id),
-                op.type.value,
-                op.timestamp.astimezone(UTC).isoformat(),
-                str(op.amount),
-            )
-            for op in wallet.operations
-        ],
+        "INSERT OR IGNORE INTO operations (id, wallet_id, type, timestamp, amount, fees, "
+        "symbol, quantity, price, price_currency) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        [_operation_to_row(wallet.id, op) for op in wallet.operations],
+    )
+
+
+def _operation_to_row(wallet_id: UUID, op: Operation) -> tuple[str | None, ...]:
+    trade = op.trade
+    return (
+        str(op.id),
+        str(wallet_id),
+        op.type.value,
+        op.timestamp.astimezone(UTC).isoformat(),
+        str(op.amount),
+        str(op.fees),
+        trade.symbol if trade else None,
+        str(trade.quantity) if trade else None,
+        str(trade.price) if trade else None,
+        trade.price_currency.value if trade else None,
+    )
+
+
+def _operation_from_row(row: tuple[str | None, ...]) -> Operation:
+    op_id, op_type, timestamp, amount, fees, symbol, quantity, price, price_currency = row
+    assert op_id and op_type and timestamp and amount and fees
+    trade = None
+    if symbol is not None:
+        assert quantity and price and price_currency
+        trade = Trade(symbol, Decimal(quantity), Decimal(price), Currency(price_currency))
+    return Operation(
+        id=UUID(op_id),
+        type=OperationType(op_type),
+        timestamp=datetime.fromisoformat(timestamp),
+        amount=Decimal(amount),
+        fees=Decimal(fees),
+        trade=trade,
     )

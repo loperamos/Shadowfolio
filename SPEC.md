@@ -176,3 +176,6 @@ No paid subscription is needed before step 8.
 - Comparison metrics and charts beyond the basics.
 - Plans, limits and pricing.
 - Hosting provider.
+- Instrument identity: key holdings by ISIN rather than ticker, so one security bought on different exchanges (e.g. Tesla on NASDAQ in USD and on Tradegate in EUR) is one holding; store the venue; value each holding from one listing (the US one in the MVP), converted with `FxRates`. Decide with the import or valuation slice.
+- FX on real trades: the broker's settled amount is the source of truth for cash. Open: also accept an FX rate instead, and warn when a broker's rate is far from the market rate (brokers add a margin, e.g. DEGIRO's AutoFX).
+- Currencies beyond USD and EUR (e.g. HKD listings) are rejected until market data covers those exchanges.

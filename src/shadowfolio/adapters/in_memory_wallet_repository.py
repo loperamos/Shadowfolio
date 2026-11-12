@@ -18,3 +18,6 @@ class InMemoryWalletRepository(WalletRepository):
 
     def get(self, wallet_id: UUID) -> Wallet | None:
         return self._wallets.get(wallet_id)
+
+    def list_by_owner(self, owner_id: str) -> list[Wallet]:
+        return [wallet for wallet in self._wallets.values() if wallet.owner_id == owner_id]

@@ -7,7 +7,9 @@ from fastapi import FastAPI, HTTPException
 from shadowfolio.domain.wallet import DomainError
 from shadowfolio.interfaces.web.schemas import (
     AmountRequest,
+    BuyRequest,
     CreateWalletRequest,
+    DepositRequest,
     OperationResponse,
     WalletResponse,
 )
@@ -28,6 +30,10 @@ def create_app(wallets: Wallets) -> FastAPI:
             raise _rule_violation(error) from error
         return WalletResponse.from_wallet(wallet)
 
+    @app.get("/wallets")
+    def list_wallets() -> list[WalletResponse]:
+        return [WalletResponse.from_wallet(wallet) for wallet in wallets.list(LOCAL_OWNER)]
+
     @app.get("/wallets/{wallet_id}")
     def get_wallet(wallet_id: UUID) -> WalletResponse:
         wallet = wallets.get(wallet_id)
@@ -43,9 +49,9 @@ def create_app(wallets: Wallets) -> FastAPI:
         return [OperationResponse.from_operation(op) for op in wallet.operations]
 
     @app.post("/wallets/{wallet_id}/deposits")
-    def deposit(wallet_id: UUID, request: AmountRequest) -> WalletResponse:
+    def deposit(wallet_id: UUID, request: DepositRequest) -> WalletResponse:
         try:
-            wallet = wallets.deposit(wallet_id, request.amount)
+            wallet = wallets.deposit(wallet_id, request.amount, request.timestamp)
         except DomainError as error:
             raise _rule_violation(error) from error
         if wallet is None:
@@ -56,6 +62,22 @@ def create_app(wallets: Wallets) -> FastAPI:
     def withdraw(wallet_id: UUID, request: AmountRequest) -> WalletResponse:
         try:
             wallet = wallets.withdraw(wallet_id, request.amount)
+        except DomainError as error:
+            raise _rule_violation(error) from error
+        if wallet is None:
+            raise _wallet_not_found()
+        return WalletResponse.from_wallet(wallet)
+
+    @app.post("/wallets/{wallet_id}/buys")
+    def record_buy(wallet_id: UUID, request: BuyRequest) -> WalletResponse:
+        try:
+            wallet = wallets.record_buy(
+                wallet_id,
+                request.to_trade(),
+                request.timestamp,
+                request.settled_amount,
+                request.fees,
+            )
         except DomainError as error:
             raise _rule_violation(error) from error
         if wallet is None:
