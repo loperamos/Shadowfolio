@@ -32,7 +32,12 @@ export type CreateWalletRequest = {
 /**
  * Currency
  */
-export type Currency = 'USD' | 'EUR';
+export const Currency = { USD: 'USD', EUR: 'EUR' } as const;
+
+/**
+ * Currency
+ */
+export type Currency = typeof Currency[keyof typeof Currency];
 
 /**
  * DepositRequest
@@ -143,7 +148,17 @@ export type OperationResponse = {
 /**
  * OperationType
  */
-export type OperationType = 'deposit' | 'withdrawal' | 'buy' | 'sell';
+export const OperationType = {
+    DEPOSIT: 'deposit',
+    WITHDRAWAL: 'withdrawal',
+    BUY: 'buy',
+    SELL: 'sell'
+} as const;
+
+/**
+ * OperationType
+ */
+export type OperationType = typeof OperationType[keyof typeof OperationType];
 
 /**
  * QuoteResponse

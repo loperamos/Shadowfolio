@@ -8,7 +8,8 @@ export default defineConfig({
   plugins: [
     // No base URL: requests go to the page's own origin, which the Vite dev server proxies to the backend.
     { name: "@hey-api/client-fetch", baseUrl: false },
-    "@hey-api/typescript",
+    // Enums also as JavaScript objects, so the UI can list their values (e.g. currencies) from the schema.
+    { name: "@hey-api/typescript", enums: "javascript" },
     "@hey-api/sdk",
   ],
 });

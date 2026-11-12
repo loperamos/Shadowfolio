@@ -1,62 +1,32 @@
-import { Alert, Container, Loader, Table, Text, Title } from "@mantine/core";
-import { useEffect, useState } from "react";
+import { Button, Container, Group, Title } from "@mantine/core";
+import { useDisclosure } from "@mantine/hooks";
+import { useCallback, useEffect, useState } from "react";
 
 import { listWallets, type WalletResponse } from "./api/generated";
+import { CreateWalletModal } from "./wallets/CreateWalletModal";
+import { WalletTable } from "./wallets/WalletTable";
 
 export function App() {
   const [wallets, setWallets] = useState<WalletResponse[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [creating, { open: openCreate, close: closeCreate }] = useDisclosure(false);
 
-  useEffect(() => {
+  const loadWallets = useCallback(() => {
     listWallets()
       .then(({ data }) => (data ? setWallets(data) : setError("Could not load wallets.")))
       .catch(() => setError("Could not reach the backend."));
   }, []);
 
+  useEffect(loadWallets, [loadWallets]);
+
   return (
     <Container py="xl">
-      <Title order={1} mb="lg">
-        Shadowfolio
-      </Title>
-      <WalletList wallets={wallets} error={error} />
+      <Group justify="space-between" mb="lg">
+        <Title order={1}>Shadowfolio</Title>
+        <Button onClick={openCreate}>New wallet</Button>
+      </Group>
+      <WalletTable wallets={wallets} error={error} />
+      <CreateWalletModal opened={creating} onClose={closeCreate} onCreated={loadWallets} />
     </Container>
-  );
-}
-
-function WalletList({ wallets, error }: { wallets: WalletResponse[] | null; error: string | null }) {
-  if (error) {
-    return <Alert color="red">{error}</Alert>;
-  }
-  if (wallets === null) {
-    return <Loader />;
-  }
-  if (wallets.length === 0) {
-    return <Text c="dimmed">No wallets yet.</Text>;
-  }
-  return (
-    <Table striped highlightOnHover>
-      <Table.Thead>
-        <Table.Tr>
-          <Table.Th>Name</Table.Th>
-          <Table.Th ta="right">Cash</Table.Th>
-          <Table.Th>Holdings</Table.Th>
-        </Table.Tr>
-      </Table.Thead>
-      <Table.Tbody>
-        {wallets.map((wallet) => (
-          <Table.Tr key={wallet.id}>
-            <Table.Td>{wallet.name}</Table.Td>
-            <Table.Td ta="right">
-              {wallet.cash} {wallet.currency}
-            </Table.Td>
-            <Table.Td>
-              {Object.entries(wallet.holdings)
-                .map(([symbol, quantity]) => `${symbol} ${quantity}`)
-                .join(", ") || <Text c="dimmed">None</Text>}
-            </Table.Td>
-          </Table.Tr>
-        ))}
-      </Table.Tbody>
-    </Table>
   );
 }
