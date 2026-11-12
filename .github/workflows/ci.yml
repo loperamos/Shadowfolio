@@ -18,3 +18,26 @@ jobs:
       - run: uv run ruff format --check
       - run: uv run mypy
       - run: uv run pytest
+
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      # The backend is needed to export the OpenAPI schema the client is generated from.
+      - uses: astral-sh/setup-uv@v10.3.3
+        with:
+          python-version: "3.13"
+      - run: uv sync --locked
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: web/.nvmrc
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+        working-directory: web
+      - run: npm run generate
+        working-directory: web
+      - name: Generated API client is up to date with the backend
+        run: git diff --exit-code -- web/openapi.json web/src/api/generated
+      - run: npm run build
+        working-directory: web
