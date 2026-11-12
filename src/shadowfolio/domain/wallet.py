@@ -8,6 +8,7 @@ from uuid import UUID
 
 from shadowfolio.domain.errors import (
     InsufficientCashError,
+    InsufficientSharesError,
     InvalidAmountError,
     MissingSettledAmountError,
 )
@@ -29,12 +30,8 @@ class Wallet:
 
     @property
     def holdings(self) -> dict[str, Decimal]:
-        """Shares held per symbol."""
-        held: dict[str, Decimal] = {}
-        for op in self.operations:
-            if op.trade is not None:
-                held[op.trade.symbol] = held.get(op.trade.symbol, Decimal(0)) + op.trade.quantity
-        return held
+        """Shares held per symbol. Symbols sold out entirely are left out."""
+        return _replay(self.operations)
 
     def deposit(self, operation_id: UUID, amount: Decimal, at: datetime) -> Self:
         _require_positive(amount, "amount")
@@ -52,9 +49,32 @@ class Wallet:
         settled_amount: Decimal | None = None,
         fees: Decimal = Decimal(0),
     ) -> Self:
-        """Record a buy. `settled_amount` is what left the wallet before fees, in its currency;
-        it is required when the price is in another currency, and defaults to quantity × price
-        otherwise."""
+        """Record a buy. `settled_amount` is what left the wallet before fees, in its currency."""
+        return self._trade(OperationType.BUY, operation_id, trade, at, settled_amount, fees)
+
+    def sell(
+        self,
+        operation_id: UUID,
+        trade: Trade,
+        at: datetime,
+        settled_amount: Decimal | None = None,
+        fees: Decimal = Decimal(0),
+    ) -> Self:
+        """Record a sell. `settled_amount` is what entered the wallet before fees, in its
+        currency."""
+        return self._trade(OperationType.SELL, operation_id, trade, at, settled_amount, fees)
+
+    def _trade(
+        self,
+        type: OperationType,
+        operation_id: UUID,
+        trade: Trade,
+        at: datetime,
+        settled_amount: Decimal | None,
+        fees: Decimal,
+    ) -> Self:
+        """`settled_amount` is required when the price is in another currency than the
+        wallet's, and defaults to quantity × price otherwise."""
         _require_positive(trade.quantity, "quantity")
         _require_positive(trade.price, "price")
         if fees < 0:
@@ -66,9 +86,7 @@ class Wallet:
                 )
             settled_amount = trade.quantity * trade.price
         _require_positive(settled_amount, "settled amount")
-        return self._with(
-            Operation(operation_id, OperationType.BUY, at, settled_amount, fees, trade)
-        )
+        return self._with(Operation(operation_id, type, at, settled_amount, fees, trade))
 
     def _with(self, operation: Operation) -> Self:
         """Insert the operation at its timestamp and check the whole timeline.
@@ -76,12 +94,31 @@ class Wallet:
         Operations with equal timestamps keep the order in which they were added.
         """
         timeline = tuple(sorted((*self.operations, operation), key=lambda op: op.timestamp))
-        cash = Decimal(0)
-        for op in timeline:
-            cash += op.cash_delta
-            if cash < 0:
-                raise InsufficientCashError(f"cash would be {cash} on {op.timestamp.isoformat()}")
+        _replay(timeline)
         return replace(self, operations=timeline)
+
+
+def _replay(timeline: tuple[Operation, ...]) -> dict[str, Decimal]:
+    """Apply operations in order and return the holdings, failing if cash or a holding would
+    go negative at any point."""
+    cash = Decimal(0)
+    held: dict[str, Decimal] = {}
+    for op in timeline:
+        cash += op.cash_delta
+        if cash < 0:
+            raise InsufficientCashError(f"cash would be {cash} on {op.timestamp.isoformat()}")
+        if op.trade is not None:
+            symbol = op.trade.symbol
+            quantity = held.get(symbol, Decimal(0)) + op.share_delta
+            if quantity < 0:
+                raise InsufficientSharesError(
+                    f"would hold {quantity} {symbol} on {op.timestamp.isoformat()}"
+                )
+            if quantity:
+                held[symbol] = quantity
+            else:
+                held.pop(symbol, None)
+    return held
 
 
 def _require_positive(value: Decimal, name: str) -> None:

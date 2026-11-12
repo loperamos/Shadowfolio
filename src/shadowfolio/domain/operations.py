@@ -13,6 +13,11 @@ class OperationType(StrEnum):
     DEPOSIT = "deposit"
     WITHDRAWAL = "withdrawal"
     BUY = "buy"
+    SELL = "sell"
+
+
+# Operations that bring cash into the wallet; all others take it out.
+_CASH_IN = {OperationType.DEPOSIT, OperationType.SELL}
 
 
 @dataclass(frozen=True)
@@ -39,7 +44,13 @@ class Operation:
 
     @property
     def cash_delta(self) -> Decimal:
-        """Signed effect on cash."""
-        if self.type is OperationType.DEPOSIT:
-            return self.amount - self.fees
-        return -self.amount - self.fees
+        """Signed effect on cash. Fees always reduce it."""
+        signed = self.amount if self.type in _CASH_IN else -self.amount
+        return signed - self.fees
+
+    @property
+    def share_delta(self) -> Decimal:
+        """Signed effect on the traded symbol's holding; zero for cash operations."""
+        if self.trade is None:
+            return Decimal(0)
+        return -self.trade.quantity if self.type is OperationType.SELL else self.trade.quantity

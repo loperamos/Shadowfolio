@@ -52,6 +52,7 @@ def test_update_stores_new_operations(make_repository: RepositoryFactory) -> Non
         wallet.deposit(uuid4(), Decimal("10"), T2)
         .withdraw(uuid4(), Decimal("5"), T2)
         .buy(uuid4(), nvda, T1, settled_amount=Decimal("907.68"), fees=Decimal("2.00"))
+        .sell(uuid4(), nvda, T2, settled_amount=Decimal("950.00"), fees=Decimal("2.00"))
     )
     make_repository().update(updated)
 

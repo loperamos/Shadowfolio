@@ -25,13 +25,14 @@ class DepositRequest(BaseModel):
     timestamp: AwareDatetime | None = None  # defaults to now
 
 
-class BuyRequest(BaseModel):
+class TradeRequest(BaseModel):
     symbol: str
     quantity: Decimal
     price: Decimal
     price_currency: Currency
     timestamp: AwareDatetime
-    # Cash that left the wallet before fees, in the wallet's currency, as the broker reports it.
+    # Cash that left (buy) or entered (sell) the wallet before fees, in the wallet's currency,
+    # as the broker reports it.
     # Required when price_currency differs from the wallet's currency.
     settled_amount: Decimal | None = None
     fees: Decimal = Decimal(0)

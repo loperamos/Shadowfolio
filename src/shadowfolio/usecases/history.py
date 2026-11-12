@@ -55,6 +55,22 @@ class History:
         self._repo.update(updated)
         return updated
 
+    def record_sell(
+        self,
+        wallet_id: UUID,
+        trade: Trade,
+        timestamp: datetime,
+        settled_amount: Decimal | None = None,
+        fees: Decimal = Decimal(0),
+    ) -> Wallet | None:
+        """Record a sell that already happened, with the price the broker reported."""
+        wallet = self._repo.get(wallet_id)
+        if wallet is None:
+            return None
+        updated = wallet.sell(uuid4(), trade, self._at(timestamp), settled_amount, fees)
+        self._repo.update(updated)
+        return updated
+
     def _at(self, timestamp: datetime | None) -> datetime:
         """The operation's time: now if not given; a given time must not be in the future."""
         now = self._clock.now()

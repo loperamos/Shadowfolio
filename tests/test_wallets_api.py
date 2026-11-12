@@ -173,6 +173,59 @@ def test_buy_before_the_cash_arrived_is_rejected(client: TestClient) -> None:
     assert client.get(f"/wallets/{wallet_id}").json()["holdings"] == {}
 
 
+def test_past_sell_reduces_holdings_and_adds_settled_amount(client: TestClient) -> None:
+    wallet_id = create_wallet(client, "0")
+    fund_in_the_past(client, wallet_id, "1000")
+    client.post(f"/wallets/{wallet_id}/buys", json=NVDA_BUY)
+
+    response = client.post(f"/wallets/{wallet_id}/sells", json=nvda_sell("5"))
+    assert response.status_code == 200
+    assert response.json()["cash"] == "688.32"  # 90.32 + 600.00 - 2.00
+    assert response.json()["holdings"] == {"NVDA": "3"}
+
+
+def test_selling_everything_removes_the_holding(client: TestClient) -> None:
+    wallet_id = create_wallet(client, "0")
+    fund_in_the_past(client, wallet_id, "1000")
+    client.post(f"/wallets/{wallet_id}/buys", json=NVDA_BUY)
+
+    response = client.post(f"/wallets/{wallet_id}/sells", json=nvda_sell("8"))
+    assert response.json()["holdings"] == {}
+
+
+@pytest.mark.parametrize(
+    ("quantity", "timestamp"),
+    [
+        ("9", "2024-07-10T14:00:00Z"),  # more than the 8 held
+        ("1", "2024-06-01T14:00:00Z"),  # before the shares were bought
+    ],
+)
+def test_selling_shares_not_held_at_that_time_is_rejected(
+    client: TestClient, quantity: str, timestamp: str
+) -> None:
+    wallet_id = create_wallet(client, "0")
+    fund_in_the_past(client, wallet_id, "1000")
+    client.post(f"/wallets/{wallet_id}/buys", json=NVDA_BUY)
+
+    response = client.post(
+        f"/wallets/{wallet_id}/sells", json={**nvda_sell(quantity), "timestamp": timestamp}
+    )
+    assert response.status_code == 422
+    assert client.get(f"/wallets/{wallet_id}").json()["holdings"] == {"NVDA": "8"}
+
+
+def nvda_sell(quantity: str) -> dict[str, str]:
+    return {
+        "symbol": "NVDA",
+        "quantity": quantity,
+        "price": "130",
+        "price_currency": "USD",
+        "timestamp": "2024-07-10T14:00:00Z",
+        "settled_amount": "600.00",
+        "fees": "2.00",
+    }
+
+
 @pytest.mark.parametrize(
     "change",
     [
@@ -199,9 +252,10 @@ def test_invalid_buy_is_rejected(client: TestClient, change: dict[str, str]) -> 
         ("POST", "/wallets/{id}/deposits"),
         ("POST", "/wallets/{id}/withdrawals"),
         ("POST", "/wallets/{id}/buys"),
+        ("POST", "/wallets/{id}/sells"),
     ],
 )
 def test_unknown_wallet_returns_404(client: TestClient, method: str, path: str) -> None:
-    body = NVDA_BUY if path.endswith("buys") else {"amount": "10"}
+    body = NVDA_BUY if path.endswith(("buys", "sells")) else {"amount": "10"}
     response = client.request(method, path.format(id=uuid4()), json=body)
     assert response.status_code == 404
