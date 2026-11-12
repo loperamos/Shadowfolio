@@ -21,13 +21,13 @@ export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends 
 /**
  * List Wallets
  */
-export const listWallets = <ThrowOnError extends boolean = false>(options?: Options<ListWalletsData, ThrowOnError>): RequestResult<ListWalletsResponses, unknown, ThrowOnError> => (options?.client ?? client).get<ListWalletsResponses, unknown, ThrowOnError>({ url: '/wallets', ...options });
+export const listWallets = <ThrowOnError extends boolean = false>(options?: Options<ListWalletsData, ThrowOnError>): RequestResult<ListWalletsResponses, unknown, ThrowOnError> => (options?.client ?? client).get<ListWalletsResponses, unknown, ThrowOnError>({ url: '/api/wallets', ...options });
 
 /**
  * Create Wallet
  */
 export const createWallet = <ThrowOnError extends boolean = false>(options: Options<CreateWalletData, ThrowOnError>): RequestResult<CreateWalletResponses, CreateWalletErrors, ThrowOnError> => (options.client ?? client).post<CreateWalletResponses, CreateWalletErrors, ThrowOnError>({
-    url: '/wallets',
+    url: '/api/wallets',
     ...options,
     headers: {
         'Content-Type': 'application/json',
@@ -39,7 +39,7 @@ export const createWallet = <ThrowOnError extends boolean = false>(options: Opti
  * Copy Wallet
  */
 export const copyWallet = <ThrowOnError extends boolean = false>(options: Options<CopyWalletData, ThrowOnError>): RequestResult<CopyWalletResponses, CopyWalletErrors, ThrowOnError> => (options.client ?? client).post<CopyWalletResponses, CopyWalletErrors, ThrowOnError>({
-    url: '/wallets/{wallet_id}/copies',
+    url: '/api/wallets/{wallet_id}/copies',
     ...options,
     headers: {
         'Content-Type': 'application/json',
@@ -50,23 +50,23 @@ export const copyWallet = <ThrowOnError extends boolean = false>(options: Option
 /**
  * Delete Wallet
  */
-export const deleteWallet = <ThrowOnError extends boolean = false>(options: Options<DeleteWalletData, ThrowOnError>): RequestResult<DeleteWalletResponses, DeleteWalletErrors, ThrowOnError> => (options.client ?? client).delete<DeleteWalletResponses, DeleteWalletErrors, ThrowOnError>({ url: '/wallets/{wallet_id}', ...options });
+export const deleteWallet = <ThrowOnError extends boolean = false>(options: Options<DeleteWalletData, ThrowOnError>): RequestResult<DeleteWalletResponses, DeleteWalletErrors, ThrowOnError> => (options.client ?? client).delete<DeleteWalletResponses, DeleteWalletErrors, ThrowOnError>({ url: '/api/wallets/{wallet_id}', ...options });
 
 /**
  * Get Wallet
  */
-export const getWallet = <ThrowOnError extends boolean = false>(options: Options<GetWalletData, ThrowOnError>): RequestResult<GetWalletResponses, GetWalletErrors, ThrowOnError> => (options.client ?? client).get<GetWalletResponses, GetWalletErrors, ThrowOnError>({ url: '/wallets/{wallet_id}', ...options });
+export const getWallet = <ThrowOnError extends boolean = false>(options: Options<GetWalletData, ThrowOnError>): RequestResult<GetWalletResponses, GetWalletErrors, ThrowOnError> => (options.client ?? client).get<GetWalletResponses, GetWalletErrors, ThrowOnError>({ url: '/api/wallets/{wallet_id}', ...options });
 
 /**
  * List Operations
  */
-export const listOperations = <ThrowOnError extends boolean = false>(options: Options<ListOperationsData, ThrowOnError>): RequestResult<ListOperationsResponses, ListOperationsErrors, ThrowOnError> => (options.client ?? client).get<ListOperationsResponses, ListOperationsErrors, ThrowOnError>({ url: '/wallets/{wallet_id}/operations', ...options });
+export const listOperations = <ThrowOnError extends boolean = false>(options: Options<ListOperationsData, ThrowOnError>): RequestResult<ListOperationsResponses, ListOperationsErrors, ThrowOnError> => (options.client ?? client).get<ListOperationsResponses, ListOperationsErrors, ThrowOnError>({ url: '/api/wallets/{wallet_id}/operations', ...options });
 
 /**
  * Deposit
  */
 export const deposit = <ThrowOnError extends boolean = false>(options: Options<DepositData, ThrowOnError>): RequestResult<DepositResponses, DepositErrors, ThrowOnError> => (options.client ?? client).post<DepositResponses, DepositErrors, ThrowOnError>({
-    url: '/wallets/{wallet_id}/deposits',
+    url: '/api/wallets/{wallet_id}/deposits',
     ...options,
     headers: {
         'Content-Type': 'application/json',
@@ -78,7 +78,7 @@ export const deposit = <ThrowOnError extends boolean = false>(options: Options<D
  * Withdraw
  */
 export const withdraw = <ThrowOnError extends boolean = false>(options: Options<WithdrawData, ThrowOnError>): RequestResult<WithdrawResponses, WithdrawErrors, ThrowOnError> => (options.client ?? client).post<WithdrawResponses, WithdrawErrors, ThrowOnError>({
-    url: '/wallets/{wallet_id}/withdrawals',
+    url: '/api/wallets/{wallet_id}/withdrawals',
     ...options,
     headers: {
         'Content-Type': 'application/json',
@@ -90,7 +90,7 @@ export const withdraw = <ThrowOnError extends boolean = false>(options: Options<
  * Record Buy
  */
 export const recordBuy = <ThrowOnError extends boolean = false>(options: Options<RecordBuyData, ThrowOnError>): RequestResult<RecordBuyResponses, RecordBuyErrors, ThrowOnError> => (options.client ?? client).post<RecordBuyResponses, RecordBuyErrors, ThrowOnError>({
-    url: '/wallets/{wallet_id}/buys',
+    url: '/api/wallets/{wallet_id}/buys',
     ...options,
     headers: {
         'Content-Type': 'application/json',
@@ -102,7 +102,7 @@ export const recordBuy = <ThrowOnError extends boolean = false>(options: Options
  * Record Sell
  */
 export const recordSell = <ThrowOnError extends boolean = false>(options: Options<RecordSellData, ThrowOnError>): RequestResult<RecordSellResponses, RecordSellErrors, ThrowOnError> => (options.client ?? client).post<RecordSellResponses, RecordSellErrors, ThrowOnError>({
-    url: '/wallets/{wallet_id}/sells',
+    url: '/api/wallets/{wallet_id}/sells',
     ...options,
     headers: {
         'Content-Type': 'application/json',
@@ -113,9 +113,9 @@ export const recordSell = <ThrowOnError extends boolean = false>(options: Option
 /**
  * Current Valuation
  */
-export const currentValuation = <ThrowOnError extends boolean = false>(options: Options<CurrentValuationData, ThrowOnError>): RequestResult<CurrentValuationResponses, CurrentValuationErrors, ThrowOnError> => (options.client ?? client).get<CurrentValuationResponses, CurrentValuationErrors, ThrowOnError>({ url: '/wallets/{wallet_id}/valuation', ...options });
+export const currentValuation = <ThrowOnError extends boolean = false>(options: Options<CurrentValuationData, ThrowOnError>): RequestResult<CurrentValuationResponses, CurrentValuationErrors, ThrowOnError> => (options.client ?? client).get<CurrentValuationResponses, CurrentValuationErrors, ThrowOnError>({ url: '/api/wallets/{wallet_id}/valuation', ...options });
 
 /**
  * Latest Quote
  */
-export const latestQuote = <ThrowOnError extends boolean = false>(options: Options<LatestQuoteData, ThrowOnError>): RequestResult<LatestQuoteResponses, LatestQuoteErrors, ThrowOnError> => (options.client ?? client).get<LatestQuoteResponses, LatestQuoteErrors, ThrowOnError>({ url: '/market/quotes/{symbol}', ...options });
+export const latestQuote = <ThrowOnError extends boolean = false>(options: Options<LatestQuoteData, ThrowOnError>): RequestResult<LatestQuoteResponses, LatestQuoteErrors, ThrowOnError> => (options.client ?? client).get<LatestQuoteResponses, LatestQuoteErrors, ThrowOnError>({ url: '/api/market/quotes/{symbol}', ...options });

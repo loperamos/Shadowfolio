@@ -9,8 +9,8 @@ const PORT_ENV = "SHADOWFOLIO_PORT";
 // Listening on every interface; to reach the backend from this machine, use the loopback address.
 const ALL_INTERFACES = "0.0.0.0";
 const LOOPBACK = "127.0.0.1";
-// Paths served by the backend.
-const API_PATHS = ["/wallets", "/market"];
+// The backend serves its whole API under this prefix (API_PREFIX in the backend's web app).
+const API_PREFIX = "/api";
 
 export default defineConfig(({ command, mode }) => {
   if (command !== "serve") {
@@ -34,7 +34,7 @@ export default defineConfig(({ command, mode }) => {
       // Local development only: the dev server forwards API calls to the backend, so the browser
       // sees a single origin and the backend needs no CORS setup. How the deployed frontend
       // reaches the backend is still open (see SPEC.md, open questions).
-      proxy: Object.fromEntries(API_PATHS.map((path) => [path, backendUrl])),
+      proxy: { [API_PREFIX]: backendUrl },
     },
   };
 });

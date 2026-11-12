@@ -11,12 +11,15 @@ from shadowfolio.usecases.market import Market
 from shadowfolio.usecases.valuation import Valuation
 from shadowfolio.usecases.wallets import Wallets
 
+# Every API route lives under this prefix, so the rest of the URL space belongs to the web frontend.
+API_PREFIX = "/api"
+
 
 def create_app(wallets: Wallets, history: History, valuation: Valuation, market: Market) -> FastAPI:
     # Operation ids are the route functions' names (e.g. list_wallets), so generated clients get readable names.
     app = FastAPI(title="Shadowfolio", generate_unique_id_function=lambda route: route.name)
-    app.include_router(wallets_router(wallets))
-    app.include_router(history_router(history))
-    app.include_router(valuation_router(valuation))
-    app.include_router(market_router(market))
+    app.include_router(wallets_router(wallets), prefix=API_PREFIX)
+    app.include_router(history_router(history), prefix=API_PREFIX)
+    app.include_router(valuation_router(valuation), prefix=API_PREFIX)
+    app.include_router(market_router(market), prefix=API_PREFIX)
     return app

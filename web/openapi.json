@@ -5,7 +5,7 @@
     "version": "0.1.0"
   },
   "paths": {
-    "/wallets": {
+    "/api/wallets": {
       "get": {
         "summary": "List Wallets",
         "operationId": "list_wallets",
@@ -63,7 +63,7 @@
         }
       }
     },
-    "/wallets/{wallet_id}/copies": {
+    "/api/wallets/{wallet_id}/copies": {
       "post": {
         "summary": "Copy Wallet",
         "operationId": "copy_wallet",
@@ -123,7 +123,7 @@
         }
       }
     },
-    "/wallets/{wallet_id}": {
+    "/api/wallets/{wallet_id}": {
       "delete": {
         "summary": "Delete Wallet",
         "operationId": "delete_wallet",
@@ -214,7 +214,7 @@
         }
       }
     },
-    "/wallets/{wallet_id}/operations": {
+    "/api/wallets/{wallet_id}/operations": {
       "get": {
         "summary": "List Operations",
         "operationId": "list_operations",
@@ -268,7 +268,7 @@
         }
       }
     },
-    "/wallets/{wallet_id}/deposits": {
+    "/api/wallets/{wallet_id}/deposits": {
       "post": {
         "summary": "Deposit",
         "operationId": "deposit",
@@ -328,7 +328,7 @@
         }
       }
     },
-    "/wallets/{wallet_id}/withdrawals": {
+    "/api/wallets/{wallet_id}/withdrawals": {
       "post": {
         "summary": "Withdraw",
         "operationId": "withdraw",
@@ -388,7 +388,7 @@
         }
       }
     },
-    "/wallets/{wallet_id}/buys": {
+    "/api/wallets/{wallet_id}/buys": {
       "post": {
         "summary": "Record Buy",
         "operationId": "record_buy",
@@ -448,7 +448,7 @@
         }
       }
     },
-    "/wallets/{wallet_id}/sells": {
+    "/api/wallets/{wallet_id}/sells": {
       "post": {
         "summary": "Record Sell",
         "operationId": "record_sell",
@@ -508,7 +508,7 @@
         }
       }
     },
-    "/wallets/{wallet_id}/valuation": {
+    "/api/wallets/{wallet_id}/valuation": {
       "get": {
         "summary": "Current Valuation",
         "operationId": "current_valuation",
@@ -558,7 +558,7 @@
         }
       }
     },
-    "/market/quotes/{symbol}": {
+    "/api/market/quotes/{symbol}": {
       "get": {
         "summary": "Latest Quote",
         "operationId": "latest_quote",

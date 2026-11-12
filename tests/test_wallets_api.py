@@ -16,7 +16,7 @@ def client() -> TestClient:
 
 
 def create_wallet(client: TestClient, cash: str) -> str:
-    response = client.post("/wallets", json={"name": "Long term", "currency": "EUR", "cash": cash})
+    response = client.post("/api/wallets", json={"name": "Long term", "currency": "EUR", "cash": cash})
     assert response.status_code == 201
     wallet_id: str = response.json()["id"]
     return wallet_id
@@ -25,60 +25,60 @@ def create_wallet(client: TestClient, cash: str) -> str:
 def test_created_wallet_can_be_read_back(client: TestClient) -> None:
     wallet_id = create_wallet(client, "1000.50")
 
-    fetched = client.get(f"/wallets/{wallet_id}")
+    fetched = client.get(f"/api/wallets/{wallet_id}")
     assert fetched.status_code == 200
     assert fetched.json() == {"id": wallet_id, "name": "Long term", "currency": "EUR", "cash": "1000.50", "holdings": {}}
 
 
 def test_wallets_are_listed_in_creation_order(client: TestClient) -> None:
-    assert client.get("/wallets").json() == []
+    assert client.get("/api/wallets").json() == []
     first = create_wallet(client, "10")
     second = create_wallet(client, "20")
 
-    listed = client.get("/wallets").json()
+    listed = client.get("/api/wallets").json()
     assert [(w["id"], w["cash"]) for w in listed] == [(first, "10"), (second, "20")]
 
 
 def test_starting_cash_and_deposits_are_recorded_as_operations(client: TestClient) -> None:
     wallet_id = create_wallet(client, "100")
-    client.post(f"/wallets/{wallet_id}/deposits", json={"amount": "50.25"})
+    client.post(f"/api/wallets/{wallet_id}/deposits", json={"amount": "50.25"})
 
-    operations = client.get(f"/wallets/{wallet_id}/operations").json()
+    operations = client.get(f"/api/wallets/{wallet_id}/operations").json()
     assert [(op["type"], op["timestamp"], op["amount"]) for op in operations] == [
         ("deposit", "2026-03-02T15:00:00Z", "100"),
         ("deposit", "2026-03-02T15:00:00Z", "50.25"),
     ]
-    assert client.get(f"/wallets/{wallet_id}").json()["cash"] == "150.25"
+    assert client.get(f"/api/wallets/{wallet_id}").json()["cash"] == "150.25"
 
 
 def test_wallet_without_starting_cash_has_no_operations(client: TestClient) -> None:
     wallet_id = create_wallet(client, "0")
 
-    assert client.get(f"/wallets/{wallet_id}/operations").json() == []
-    assert client.get(f"/wallets/{wallet_id}").json()["cash"] == "0"
+    assert client.get(f"/api/wallets/{wallet_id}/operations").json() == []
+    assert client.get(f"/api/wallets/{wallet_id}").json()["cash"] == "0"
 
 
 def test_negative_starting_cash_is_rejected(client: TestClient) -> None:
-    response = client.post("/wallets", json={"name": "X", "currency": "EUR", "cash": "-1"})
+    response = client.post("/api/wallets", json={"name": "X", "currency": "EUR", "cash": "-1"})
     assert response.status_code == 422
 
 
 def test_withdrawal_takes_cash_out_and_is_recorded(client: TestClient) -> None:
     wallet_id = create_wallet(client, "100")
 
-    response = client.post(f"/wallets/{wallet_id}/withdrawals", json={"amount": "30.50"})
+    response = client.post(f"/api/wallets/{wallet_id}/withdrawals", json={"amount": "30.50"})
     assert response.status_code == 200
     assert response.json()["cash"] == "69.50"
-    operations = client.get(f"/wallets/{wallet_id}/operations").json()
+    operations = client.get(f"/api/wallets/{wallet_id}/operations").json()
     assert [(op["type"], op["amount"]) for op in operations] == [("deposit", "100"), ("withdrawal", "30.50")]
 
 
 def test_withdrawing_more_than_cash_is_rejected(client: TestClient) -> None:
     wallet_id = create_wallet(client, "100")
 
-    response = client.post(f"/wallets/{wallet_id}/withdrawals", json={"amount": "100.01"})
+    response = client.post(f"/api/wallets/{wallet_id}/withdrawals", json={"amount": "100.01"})
     assert response.status_code == 422
-    assert len(client.get(f"/wallets/{wallet_id}/operations").json()) == 1
+    assert len(client.get(f"/api/wallets/{wallet_id}/operations").json()) == 1
 
 
 @pytest.mark.parametrize("operation", ["deposits", "withdrawals"])
@@ -86,13 +86,13 @@ def test_withdrawing_more_than_cash_is_rejected(client: TestClient) -> None:
 def test_amount_must_be_positive(client: TestClient, operation: str, amount: str) -> None:
     wallet_id = create_wallet(client, "100")
 
-    response = client.post(f"/wallets/{wallet_id}/{operation}", json={"amount": amount})
+    response = client.post(f"/api/wallets/{wallet_id}/{operation}", json={"amount": amount})
     assert response.status_code == 422
-    assert len(client.get(f"/wallets/{wallet_id}/operations").json()) == 1
+    assert len(client.get(f"/api/wallets/{wallet_id}/operations").json()) == 1
 
 
 def fund_in_the_past(client: TestClient, wallet_id: str, amount: str) -> None:
-    response = client.post(f"/wallets/{wallet_id}/deposits", json={"amount": amount, "timestamp": "2024-01-02T09:00:00Z"})
+    response = client.post(f"/api/wallets/{wallet_id}/deposits", json={"amount": amount, "timestamp": "2024-01-02T09:00:00Z"})
     assert response.status_code == 200
 
 
@@ -112,11 +112,11 @@ def test_past_buy_in_foreign_currency_uses_settled_amount_and_fees(client: TestC
     wallet_id = create_wallet(client, "0")
     fund_in_the_past(client, wallet_id, "1000")
 
-    response = client.post(f"/wallets/{wallet_id}/buys", json=NVDA_BUY)
+    response = client.post(f"/api/wallets/{wallet_id}/buys", json=NVDA_BUY)
     assert response.status_code == 200
     assert response.json()["cash"] == "90.32"
     assert response.json()["holdings"] == {"NVDA": "8"}
-    buy = client.get(f"/wallets/{wallet_id}/operations").json()[-1]
+    buy = client.get(f"/api/wallets/{wallet_id}/operations").json()[-1]
     assert {k: buy[k] for k in ("type", "timestamp", "amount", "fees", "price")} == {
         "type": "buy",
         "timestamp": "2024-06-24T14:26:00Z",
@@ -131,7 +131,7 @@ def test_buy_in_wallet_currency_costs_quantity_times_price(client: TestClient) -
     fund_in_the_past(client, wallet_id, "2000")
 
     response = client.post(
-        f"/wallets/{wallet_id}/buys",
+        f"/api/wallets/{wallet_id}/buys",
         json={
             "symbol": "TSLA",
             "quantity": "5",
@@ -148,7 +148,7 @@ def test_foreign_currency_buy_without_settled_amount_is_rejected(client: TestCli
     wallet_id = create_wallet(client, "0")
     fund_in_the_past(client, wallet_id, "1000")
 
-    response = client.post(f"/wallets/{wallet_id}/buys", json={**NVDA_BUY, "settled_amount": None})
+    response = client.post(f"/api/wallets/{wallet_id}/buys", json={**NVDA_BUY, "settled_amount": None})
     assert response.status_code == 422
 
 
@@ -156,17 +156,17 @@ def test_buy_before_the_cash_arrived_is_rejected(client: TestClient) -> None:
     # The wallet has enough cash now, but the starting deposit is dated after the buy.
     wallet_id = create_wallet(client, "5000")
 
-    response = client.post(f"/wallets/{wallet_id}/buys", json=NVDA_BUY)
+    response = client.post(f"/api/wallets/{wallet_id}/buys", json=NVDA_BUY)
     assert response.status_code == 422
-    assert client.get(f"/wallets/{wallet_id}").json()["holdings"] == {}
+    assert client.get(f"/api/wallets/{wallet_id}").json()["holdings"] == {}
 
 
 def test_past_sell_reduces_holdings_and_adds_settled_amount(client: TestClient) -> None:
     wallet_id = create_wallet(client, "0")
     fund_in_the_past(client, wallet_id, "1000")
-    client.post(f"/wallets/{wallet_id}/buys", json=NVDA_BUY)
+    client.post(f"/api/wallets/{wallet_id}/buys", json=NVDA_BUY)
 
-    response = client.post(f"/wallets/{wallet_id}/sells", json=nvda_sell("5"))
+    response = client.post(f"/api/wallets/{wallet_id}/sells", json=nvda_sell("5"))
     assert response.status_code == 200
     assert response.json()["cash"] == "688.32"  # 90.32 + 600.00 - 2.00
     assert response.json()["holdings"] == {"NVDA": "3"}
@@ -175,9 +175,9 @@ def test_past_sell_reduces_holdings_and_adds_settled_amount(client: TestClient) 
 def test_selling_everything_removes_the_holding(client: TestClient) -> None:
     wallet_id = create_wallet(client, "0")
     fund_in_the_past(client, wallet_id, "1000")
-    client.post(f"/wallets/{wallet_id}/buys", json=NVDA_BUY)
+    client.post(f"/api/wallets/{wallet_id}/buys", json=NVDA_BUY)
 
-    response = client.post(f"/wallets/{wallet_id}/sells", json=nvda_sell("8"))
+    response = client.post(f"/api/wallets/{wallet_id}/sells", json=nvda_sell("8"))
     assert response.json()["holdings"] == {}
 
 
@@ -191,11 +191,11 @@ def test_selling_everything_removes_the_holding(client: TestClient) -> None:
 def test_selling_shares_not_held_at_that_time_is_rejected(client: TestClient, quantity: str, timestamp: str) -> None:
     wallet_id = create_wallet(client, "0")
     fund_in_the_past(client, wallet_id, "1000")
-    client.post(f"/wallets/{wallet_id}/buys", json=NVDA_BUY)
+    client.post(f"/api/wallets/{wallet_id}/buys", json=NVDA_BUY)
 
-    response = client.post(f"/wallets/{wallet_id}/sells", json={**nvda_sell(quantity), "timestamp": timestamp})
+    response = client.post(f"/api/wallets/{wallet_id}/sells", json={**nvda_sell(quantity), "timestamp": timestamp})
     assert response.status_code == 422
-    assert client.get(f"/wallets/{wallet_id}").json()["holdings"] == {"NVDA": "8"}
+    assert client.get(f"/api/wallets/{wallet_id}").json()["holdings"] == {"NVDA": "8"}
 
 
 def nvda_sell(quantity: str) -> dict[str, str]:
@@ -224,22 +224,22 @@ def test_invalid_buy_is_rejected(client: TestClient, change: dict[str, str]) -> 
     wallet_id = create_wallet(client, "0")
     fund_in_the_past(client, wallet_id, "1000")
 
-    response = client.post(f"/wallets/{wallet_id}/buys", json={**NVDA_BUY, **change})
+    response = client.post(f"/api/wallets/{wallet_id}/buys", json={**NVDA_BUY, **change})
     assert response.status_code == 422
 
 
 def test_copy_has_the_same_history_under_a_new_id(client: TestClient) -> None:
     wallet_id = create_wallet(client, "0")
     fund_in_the_past(client, wallet_id, "1000")
-    client.post(f"/wallets/{wallet_id}/buys", json=NVDA_BUY)
+    client.post(f"/api/wallets/{wallet_id}/buys", json=NVDA_BUY)
 
-    response = client.post(f"/wallets/{wallet_id}/copies", json={"name": "What if"})
+    response = client.post(f"/api/wallets/{wallet_id}/copies", json={"name": "What if"})
     assert response.status_code == 201
     copy = response.json()
     assert copy["id"] != wallet_id
     assert (copy["name"], copy["currency"], copy["cash"], copy["holdings"]) == ("What if", "EUR", "90.32", {"NVDA": "8"})
-    original_ops = client.get(f"/wallets/{wallet_id}/operations").json()
-    copy_ops = client.get(f"/wallets/{copy['id']}/operations").json()
+    original_ops = client.get(f"/api/wallets/{wallet_id}/operations").json()
+    copy_ops = client.get(f"/api/wallets/{copy['id']}/operations").json()
     assert [(op["type"], op["timestamp"], op["amount"]) for op in copy_ops] == [
         (op["type"], op["timestamp"], op["amount"]) for op in original_ops
     ]
@@ -248,32 +248,32 @@ def test_copy_has_the_same_history_under_a_new_id(client: TestClient) -> None:
 
 def test_copy_changes_independently_of_the_original(client: TestClient) -> None:
     wallet_id = create_wallet(client, "100")
-    copy_id = client.post(f"/wallets/{wallet_id}/copies", json={"name": "Copy"}).json()["id"]
+    copy_id = client.post(f"/api/wallets/{wallet_id}/copies", json={"name": "Copy"}).json()["id"]
 
-    client.post(f"/wallets/{copy_id}/deposits", json={"amount": "50"})
-    assert client.get(f"/wallets/{copy_id}").json()["cash"] == "150"
-    assert client.get(f"/wallets/{wallet_id}").json()["cash"] == "100"
+    client.post(f"/api/wallets/{copy_id}/deposits", json={"amount": "50"})
+    assert client.get(f"/api/wallets/{copy_id}").json()["cash"] == "150"
+    assert client.get(f"/api/wallets/{wallet_id}").json()["cash"] == "100"
 
 
 def test_deleted_wallet_is_gone(client: TestClient) -> None:
     kept, deleted = create_wallet(client, "10"), create_wallet(client, "20")
 
-    assert client.delete(f"/wallets/{deleted}").status_code == 204
-    assert client.get(f"/wallets/{deleted}").status_code == 404
-    assert [w["id"] for w in client.get("/wallets").json()] == [kept]
+    assert client.delete(f"/api/wallets/{deleted}").status_code == 204
+    assert client.get(f"/api/wallets/{deleted}").status_code == 404
+    assert [w["id"] for w in client.get("/api/wallets").json()] == [kept]
 
 
 @pytest.mark.parametrize(
     ("method", "path"),
     [
-        ("GET", "/wallets/{id}"),
-        ("DELETE", "/wallets/{id}"),
-        ("POST", "/wallets/{id}/copies"),
-        ("GET", "/wallets/{id}/operations"),
-        ("POST", "/wallets/{id}/deposits"),
-        ("POST", "/wallets/{id}/withdrawals"),
-        ("POST", "/wallets/{id}/buys"),
-        ("POST", "/wallets/{id}/sells"),
+        ("GET", "/api/wallets/{id}"),
+        ("DELETE", "/api/wallets/{id}"),
+        ("POST", "/api/wallets/{id}/copies"),
+        ("GET", "/api/wallets/{id}/operations"),
+        ("POST", "/api/wallets/{id}/deposits"),
+        ("POST", "/api/wallets/{id}/withdrawals"),
+        ("POST", "/api/wallets/{id}/buys"),
+        ("POST", "/api/wallets/{id}/sells"),
     ],
 )
 def test_unknown_wallet_returns_404(client: TestClient, method: str, path: str) -> None:

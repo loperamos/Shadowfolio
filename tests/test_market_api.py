@@ -13,7 +13,7 @@ def test_latest_quote_for_a_symbol() -> None:
     prices = InMemoryPriceData({"NVDA": Quote(Decimal("135.50"), Currency.USD, datetime(2026, 3, 2, 20, 59, tzinfo=UTC))})
     client = TestClient(build_test_app(prices=prices))
 
-    response = client.get("/market/quotes/NVDA")
+    response = client.get("/api/market/quotes/NVDA")
     assert response.status_code == 200
     assert response.json() == {"symbol": "NVDA", "price": "135.50", "currency": "USD", "as_of": "2026-03-02T20:59:00Z"}
 
@@ -21,6 +21,6 @@ def test_latest_quote_for_a_symbol() -> None:
 def test_symbol_without_price_returns_404() -> None:
     client = TestClient(build_test_app())
 
-    response = client.get("/market/quotes/ZZZZ")
+    response = client.get("/api/market/quotes/ZZZZ")
     assert response.status_code == 404
     assert response.json()["detail"] == "no price for ZZZZ"

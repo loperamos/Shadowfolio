@@ -33,10 +33,10 @@ def client(prices: InMemoryPriceData, fx_rates: InMemoryFxRates) -> TestClient:
 
 def wallet_holding(client: TestClient, *trades: dict[str, str]) -> str:
     """An EUR wallet funded with 3000 EUR in 2024, then the given past buys."""
-    wallet_id: str = client.post("/wallets", json={"name": "W", "currency": "EUR", "cash": "0"}).json()["id"]
-    client.post(f"/wallets/{wallet_id}/deposits", json={"amount": "3000", "timestamp": "2024-01-02T09:00:00Z"})
+    wallet_id: str = client.post("/api/wallets", json={"name": "W", "currency": "EUR", "cash": "0"}).json()["id"]
+    client.post(f"/api/wallets/{wallet_id}/deposits", json={"amount": "3000", "timestamp": "2024-01-02T09:00:00Z"})
     for trade in trades:
-        assert client.post(f"/wallets/{wallet_id}/buys", json=trade).status_code == 200
+        assert client.post(f"/api/wallets/{wallet_id}/buys", json=trade).status_code == 200
     return wallet_id
 
 
@@ -62,7 +62,7 @@ TSLA_BUY = {
 def test_cash_only_wallet_is_worth_its_cash(client: TestClient) -> None:
     wallet_id = wallet_holding(client)
 
-    response = client.get(f"/wallets/{wallet_id}/valuation")
+    response = client.get(f"/api/wallets/{wallet_id}/valuation")
     assert response.status_code == 200
     assert response.json() == {"currency": "EUR", "cash": "3000", "holdings": [], "total": "3000"}
 
@@ -75,7 +75,7 @@ def test_holdings_are_valued_at_latest_prices_and_converted_into_the_wallet_curr
     prices.set("TSLA", Quote(Decimal("310.00"), Currency.EUR, QUOTE_TIME))
     fx_rates.set(FxRate(Currency.USD, Currency.EUR, Decimal("0.9025"), date(2026, 3, 2)))
 
-    valuation = client.get(f"/wallets/{wallet_id}/valuation").json()
+    valuation = client.get(f"/api/wallets/{wallet_id}/valuation").json()
     nvda, tsla = valuation["holdings"]
     assert (nvda["symbol"], nvda["value"], nvda["fx_rate"], nvda["value_in_wallet_currency"]) == (
         "NVDA",
@@ -92,7 +92,7 @@ def test_missing_price_fails_the_valuation(client: TestClient, prices: InMemoryP
     wallet_id = wallet_holding(client, NVDA_BUY, TSLA_BUY)
     prices.set("TSLA", Quote(Decimal("310.00"), Currency.EUR, QUOTE_TIME))
 
-    response = client.get(f"/wallets/{wallet_id}/valuation")
+    response = client.get(f"/api/wallets/{wallet_id}/valuation")
     assert response.status_code == 422
     assert response.json()["detail"] == "no price for NVDA"
 
@@ -101,10 +101,10 @@ def test_missing_exchange_rate_fails_the_valuation(client: TestClient, prices: I
     wallet_id = wallet_holding(client, NVDA_BUY)
     prices.set("NVDA", Quote(Decimal("135.50"), Currency.USD, QUOTE_TIME))
 
-    response = client.get(f"/wallets/{wallet_id}/valuation")
+    response = client.get(f"/api/wallets/{wallet_id}/valuation")
     assert response.status_code == 422
     assert response.json()["detail"] == "no USD→EUR rate"
 
 
 def test_unknown_wallet_valuation_returns_404(client: TestClient) -> None:
-    assert client.get(f"/wallets/{uuid4()}/valuation").status_code == 404
+    assert client.get(f"/api/wallets/{uuid4()}/valuation").status_code == 404

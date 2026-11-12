@@ -288,7 +288,7 @@ export type ListWalletsData = {
     body?: never;
     path?: never;
     query?: never;
-    url: '/wallets';
+    url: '/api/wallets';
 };
 
 export type ListWalletsResponses = {
@@ -306,7 +306,7 @@ export type CreateWalletData = {
     body: CreateWalletRequest;
     path?: never;
     query?: never;
-    url: '/wallets';
+    url: '/api/wallets';
 };
 
 export type CreateWalletErrors = {
@@ -336,7 +336,7 @@ export type CopyWalletData = {
         wallet_id: string;
     };
     query?: never;
-    url: '/wallets/{wallet_id}/copies';
+    url: '/api/wallets/{wallet_id}/copies';
 };
 
 export type CopyWalletErrors = {
@@ -370,7 +370,7 @@ export type DeleteWalletData = {
         wallet_id: string;
     };
     query?: never;
-    url: '/wallets/{wallet_id}';
+    url: '/api/wallets/{wallet_id}';
 };
 
 export type DeleteWalletErrors = {
@@ -404,7 +404,7 @@ export type GetWalletData = {
         wallet_id: string;
     };
     query?: never;
-    url: '/wallets/{wallet_id}';
+    url: '/api/wallets/{wallet_id}';
 };
 
 export type GetWalletErrors = {
@@ -438,7 +438,7 @@ export type ListOperationsData = {
         wallet_id: string;
     };
     query?: never;
-    url: '/wallets/{wallet_id}/operations';
+    url: '/api/wallets/{wallet_id}/operations';
 };
 
 export type ListOperationsErrors = {
@@ -474,7 +474,7 @@ export type DepositData = {
         wallet_id: string;
     };
     query?: never;
-    url: '/wallets/{wallet_id}/deposits';
+    url: '/api/wallets/{wallet_id}/deposits';
 };
 
 export type DepositErrors = {
@@ -508,7 +508,7 @@ export type WithdrawData = {
         wallet_id: string;
     };
     query?: never;
-    url: '/wallets/{wallet_id}/withdrawals';
+    url: '/api/wallets/{wallet_id}/withdrawals';
 };
 
 export type WithdrawErrors = {
@@ -542,7 +542,7 @@ export type RecordBuyData = {
         wallet_id: string;
     };
     query?: never;
-    url: '/wallets/{wallet_id}/buys';
+    url: '/api/wallets/{wallet_id}/buys';
 };
 
 export type RecordBuyErrors = {
@@ -576,7 +576,7 @@ export type RecordSellData = {
         wallet_id: string;
     };
     query?: never;
-    url: '/wallets/{wallet_id}/sells';
+    url: '/api/wallets/{wallet_id}/sells';
 };
 
 export type RecordSellErrors = {
@@ -610,7 +610,7 @@ export type CurrentValuationData = {
         wallet_id: string;
     };
     query?: never;
-    url: '/wallets/{wallet_id}/valuation';
+    url: '/api/wallets/{wallet_id}/valuation';
 };
 
 export type CurrentValuationErrors = {
@@ -644,7 +644,7 @@ export type LatestQuoteData = {
         symbol: string;
     };
     query?: never;
-    url: '/market/quotes/{symbol}';
+    url: '/api/market/quotes/{symbol}';
 };
 
 export type LatestQuoteErrors = {
