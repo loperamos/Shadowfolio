@@ -13,7 +13,8 @@ from shadowfolio.usecases.wallets import Wallets
 
 
 def create_app(wallets: Wallets, history: History, valuation: Valuation, market: Market) -> FastAPI:
-    app = FastAPI(title="Shadowfolio")
+    # Operation ids are the route functions' names (e.g. list_wallets), so generated clients get readable names.
+    app = FastAPI(title="Shadowfolio", generate_unique_id_function=lambda route: route.name)
     app.include_router(wallets_router(wallets))
     app.include_router(history_router(history))
     app.include_router(valuation_router(valuation))

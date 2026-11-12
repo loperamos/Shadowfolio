@@ -31,3 +31,17 @@ uv run shadowfolio
 ```
 
 After changing dependencies, run `uv lock` and commit `uv.lock`; CI installs with `uv sync --locked`.
+
+## Frontend
+
+The web app lives in `web/` (Vite, React, TypeScript). It needs Node 24 LTS; with [nvm](https://github.com/nvm-sh/nvm), run `nvm use` inside `web/`.
+
+```bash
+cd web
+npm install
+npm run dev        # http://localhost:5173, with the backend running (uv run shadowfolio)
+npm run generate   # after backend API changes: export the OpenAPI schema and regenerate src/api/generated
+npm run build      # type-check and build
+```
+
+The API client in `web/src/api/generated` is generated from the backend's OpenAPI schema; never edit it by hand. In development the Vite dev server proxies API calls to the backend, so no CORS setup is needed.

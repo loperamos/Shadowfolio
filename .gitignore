@@ -18,3 +18,7 @@ __pycache__/
 # Local data
 /data/
 *.db
+
+# Frontend
+node_modules/
+/web/dist/
