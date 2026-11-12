@@ -1,8 +1,9 @@
-import { ActionIcon, Alert, Checkbox, Loader, Menu, Table, Text } from "@mantine/core";
-import { IconCopy, IconDots, IconTrash } from "@tabler/icons-react";
+import { Alert, Anchor, Checkbox, Loader, Table, Text } from "@mantine/core";
+import { Link } from "react-router";
 
 import type { WalletResponse } from "../api/generated";
-import { ICON_SIZE } from "../ui/theme";
+import { walletPath } from "../routes";
+import { WalletActionsMenu } from "./WalletActionsMenu";
 
 type Props = {
   wallets: WalletResponse[] | null;
@@ -61,7 +62,11 @@ export function WalletTable({ wallets, error, selectedIds, onSelectionChange, on
             <Table.Td>
               <Checkbox aria-label={`Select ${wallet.name}`} checked={selectedIds.has(wallet.id)} onChange={() => toggle(wallet.id)} />
             </Table.Td>
-            <Table.Td>{wallet.name}</Table.Td>
+            <Table.Td>
+              <Anchor component={Link} to={walletPath(wallet.id)}>
+                {wallet.name}
+              </Anchor>
+            </Table.Td>
             <Table.Td ta="right">
               {wallet.cash} {wallet.currency}
             </Table.Td>
@@ -71,21 +76,7 @@ export function WalletTable({ wallets, error, selectedIds, onSelectionChange, on
                 .join(", ") || <Text c="dimmed">None</Text>}
             </Table.Td>
             <Table.Td>
-              <Menu position="bottom-end">
-                <Menu.Target>
-                  <ActionIcon variant="subtle" color="gray" aria-label={`Actions for ${wallet.name}`}>
-                    <IconDots size={ICON_SIZE} />
-                  </ActionIcon>
-                </Menu.Target>
-                <Menu.Dropdown>
-                  <Menu.Item leftSection={<IconCopy size={ICON_SIZE} />} onClick={() => onDuplicate(wallet)}>
-                    Duplicate
-                  </Menu.Item>
-                  <Menu.Item color="red" leftSection={<IconTrash size={ICON_SIZE} />} onClick={() => onDelete([wallet])}>
-                    Delete
-                  </Menu.Item>
-                </Menu.Dropdown>
-              </Menu>
+              <WalletActionsMenu wallet={wallet} onDuplicate={onDuplicate} onDelete={onDelete} />
             </Table.Td>
           </Table.Tr>
         ))}

@@ -7,7 +7,7 @@ import { deleteWallet, type WalletResponse } from "../api/generated";
 type Props = {
   wallets: WalletResponse[]; // the wallets to delete; empty when closed
   onClose: () => void;
-  onDeleted: () => void;
+  onDeleted: (allDeleted: boolean) => void; // called after every attempt, so lists can refresh
 };
 
 export function DeleteWalletsModal({ wallets, onClose, onDeleted }: Props) {
@@ -22,6 +22,7 @@ export function DeleteWalletsModal({ wallets, onClose, onDeleted }: Props) {
   async function confirm() {
     setDeleting(true);
     setError(null);
+    let allDeleted = false;
     try {
       for (const wallet of wallets) {
         const { error } = await deleteWallet({ path: { wallet_id: wallet.id } });
@@ -30,13 +31,14 @@ export function DeleteWalletsModal({ wallets, onClose, onDeleted }: Props) {
           return;
         }
       }
+      allDeleted = true;
       close();
     } catch {
       setError("Could not reach the backend.");
     } finally {
       setDeleting(false);
-      // Some wallets may be gone even if a later one failed, so always refresh.
-      onDeleted();
+      // Some wallets may be gone even if a later one failed, so always report back.
+      onDeleted(allDeleted);
     }
   }
 

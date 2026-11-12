@@ -7,7 +7,7 @@ import { copyWallet, type WalletResponse } from "../api/generated";
 type Props = {
   wallet: WalletResponse | null; // the wallet to duplicate; null when closed
   onClose: () => void;
-  onDuplicated: () => void;
+  onDuplicated: (copy: WalletResponse) => void;
 };
 
 export function DuplicateWalletModal({ wallet, onClose, onDuplicated }: Props) {
@@ -19,7 +19,7 @@ export function DuplicateWalletModal({ wallet, onClose, onDuplicated }: Props) {
   );
 }
 
-function DuplicateForm({ wallet, onClose, onDuplicated }: { wallet: WalletResponse; onClose: () => void; onDuplicated: () => void }) {
+function DuplicateForm({ wallet, onClose, onDuplicated }: { wallet: WalletResponse; onClose: () => void; onDuplicated: (copy: WalletResponse) => void }) {
   const [name, setName] = useState(`Copy of ${wallet.name}`);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -32,7 +32,7 @@ function DuplicateForm({ wallet, onClose, onDuplicated }: { wallet: WalletRespon
       const { data, error } = await copyWallet({ path: { wallet_id: wallet.id }, body: { name } });
       if (data) {
         onClose();
-        onDuplicated();
+        onDuplicated(data);
       } else {
         setError(apiErrorMessage(error));
       }
