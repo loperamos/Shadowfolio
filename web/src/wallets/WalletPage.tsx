@@ -1,4 +1,4 @@
-import { Alert, Anchor, Breadcrumbs, Group, Loader, Stack, Table, Text, Title } from "@mantine/core";
+import { Alert, Anchor, Breadcrumbs, Group, Loader, Stack, Table, Text, Title, Tooltip } from "@mantine/core";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 
@@ -6,12 +6,16 @@ import { apiErrorMessage } from "../api/errors";
 import { getWallet, listOperations, type OperationResponse, renameWallet, type WalletResponse } from "../api/generated";
 import { walletPath, WALLETS_PATH } from "../routes";
 import { EditableTitle } from "../ui/EditableTitle";
+import { formatDate, formatDateTime, shortDecimal } from "../ui/format";
 import { DeleteWalletsModal } from "./DeleteWalletsModal";
 import { DuplicateWalletModal } from "./DuplicateWalletModal";
+import { type ValuationState, useWalletValuation } from "./useWalletValuation";
 import { WalletActionsMenu } from "./WalletActionsMenu";
+import { WalletValue } from "./WalletValue";
 
 const NOT_FOUND_STATUS = 404;
-const DATE_FORMAT = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" });
+// Exchange rates are shown to this many decimals in tooltips; the valuation uses the exact rate.
+const RATE_DECIMALS = 4;
 
 type Loaded = { wallet: WalletResponse; operations: OperationResponse[] };
 type State = { status: "loading" } | { status: "not-found" } | { status: "error"; message: string } | ({ status: "loaded" } & Loaded);
@@ -99,16 +103,30 @@ export function WalletPage() {
 
 function WalletDetails({ wallet, operations }: Loaded) {
   const holdings = Object.entries(wallet.holdings);
+  const valuation = useWalletValuation(wallet.id);
   return (
     <Stack gap="xl">
-      <div>
-        <Text c="dimmed" size="sm">
-          Cash
-        </Text>
-        <Text size="xl" fw={600}>
-          {wallet.cash} {wallet.currency}
-        </Text>
-      </div>
+      <Group gap="xl">
+        <div>
+          <Text c="dimmed" size="sm">
+            Cash
+          </Text>
+          <Text size="xl" fw={600}>
+            {wallet.cash} {wallet.currency}
+          </Text>
+        </div>
+        <div>
+          <Text c="dimmed" size="sm">
+            Value
+          </Text>
+          <WalletValue state={valuation} size="xl" fw={600} />
+        </div>
+      </Group>
+      {valuation.status === "error" && (
+        <Alert color="yellow" title="Value unavailable">
+          {valuation.message}
+        </Alert>
+      )}
 
       <div>
         <Title order={2} mb="sm">
@@ -122,6 +140,8 @@ function WalletDetails({ wallet, operations }: Loaded) {
               <Table.Tr>
                 <Table.Th>Symbol</Table.Th>
                 <Table.Th ta="right">Shares</Table.Th>
+                <Table.Th ta="right">Price</Table.Th>
+                <Table.Th ta="right">Value</Table.Th>
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
@@ -129,6 +149,7 @@ function WalletDetails({ wallet, operations }: Loaded) {
                 <Table.Tr key={symbol}>
                   <Table.Td>{symbol}</Table.Td>
                   <Table.Td ta="right">{quantity}</Table.Td>
+                  <HoldingPriceAndValue symbol={symbol} valuation={valuation} />
                 </Table.Tr>
               ))}
             </Table.Tbody>
@@ -159,7 +180,7 @@ function WalletDetails({ wallet, operations }: Loaded) {
               {/* Newest first, as in a statement. */}
               {[...operations].reverse().map((op) => (
                 <Table.Tr key={op.id}>
-                  <Table.Td>{DATE_FORMAT.format(new Date(op.timestamp))}</Table.Td>
+                  <Table.Td>{formatDateTime(op.timestamp)}</Table.Td>
                   <Table.Td tt="capitalize">{op.type}</Table.Td>
                   <Table.Td>{op.symbol ?? ""}</Table.Td>
                   <Table.Td ta="right">{op.quantity ?? ""}</Table.Td>
@@ -175,5 +196,37 @@ function WalletDetails({ wallet, operations }: Loaded) {
         )}
       </div>
     </Stack>
+  );
+}
+
+/** The holding's latest price and its value in the wallet's currency, once the valuation has loaded. */
+function HoldingPriceAndValue({ symbol, valuation }: { symbol: string; valuation: ValuationState }) {
+  const loaded = valuation.status === "loaded" ? valuation.valuation : null;
+  const holding = loaded?.holdings.find((h) => h.symbol === symbol);
+  if (!loaded || !holding) {
+    return (
+      <>
+        <Table.Td ta="right">{valuation.status === "loading" ? <Loader size="xs" /> : "—"}</Table.Td>
+        <Table.Td ta="right">—</Table.Td>
+      </>
+    );
+  }
+  const fx = holding.fx_rate;
+  const priceNote = [`As of ${formatDateTime(holding.as_of)}`, fx && `1 ${holding.currency} ≈ ${shortDecimal(fx.rate, RATE_DECIMALS)} ${loaded.currency} (${formatDate(fx.as_of)})`]
+    .filter(Boolean)
+    .join(" · ");
+  return (
+    <>
+      <Table.Td ta="right">
+        <Tooltip label={priceNote}>
+          <Text span>
+            {holding.price} {holding.currency}
+          </Text>
+        </Tooltip>
+      </Table.Td>
+      <Table.Td ta="right">
+        {holding.value_in_wallet_currency} {loaded.currency}
+      </Table.Td>
+    </>
   );
 }
