@@ -59,11 +59,33 @@ def test_negative_starting_cash_is_rejected(client: TestClient) -> None:
     assert response.status_code == 422
 
 
-@pytest.mark.parametrize("amount", ["0", "-1"])
-def test_deposit_must_be_positive(client: TestClient, amount: str) -> None:
+def test_withdrawal_takes_cash_out_and_is_recorded(client: TestClient) -> None:
     wallet_id = create_wallet(client, "100")
 
-    response = client.post(f"/wallets/{wallet_id}/deposits", json={"amount": amount})
+    response = client.post(f"/wallets/{wallet_id}/withdrawals", json={"amount": "30.50"})
+    assert response.status_code == 200
+    assert response.json()["cash"] == "69.50"
+    operations = client.get(f"/wallets/{wallet_id}/operations").json()
+    assert [(op["type"], op["amount"]) for op in operations] == [
+        ("deposit", "100"),
+        ("withdrawal", "30.50"),
+    ]
+
+
+def test_withdrawing_more_than_cash_is_rejected(client: TestClient) -> None:
+    wallet_id = create_wallet(client, "100")
+
+    response = client.post(f"/wallets/{wallet_id}/withdrawals", json={"amount": "100.01"})
+    assert response.status_code == 422
+    assert len(client.get(f"/wallets/{wallet_id}/operations").json()) == 1
+
+
+@pytest.mark.parametrize("operation", ["deposits", "withdrawals"])
+@pytest.mark.parametrize("amount", ["0", "-1"])
+def test_amount_must_be_positive(client: TestClient, operation: str, amount: str) -> None:
+    wallet_id = create_wallet(client, "100")
+
+    response = client.post(f"/wallets/{wallet_id}/{operation}", json={"amount": amount})
     assert response.status_code == 422
     assert len(client.get(f"/wallets/{wallet_id}/operations").json()) == 1
 
@@ -74,6 +96,7 @@ def test_deposit_must_be_positive(client: TestClient, amount: str) -> None:
         ("GET", "/wallets/{id}"),
         ("GET", "/wallets/{id}/operations"),
         ("POST", "/wallets/{id}/deposits"),
+        ("POST", "/wallets/{id}/withdrawals"),
     ],
 )
 def test_unknown_wallet_returns_404(client: TestClient, method: str, path: str) -> None:

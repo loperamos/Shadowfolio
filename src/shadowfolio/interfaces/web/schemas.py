@@ -15,7 +15,7 @@ class CreateWalletRequest(BaseModel):
     cash: Decimal
 
 
-class DepositRequest(BaseModel):
+class AmountRequest(BaseModel):
     amount: Decimal
 
 

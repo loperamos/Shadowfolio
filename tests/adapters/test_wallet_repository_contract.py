@@ -44,7 +44,7 @@ def test_added_wallet_can_be_read_back(make_repository: RepositoryFactory) -> No
 def test_update_stores_new_operations(make_repository: RepositoryFactory) -> None:
     wallet = a_wallet()
     make_repository().add(wallet)
-    updated = wallet.deposit(uuid4(), Decimal("10"), T2)
+    updated = wallet.deposit(uuid4(), Decimal("10"), T2).withdraw(uuid4(), Decimal("5"), T2)
     make_repository().update(updated)
 
     assert make_repository().get(wallet.id) == updated

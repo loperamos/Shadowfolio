@@ -4,10 +4,10 @@ from uuid import UUID
 
 from fastapi import FastAPI, HTTPException
 
-from shadowfolio.domain.wallet import InvalidAmountError
+from shadowfolio.domain.wallet import DomainError
 from shadowfolio.interfaces.web.schemas import (
+    AmountRequest,
     CreateWalletRequest,
-    DepositRequest,
     OperationResponse,
     WalletResponse,
 )
@@ -24,8 +24,8 @@ def create_app(wallets: Wallets) -> FastAPI:
     def create_wallet(request: CreateWalletRequest) -> WalletResponse:
         try:
             wallet = wallets.create(LOCAL_OWNER, request.name, request.currency, request.cash)
-        except InvalidAmountError as error:
-            raise _invalid_amount(error) from error
+        except DomainError as error:
+            raise _rule_violation(error) from error
         return WalletResponse.from_wallet(wallet)
 
     @app.get("/wallets/{wallet_id}")
@@ -43,11 +43,21 @@ def create_app(wallets: Wallets) -> FastAPI:
         return [OperationResponse.from_operation(op) for op in wallet.operations]
 
     @app.post("/wallets/{wallet_id}/deposits")
-    def deposit(wallet_id: UUID, request: DepositRequest) -> WalletResponse:
+    def deposit(wallet_id: UUID, request: AmountRequest) -> WalletResponse:
         try:
             wallet = wallets.deposit(wallet_id, request.amount)
-        except InvalidAmountError as error:
-            raise _invalid_amount(error) from error
+        except DomainError as error:
+            raise _rule_violation(error) from error
+        if wallet is None:
+            raise _wallet_not_found()
+        return WalletResponse.from_wallet(wallet)
+
+    @app.post("/wallets/{wallet_id}/withdrawals")
+    def withdraw(wallet_id: UUID, request: AmountRequest) -> WalletResponse:
+        try:
+            wallet = wallets.withdraw(wallet_id, request.amount)
+        except DomainError as error:
+            raise _rule_violation(error) from error
         if wallet is None:
             raise _wallet_not_found()
         return WalletResponse.from_wallet(wallet)
@@ -59,5 +69,5 @@ def _wallet_not_found() -> HTTPException:
     return HTTPException(status_code=404, detail="wallet not found")
 
 
-def _invalid_amount(error: InvalidAmountError) -> HTTPException:
+def _rule_violation(error: DomainError) -> HTTPException:
     return HTTPException(status_code=422, detail=str(error))

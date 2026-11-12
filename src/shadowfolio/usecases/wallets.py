@@ -32,3 +32,12 @@ class Wallets:
         updated = wallet.deposit(uuid4(), amount, self._clock.now())
         self._repo.update(updated)
         return updated
+
+    def withdraw(self, wallet_id: UUID, amount: Decimal) -> Wallet | None:
+        """Take cash out of a wallet. Returns None if the wallet does not exist."""
+        wallet = self._repo.get(wallet_id)
+        if wallet is None:
+            return None
+        updated = wallet.withdraw(uuid4(), amount, self._clock.now())
+        self._repo.update(updated)
+        return updated
