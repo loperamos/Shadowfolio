@@ -14,7 +14,7 @@ shadowfolio = "shadowfolio.main:main"
 
 [dependency-groups]
 dev = [
-    "httpx",
+    "httpx2",
     "mypy",
     "pytest",
     "ruff",
