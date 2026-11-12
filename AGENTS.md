@@ -33,6 +33,12 @@ What to build is in [SPEC.md](SPEC.md). This file is about *how* to work here. K
 - The UI looks the same everywhere. Every element comes from Mantine or from shared wrappers in `web/src/ui/`; pages compose components and do not style elements themselves.
 - Colours, spacing, typography and radii come from the theme in `web/src/ui/theme.ts`; no hard-coded values in components.
 - A new kind of element is added to the shared set first, then used.
+- UI changes follow established UX practice: check how common products and design systems solve the same problem before proposing a design, and say which pattern you chose and why. In particular:
+  - every view handles loading, empty and error states, and a slow or failing part never blocks the rest of the page;
+  - destructive actions ask for confirmation and say what will be lost;
+  - navigation uses real links, so URLs can be opened, bookmarked and shared;
+  - actions that do not apply stay visible but disabled, with the reason;
+  - controls are usable by keyboard and screen readers (labels, focus, Enter and Esc).
 - API calls go through the generated client in `web/src/api/generated`; run `npm run generate` after backend API changes and never edit it by hand.
 
 ## Tests
