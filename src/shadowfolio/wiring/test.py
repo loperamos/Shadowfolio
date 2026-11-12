@@ -18,7 +18,4 @@ def build_test_app(clock: Clock | None = None) -> FastAPI:
     """Pass a clock to control "now"; otherwise it is fixed at DEFAULT_NOW."""
     clock = clock or FixedClock(DEFAULT_NOW)
     wallet_repository = InMemoryWalletRepository()
-    return create_app(
-        wallets=Wallets(wallet_repository, clock),
-        history=History(wallet_repository, clock),
-    )
+    return create_app(wallets=Wallets(wallet_repository, clock), history=History(wallet_repository, clock))

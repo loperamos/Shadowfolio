@@ -59,9 +59,7 @@ def test_update_stores_new_operations(make_repository: RepositoryFactory) -> Non
     assert make_repository().get(wallet.id) == updated
 
 
-def test_list_by_owner_returns_only_their_wallets_in_order(
-    make_repository: RepositoryFactory,
-) -> None:
+def test_list_by_owner_returns_only_their_wallets_in_order(make_repository: RepositoryFactory) -> None:
     first, second, other = a_wallet(), a_wallet(), replace(a_wallet(), owner_id="owner-2")
     for wallet in (first, other, second):
         make_repository().add(wallet)

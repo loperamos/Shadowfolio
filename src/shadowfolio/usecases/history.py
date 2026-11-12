@@ -19,9 +19,7 @@ class History:
         self._repo = repo
         self._clock = clock
 
-    def deposit(
-        self, wallet_id: UUID, amount: Decimal, timestamp: datetime | None = None
-    ) -> Wallet | None:
+    def deposit(self, wallet_id: UUID, amount: Decimal, timestamp: datetime | None = None) -> Wallet | None:
         """Add cash to a wallet, now or at a past timestamp."""
         wallet = self._repo.get(wallet_id)
         if wallet is None:
@@ -40,12 +38,7 @@ class History:
         return updated
 
     def record_buy(
-        self,
-        wallet_id: UUID,
-        trade: Trade,
-        timestamp: datetime,
-        settled_amount: Decimal | None = None,
-        fees: Decimal = Decimal(0),
+        self, wallet_id: UUID, trade: Trade, timestamp: datetime, settled_amount: Decimal | None = None, fees: Decimal = Decimal(0)
     ) -> Wallet | None:
         """Record a buy that already happened, with the price the broker reported."""
         wallet = self._repo.get(wallet_id)
@@ -56,12 +49,7 @@ class History:
         return updated
 
     def record_sell(
-        self,
-        wallet_id: UUID,
-        trade: Trade,
-        timestamp: datetime,
-        settled_amount: Decimal | None = None,
-        fees: Decimal = Decimal(0),
+        self, wallet_id: UUID, trade: Trade, timestamp: datetime, settled_amount: Decimal | None = None, fees: Decimal = Decimal(0)
     ) -> Wallet | None:
         """Record a sell that already happened, with the price the broker reported."""
         wallet = self._repo.get(wallet_id)

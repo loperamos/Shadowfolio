@@ -6,11 +6,7 @@ from fastapi import APIRouter
 
 from shadowfolio.domain.errors import DomainError
 from shadowfolio.interfaces.web.errors import rule_violation, wallet_not_found
-from shadowfolio.interfaces.web.schemas import (
-    CreateWalletRequest,
-    OperationResponse,
-    WalletResponse,
-)
+from shadowfolio.interfaces.web.schemas import CreateWalletRequest, OperationResponse, WalletResponse
 from shadowfolio.usecases.wallets import Wallets
 
 # Until accounts exist, every wallet belongs to this owner.

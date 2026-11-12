@@ -6,15 +6,7 @@ from uuid import UUID
 from pydantic import AwareDatetime, BaseModel
 
 from shadowfolio.domain.money import Currency
-from shadowfolio.domain.operations import (
-    Buy,
-    Deposit,
-    Operation,
-    OperationType,
-    Sell,
-    Trade,
-    Withdrawal,
-)
+from shadowfolio.domain.operations import Buy, Deposit, Operation, OperationType, Sell, Trade, Withdrawal
 from shadowfolio.domain.wallet import Wallet
 
 
@@ -58,13 +50,7 @@ class WalletResponse(BaseModel):
 
     @classmethod
     def from_wallet(cls, wallet: Wallet) -> "WalletResponse":
-        return cls(
-            id=wallet.id,
-            name=wallet.name,
-            currency=wallet.currency,
-            cash=wallet.cash,
-            holdings=wallet.holdings,
-        )
+        return cls(id=wallet.id, name=wallet.name, currency=wallet.currency, cash=wallet.cash, holdings=wallet.holdings)
 
 
 class OperationResponse(BaseModel):
@@ -82,13 +68,7 @@ class OperationResponse(BaseModel):
     def from_operation(cls, operation: Operation) -> "OperationResponse":
         match operation:
             case Deposit() | Withdrawal():
-                return cls(
-                    id=operation.id,
-                    type=operation.type,
-                    timestamp=operation.timestamp,
-                    amount=operation.amount,
-                    fees=Decimal(0),
-                )
+                return cls(id=operation.id, type=operation.type, timestamp=operation.timestamp, amount=operation.amount, fees=Decimal(0))
             case Buy() | Sell():
                 trade = operation.trade
                 return cls(

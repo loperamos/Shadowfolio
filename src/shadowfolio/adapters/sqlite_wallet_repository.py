@@ -8,15 +8,7 @@ from pathlib import Path
 from uuid import UUID
 
 from shadowfolio.domain.money import Currency
-from shadowfolio.domain.operations import (
-    Buy,
-    Deposit,
-    Operation,
-    OperationType,
-    Sell,
-    Trade,
-    Withdrawal,
-)
+from shadowfolio.domain.operations import Buy, Deposit, Operation, OperationType, Sell, Trade, Withdrawal
 from shadowfolio.domain.wallet import Wallet
 from shadowfolio.ports.wallet_repository import WalletRepository
 
@@ -67,10 +59,7 @@ class SqliteWalletRepository(WalletRepository):
 
     def get(self, wallet_id: UUID) -> Wallet | None:
         with closing(self._connect()) as conn:
-            row = conn.execute(
-                "SELECT id, owner_id, name, currency FROM wallets WHERE id = ?",
-                (str(wallet_id),),
-            ).fetchone()
+            row = conn.execute("SELECT id, owner_id, name, currency FROM wallets WHERE id = ?", (str(wallet_id),)).fetchone()
             if row is None:
                 return None
             operation_rows = conn.execute(
@@ -88,9 +77,7 @@ class SqliteWalletRepository(WalletRepository):
 
     def list_by_owner(self, owner_id: str) -> list[Wallet]:
         with closing(self._connect()) as conn:
-            rows = conn.execute(
-                "SELECT id FROM wallets WHERE owner_id = ? ORDER BY rowid", (owner_id,)
-            ).fetchall()
+            rows = conn.execute("SELECT id FROM wallets WHERE owner_id = ? ORDER BY rowid", (owner_id,)).fetchall()
         wallets = [self.get(UUID(row[0])) for row in rows]
         return [wallet for wallet in wallets if wallet is not None]
 

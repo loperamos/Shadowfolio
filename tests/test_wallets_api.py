@@ -27,13 +27,7 @@ def test_created_wallet_can_be_read_back(client: TestClient) -> None:
 
     fetched = client.get(f"/wallets/{wallet_id}")
     assert fetched.status_code == 200
-    assert fetched.json() == {
-        "id": wallet_id,
-        "name": "Long term",
-        "currency": "EUR",
-        "cash": "1000.50",
-        "holdings": {},
-    }
+    assert fetched.json() == {"id": wallet_id, "name": "Long term", "currency": "EUR", "cash": "1000.50", "holdings": {}}
 
 
 def test_wallets_are_listed_in_creation_order(client: TestClient) -> None:
@@ -76,10 +70,7 @@ def test_withdrawal_takes_cash_out_and_is_recorded(client: TestClient) -> None:
     assert response.status_code == 200
     assert response.json()["cash"] == "69.50"
     operations = client.get(f"/wallets/{wallet_id}/operations").json()
-    assert [(op["type"], op["amount"]) for op in operations] == [
-        ("deposit", "100"),
-        ("withdrawal", "30.50"),
-    ]
+    assert [(op["type"], op["amount"]) for op in operations] == [("deposit", "100"), ("withdrawal", "30.50")]
 
 
 def test_withdrawing_more_than_cash_is_rejected(client: TestClient) -> None:
@@ -101,10 +92,7 @@ def test_amount_must_be_positive(client: TestClient, operation: str, amount: str
 
 
 def fund_in_the_past(client: TestClient, wallet_id: str, amount: str) -> None:
-    response = client.post(
-        f"/wallets/{wallet_id}/deposits",
-        json={"amount": amount, "timestamp": "2024-01-02T09:00:00Z"},
-    )
+    response = client.post(f"/wallets/{wallet_id}/deposits", json={"amount": amount, "timestamp": "2024-01-02T09:00:00Z"})
     assert response.status_code == 200
 
 
@@ -200,16 +188,12 @@ def test_selling_everything_removes_the_holding(client: TestClient) -> None:
         ("1", "2024-06-01T14:00:00Z"),  # before the shares were bought
     ],
 )
-def test_selling_shares_not_held_at_that_time_is_rejected(
-    client: TestClient, quantity: str, timestamp: str
-) -> None:
+def test_selling_shares_not_held_at_that_time_is_rejected(client: TestClient, quantity: str, timestamp: str) -> None:
     wallet_id = create_wallet(client, "0")
     fund_in_the_past(client, wallet_id, "1000")
     client.post(f"/wallets/{wallet_id}/buys", json=NVDA_BUY)
 
-    response = client.post(
-        f"/wallets/{wallet_id}/sells", json={**nvda_sell(quantity), "timestamp": timestamp}
-    )
+    response = client.post(f"/wallets/{wallet_id}/sells", json={**nvda_sell(quantity), "timestamp": timestamp})
     assert response.status_code == 422
     assert client.get(f"/wallets/{wallet_id}").json()["holdings"] == {"NVDA": "8"}
 

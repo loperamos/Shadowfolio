@@ -16,19 +16,7 @@ FORBIDDEN_LAYERS = {
 }
 
 # Modules the pure domain must not import (I/O, network, environment).
-DOMAIN_FORBIDDEN_MODULES = {
-    "http",
-    "httpx",
-    "io",
-    "os",
-    "pathlib",
-    "requests",
-    "shutil",
-    "socket",
-    "sqlite3",
-    "subprocess",
-    "urllib",
-}
+DOMAIN_FORBIDDEN_MODULES = {"http", "httpx", "io", "os", "pathlib", "requests", "shutil", "socket", "sqlite3", "subprocess", "urllib"}
 
 
 def _imports(path: Path) -> set[str]:
@@ -51,14 +39,10 @@ def test_layer_does_not_import_outer_layers(layer: str) -> None:
     forbidden = {f"{PACKAGE}.{name}" for name in FORBIDDEN_LAYERS[layer]}
     for path in _files(layer):
         for name in _imports(path):
-            assert not any(name == f or name.startswith(f + ".") for f in forbidden), (
-                f"{path.relative_to(SRC)} imports {name}"
-            )
+            assert not any(name == f or name.startswith(f + ".") for f in forbidden), f"{path.relative_to(SRC)} imports {name}"
 
 
 def test_domain_does_no_io() -> None:
     for path in _files("domain"):
         for name in _imports(path):
-            assert name.split(".")[0] not in DOMAIN_FORBIDDEN_MODULES, (
-                f"{path.relative_to(SRC)} imports {name}"
-            )
+            assert name.split(".")[0] not in DOMAIN_FORBIDDEN_MODULES, f"{path.relative_to(SRC)} imports {name}"
