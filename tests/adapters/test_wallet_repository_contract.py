@@ -42,5 +42,14 @@ def test_added_wallet_can_be_read_back(make_repository: RepositoryFactory) -> No
     assert make_repository().get(wallet.id) == wallet
 
 
+def test_updated_wallet_replaces_the_stored_one(make_repository: RepositoryFactory) -> None:
+    wallet = a_wallet()
+    make_repository().add(wallet)
+    updated = wallet.deposit(Decimal("10"))
+    make_repository().update(updated)
+
+    assert make_repository().get(wallet.id) == updated
+
+
 def test_unknown_wallet_is_none(make_repository: RepositoryFactory) -> None:
     assert make_repository().get(uuid4()) is None

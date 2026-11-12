@@ -13,5 +13,8 @@ class InMemoryWalletRepository(WalletRepository):
     def add(self, wallet: Wallet) -> None:
         self._wallets[wallet.id] = wallet
 
+    def update(self, wallet: Wallet) -> None:
+        self._wallets[wallet.id] = wallet
+
     def get(self, wallet_id: UUID) -> Wallet | None:
         return self._wallets.get(wallet_id)

@@ -14,6 +14,10 @@ class CreateWalletRequest(BaseModel):
     cash: Decimal
 
 
+class DepositRequest(BaseModel):
+    amount: Decimal
+
+
 class WalletResponse(BaseModel):
     id: UUID
     name: str

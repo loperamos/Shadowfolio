@@ -40,6 +40,19 @@ class SqliteWalletRepository(WalletRepository):
                 ),
             )
 
+    def update(self, wallet: Wallet) -> None:
+        with closing(self._connect()) as conn, conn:
+            conn.execute(
+                "UPDATE wallets SET owner_id = ?, name = ?, currency = ?, cash = ? WHERE id = ?",
+                (
+                    wallet.owner_id,
+                    wallet.name,
+                    wallet.currency.value,
+                    str(wallet.cash),
+                    str(wallet.id),
+                ),
+            )
+
     def get(self, wallet_id: UUID) -> Wallet | None:
         with closing(self._connect()) as conn:
             row = conn.execute(

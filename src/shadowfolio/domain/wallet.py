@@ -1,9 +1,14 @@
 """Wallet: a cash balance owned by a user."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from decimal import Decimal
 from enum import StrEnum
+from typing import Self
 from uuid import UUID
+
+
+class InvalidAmountError(ValueError):
+    """An amount that must be positive is zero or negative."""
 
 
 class Currency(StrEnum):
@@ -18,3 +23,8 @@ class Wallet:
     name: str
     currency: Currency
     cash: Decimal
+
+    def deposit(self, amount: Decimal) -> Self:
+        if amount <= 0:
+            raise InvalidAmountError("deposit amount must be positive")
+        return replace(self, cash=self.cash + amount)

@@ -4,7 +4,8 @@ from uuid import UUID
 
 from fastapi import FastAPI, HTTPException
 
-from shadowfolio.interfaces.web.schemas import CreateWalletRequest, WalletResponse
+from shadowfolio.domain.wallet import InvalidAmountError
+from shadowfolio.interfaces.web.schemas import CreateWalletRequest, DepositRequest, WalletResponse
 from shadowfolio.usecases.wallets import Wallets
 
 # Until accounts exist, every wallet belongs to this owner.
@@ -23,7 +24,21 @@ def create_app(wallets: Wallets) -> FastAPI:
     def get_wallet(wallet_id: UUID) -> WalletResponse:
         wallet = wallets.get(wallet_id)
         if wallet is None:
-            raise HTTPException(status_code=404, detail="wallet not found")
+            raise _wallet_not_found()
+        return WalletResponse.from_wallet(wallet)
+
+    @app.post("/wallets/{wallet_id}/deposits")
+    def deposit(wallet_id: UUID, request: DepositRequest) -> WalletResponse:
+        try:
+            wallet = wallets.deposit(wallet_id, request.amount)
+        except InvalidAmountError as error:
+            raise HTTPException(status_code=422, detail=str(error)) from error
+        if wallet is None:
+            raise _wallet_not_found()
         return WalletResponse.from_wallet(wallet)
 
     return app
+
+
+def _wallet_not_found() -> HTTPException:
+    return HTTPException(status_code=404, detail="wallet not found")

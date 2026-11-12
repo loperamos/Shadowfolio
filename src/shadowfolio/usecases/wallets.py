@@ -18,3 +18,12 @@ class Wallets:
 
     def get(self, wallet_id: UUID) -> Wallet | None:
         return self._repo.get(wallet_id)
+
+    def deposit(self, wallet_id: UUID, amount: Decimal) -> Wallet | None:
+        """Add cash to a wallet. Returns None if the wallet does not exist."""
+        wallet = self._repo.get(wallet_id)
+        if wallet is None:
+            return None
+        updated = wallet.deposit(amount)
+        self._repo.update(updated)
+        return updated
