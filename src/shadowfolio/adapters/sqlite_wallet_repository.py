@@ -7,7 +7,9 @@ from decimal import Decimal
 from pathlib import Path
 from uuid import UUID
 
-from shadowfolio.domain.wallet import Currency, Operation, OperationType, Trade, Wallet
+from shadowfolio.domain.money import Currency
+from shadowfolio.domain.operations import Operation, OperationType, Trade
+from shadowfolio.domain.wallet import Wallet
 from shadowfolio.ports.wallet_repository import WalletRepository
 
 _SCHEMA = """

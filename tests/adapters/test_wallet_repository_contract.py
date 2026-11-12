@@ -11,7 +11,9 @@ import pytest
 
 from shadowfolio.adapters.in_memory_wallet_repository import InMemoryWalletRepository
 from shadowfolio.adapters.sqlite_wallet_repository import SqliteWalletRepository
-from shadowfolio.domain.wallet import Currency, Trade, Wallet
+from shadowfolio.domain.money import Currency
+from shadowfolio.domain.operations import Trade
+from shadowfolio.domain.wallet import Wallet
 from shadowfolio.ports.wallet_repository import WalletRepository
 
 RepositoryFactory = Callable[[], WalletRepository]

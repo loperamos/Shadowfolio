@@ -5,7 +5,9 @@ from uuid import UUID
 
 from pydantic import AwareDatetime, BaseModel
 
-from shadowfolio.domain.wallet import Currency, Operation, OperationType, Trade, Wallet
+from shadowfolio.domain.money import Currency
+from shadowfolio.domain.operations import Operation, OperationType, Trade
+from shadowfolio.domain.wallet import Wallet
 
 
 class CreateWalletRequest(BaseModel):
