@@ -8,6 +8,7 @@ import { ICON_SIZE } from "../ui/theme";
 import { CreateWalletModal } from "./CreateWalletModal";
 import { DeleteWalletsModal } from "./DeleteWalletsModal";
 import { DuplicateWalletModal } from "./DuplicateWalletModal";
+import { RenameWalletModal } from "./RenameWalletModal";
 import { WalletSelectionBar } from "./WalletSelectionBar";
 import { WalletTable } from "./WalletTable";
 
@@ -17,6 +18,7 @@ export function WalletsPage() {
   const [error, setError] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [creating, { open: openCreate, close: closeCreate }] = useDisclosure(false);
+  const [toRename, setToRename] = useState<WalletResponse | null>(null);
   const [toDuplicate, setToDuplicate] = useState<WalletResponse | null>(null);
   const [toDelete, setToDelete] = useState<WalletResponse[]>([]);
 
@@ -52,10 +54,12 @@ export function WalletsPage() {
         error={error}
         selectedIds={selectedIds}
         onSelectionChange={setSelectedIds}
+        onRename={setToRename}
         onDuplicate={setToDuplicate}
         onDelete={setToDelete}
       />
       <CreateWalletModal opened={creating} onClose={closeCreate} onCreated={loadWallets} />
+      <RenameWalletModal wallet={toRename} onClose={() => setToRename(null)} onRenamed={loadWallets} />
       <DuplicateWalletModal wallet={toDuplicate} onClose={() => setToDuplicate(null)} onDuplicated={loadWallets} />
       <DeleteWalletsModal wallets={toDelete} onClose={() => setToDelete([])} onDeleted={loadWallets} />
     </>

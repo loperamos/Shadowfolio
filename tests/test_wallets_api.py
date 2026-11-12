@@ -255,6 +255,29 @@ def test_copy_changes_independently_of_the_original(client: TestClient) -> None:
     assert client.get(f"/api/wallets/{wallet_id}").json()["cash"] == "100"
 
 
+def test_renamed_wallet_keeps_its_history(client: TestClient) -> None:
+    wallet_id = create_wallet(client, "100")
+
+    response = client.patch(f"/api/wallets/{wallet_id}", json={"name": "Renamed"})
+    assert response.status_code == 200
+    wallet = client.get(f"/api/wallets/{wallet_id}").json()
+    assert (wallet["name"], wallet["cash"]) == ("Renamed", "100")
+    assert len(client.get(f"/api/wallets/{wallet_id}/operations").json()) == 1
+
+
+@pytest.mark.parametrize(
+    ("method", "path"), [("POST", "/api/wallets"), ("PATCH", "/api/wallets/{id}"), ("POST", "/api/wallets/{id}/copies")]
+)
+@pytest.mark.parametrize("name", ["", "   "])
+def test_blank_names_are_rejected(client: TestClient, method: str, path: str, name: str) -> None:
+    wallet_id = create_wallet(client, "100")  # named "Long term"
+
+    response = client.request(method, path.format(id=wallet_id), json={"name": name, "currency": "EUR", "cash": "0"})
+    assert response.status_code == 422
+    assert response.json()["detail"] == "name must not be blank"
+    assert [w["name"] for w in client.get("/api/wallets").json()] == ["Long term"]
+
+
 def test_deleted_wallet_is_gone(client: TestClient) -> None:
     kept, deleted = create_wallet(client, "10"), create_wallet(client, "20")
 
@@ -268,6 +291,7 @@ def test_deleted_wallet_is_gone(client: TestClient) -> None:
     [
         ("GET", "/api/wallets/{id}"),
         ("DELETE", "/api/wallets/{id}"),
+        ("PATCH", "/api/wallets/{id}"),
         ("POST", "/api/wallets/{id}/copies"),
         ("GET", "/api/wallets/{id}/operations"),
         ("POST", "/api/wallets/{id}/deposits"),
@@ -277,6 +301,12 @@ def test_deleted_wallet_is_gone(client: TestClient) -> None:
     ],
 )
 def test_unknown_wallet_returns_404(client: TestClient, method: str, path: str) -> None:
-    body = NVDA_BUY if path.endswith(("buys", "sells")) else {"name": "Copy"} if path.endswith("copies") else {"amount": "10"}
+    body = (
+        NVDA_BUY
+        if path.endswith(("buys", "sells"))
+        else {"name": "Copy"}
+        if path.endswith("copies") or method == "PATCH"
+        else {"amount": "10"}
+    )
     response = client.request(method, path.format(id=uuid4()), json=body)
     assert response.status_code == 404

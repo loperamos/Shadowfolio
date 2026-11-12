@@ -210,6 +210,16 @@ export type QuoteResponse = {
 };
 
 /**
+ * RenameWalletRequest
+ */
+export type RenameWalletRequest = {
+    /**
+     * Name
+     */
+    name: string;
+};
+
+/**
  * TradeRequest
  */
 export type TradeRequest = {
@@ -428,6 +438,40 @@ export type GetWalletResponses = {
 };
 
 export type GetWalletResponse = GetWalletResponses[keyof GetWalletResponses];
+
+export type RenameWalletData = {
+    body: RenameWalletRequest;
+    path: {
+        /**
+         * Wallet Id
+         */
+        wallet_id: string;
+    };
+    query?: never;
+    url: '/api/wallets/{wallet_id}';
+};
+
+export type RenameWalletErrors = {
+    /**
+     * Not found
+     */
+    404: ErrorResponse;
+    /**
+     * Malformed request or broken business rule
+     */
+    422: ErrorResponse;
+};
+
+export type RenameWalletError = RenameWalletErrors[keyof RenameWalletErrors];
+
+export type RenameWalletResponses = {
+    /**
+     * Successful Response
+     */
+    200: WalletResponse;
+};
+
+export type RenameWalletResponse = RenameWalletResponses[keyof RenameWalletResponses];
 
 export type ListOperationsData = {
     body?: never;

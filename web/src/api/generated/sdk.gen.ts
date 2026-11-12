@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { CopyWalletData, CopyWalletErrors, CopyWalletResponses, CreateWalletData, CreateWalletErrors, CreateWalletResponses, CurrentValuationData, CurrentValuationErrors, CurrentValuationResponses, DeleteWalletData, DeleteWalletErrors, DeleteWalletResponses, DepositData, DepositErrors, DepositResponses, GetWalletData, GetWalletErrors, GetWalletResponses, LatestQuoteData, LatestQuoteErrors, LatestQuoteResponses, ListOperationsData, ListOperationsErrors, ListOperationsResponses, ListWalletsData, ListWalletsResponses, RecordBuyData, RecordBuyErrors, RecordBuyResponses, RecordSellData, RecordSellErrors, RecordSellResponses, WithdrawData, WithdrawErrors, WithdrawResponses } from './types.gen';
+import type { CopyWalletData, CopyWalletErrors, CopyWalletResponses, CreateWalletData, CreateWalletErrors, CreateWalletResponses, CurrentValuationData, CurrentValuationErrors, CurrentValuationResponses, DeleteWalletData, DeleteWalletErrors, DeleteWalletResponses, DepositData, DepositErrors, DepositResponses, GetWalletData, GetWalletErrors, GetWalletResponses, LatestQuoteData, LatestQuoteErrors, LatestQuoteResponses, ListOperationsData, ListOperationsErrors, ListOperationsResponses, ListWalletsData, ListWalletsResponses, RecordBuyData, RecordBuyErrors, RecordBuyResponses, RecordSellData, RecordSellErrors, RecordSellResponses, RenameWalletData, RenameWalletErrors, RenameWalletResponses, WithdrawData, WithdrawErrors, WithdrawResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -56,6 +56,18 @@ export const deleteWallet = <ThrowOnError extends boolean = false>(options: Opti
  * Get Wallet
  */
 export const getWallet = <ThrowOnError extends boolean = false>(options: Options<GetWalletData, ThrowOnError>): RequestResult<GetWalletResponses, GetWalletErrors, ThrowOnError> => (options.client ?? client).get<GetWalletResponses, GetWalletErrors, ThrowOnError>({ url: '/api/wallets/{wallet_id}', ...options });
+
+/**
+ * Rename Wallet
+ */
+export const renameWallet = <ThrowOnError extends boolean = false>(options: Options<RenameWalletData, ThrowOnError>): RequestResult<RenameWalletResponses, RenameWalletErrors, ThrowOnError> => (options.client ?? client).patch<RenameWalletResponses, RenameWalletErrors, ThrowOnError>({
+    url: '/api/wallets/{wallet_id}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
 
 /**
  * List Operations

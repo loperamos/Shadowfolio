@@ -10,11 +10,12 @@ type Props = {
   error: string | null;
   selectedIds: ReadonlySet<string>;
   onSelectionChange: (ids: Set<string>) => void;
+  onRename: (wallet: WalletResponse) => void;
   onDuplicate: (wallet: WalletResponse) => void;
   onDelete: (wallets: WalletResponse[]) => void;
 };
 
-export function WalletTable({ wallets, error, selectedIds, onSelectionChange, onDuplicate, onDelete }: Props) {
+export function WalletTable({ wallets, error, selectedIds, onSelectionChange, onRename, onDuplicate, onDelete }: Props) {
   if (error) {
     return <Alert color="red">{error}</Alert>;
   }
@@ -76,7 +77,7 @@ export function WalletTable({ wallets, error, selectedIds, onSelectionChange, on
                 .join(", ") || <Text c="dimmed">None</Text>}
             </Table.Td>
             <Table.Td>
-              <WalletActionsMenu wallet={wallet} onDuplicate={onDuplicate} onDelete={onDelete} />
+              <WalletActionsMenu wallet={wallet} onRename={onRename} onDuplicate={onDuplicate} onDelete={onDelete} />
             </Table.Td>
           </Table.Tr>
         ))}

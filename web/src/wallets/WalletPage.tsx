@@ -2,8 +2,10 @@ import { Alert, Anchor, Breadcrumbs, Group, Loader, Stack, Table, Text, Title } 
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 
-import { getWallet, listOperations, type OperationResponse, type WalletResponse } from "../api/generated";
+import { apiErrorMessage } from "../api/errors";
+import { getWallet, listOperations, type OperationResponse, renameWallet, type WalletResponse } from "../api/generated";
 import { walletPath, WALLETS_PATH } from "../routes";
+import { EditableTitle } from "../ui/EditableTitle";
 import { DeleteWalletsModal } from "./DeleteWalletsModal";
 import { DuplicateWalletModal } from "./DuplicateWalletModal";
 import { WalletActionsMenu } from "./WalletActionsMenu";
@@ -19,6 +21,7 @@ export function WalletPage() {
   const { walletId = "" } = useParams();
   const navigate = useNavigate();
   const [state, setState] = useState<State>({ status: "loading" });
+  const [editingName, setEditingName] = useState(false);
   const [toDuplicate, setToDuplicate] = useState<WalletResponse | null>(null);
   const [toDelete, setToDelete] = useState<WalletResponse[]>([]);
 
@@ -47,6 +50,19 @@ export function WalletPage() {
     </Breadcrumbs>
   );
 
+  async function rename(name: string): Promise<string | null> {
+    try {
+      const { data, error } = await renameWallet({ path: { wallet_id: walletId }, body: { name } });
+      if (!data) {
+        return apiErrorMessage(error);
+      }
+      setState((current) => (current.status === "loaded" ? { ...current, wallet: data } : current));
+      return null;
+    } catch {
+      return "Could not reach the backend.";
+    }
+  }
+
   switch (state.status) {
     case "loading":
       return <Loader />;
@@ -69,8 +85,8 @@ export function WalletPage() {
         <>
           {breadcrumbs(state.wallet.name)}
           <Group justify="space-between" mb="lg">
-            <Title order={1}>{state.wallet.name}</Title>
-            <WalletActionsMenu wallet={state.wallet} onDuplicate={setToDuplicate} onDelete={setToDelete} />
+            <EditableTitle value={state.wallet.name} editing={editingName} onEditingChange={setEditingName} onSave={rename} label="Wallet name" />
+            <WalletActionsMenu wallet={state.wallet} onRename={() => setEditingName(true)} onDuplicate={setToDuplicate} onDelete={setToDelete} />
           </Group>
           <WalletDetails wallet={state.wallet} operations={state.operations} />
           {/* Duplicating opens the copy; deleting goes back to the list. */}

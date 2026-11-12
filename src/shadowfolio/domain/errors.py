@@ -5,6 +5,10 @@ class DomainError(ValueError):
     """A request breaks a business rule."""
 
 
+class InvalidNameError(DomainError):
+    """A name is blank."""
+
+
 class InvalidAmountError(DomainError):
     """An amount, quantity or price is out of range."""
 

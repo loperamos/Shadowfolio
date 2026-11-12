@@ -1,4 +1,4 @@
-"""Wallet use cases: creating, copying, deleting and reading wallets."""
+"""Wallet use cases: creating, renaming, copying, deleting and reading wallets."""
 
 from decimal import Decimal
 from uuid import UUID, uuid4
@@ -21,6 +21,15 @@ class Wallets:
             wallet = wallet.deposit(uuid4(), cash, self._clock.now())
         self._repo.add(wallet)
         return wallet
+
+    def rename(self, wallet_id: UUID, name: str) -> Wallet | None:
+        """Give the wallet a new name. Returns None if the wallet does not exist."""
+        wallet = self._repo.get(wallet_id)
+        if wallet is None:
+            return None
+        renamed = wallet.rename(name)
+        self._repo.update(renamed)
+        return renamed
 
     def copy(self, wallet_id: UUID, name: str) -> Wallet | None:
         """A new wallet with the same currency and history under another name. Returns None if the wallet does not exist."""

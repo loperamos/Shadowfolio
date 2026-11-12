@@ -44,7 +44,7 @@ def test_added_wallet_can_be_read_back(make_repository: RepositoryFactory) -> No
     assert make_repository().get(wallet.id) == wallet
 
 
-def test_update_stores_new_operations(make_repository: RepositoryFactory) -> None:
+def test_update_stores_new_operations_and_name(make_repository: RepositoryFactory) -> None:
     wallet = a_wallet()
     make_repository().add(wallet)
     nvda = Trade("NVDA", Decimal("8"), Decimal("121.81"), Currency.USD)
@@ -53,6 +53,7 @@ def test_update_stores_new_operations(make_repository: RepositoryFactory) -> Non
         .withdraw(uuid4(), Decimal("5"), T2)
         .buy(uuid4(), nvda, T1, settled_amount=Decimal("907.68"), fees=Decimal("2.00"))
         .sell(uuid4(), nvda, T2, settled_amount=Decimal("950.00"), fees=Decimal("2.00"))
+        .rename("Renamed")
     )
     make_repository().update(updated)
 

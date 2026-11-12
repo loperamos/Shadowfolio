@@ -1,4 +1,4 @@
-"""Routes for creating, copying, deleting and reading wallets."""
+"""Routes for creating, renaming, copying, deleting and reading wallets."""
 
 from uuid import UUID
 
@@ -6,7 +6,13 @@ from fastapi import APIRouter, Response
 
 from shadowfolio.domain.errors import DomainError
 from shadowfolio.interfaces.web.errors import INVALID, NOT_FOUND, rule_violation, wallet_not_found
-from shadowfolio.interfaces.web.schemas import CopyWalletRequest, CreateWalletRequest, OperationResponse, WalletResponse
+from shadowfolio.interfaces.web.schemas import (
+    CopyWalletRequest,
+    CreateWalletRequest,
+    OperationResponse,
+    RenameWalletRequest,
+    WalletResponse,
+)
 from shadowfolio.usecases.wallets import Wallets
 
 # Until accounts exist, every wallet belongs to this owner.
@@ -26,10 +32,23 @@ def wallets_router(wallets: Wallets) -> APIRouter:
 
     @router.post("/wallets/{wallet_id}/copies", status_code=201, responses=NOT_FOUND | INVALID)
     def copy_wallet(wallet_id: UUID, request: CopyWalletRequest) -> WalletResponse:
-        copy = wallets.copy(wallet_id, request.name)
+        try:
+            copy = wallets.copy(wallet_id, request.name)
+        except DomainError as error:
+            raise rule_violation(error) from error
         if copy is None:
             raise wallet_not_found()
         return WalletResponse.from_wallet(copy)
+
+    @router.patch("/wallets/{wallet_id}", responses=NOT_FOUND | INVALID)
+    def rename_wallet(wallet_id: UUID, request: RenameWalletRequest) -> WalletResponse:
+        try:
+            wallet = wallets.rename(wallet_id, request.name)
+        except DomainError as error:
+            raise rule_violation(error) from error
+        if wallet is None:
+            raise wallet_not_found()
+        return WalletResponse.from_wallet(wallet)
 
     @router.delete("/wallets/{wallet_id}", status_code=204, responses=NOT_FOUND | INVALID)
     def delete_wallet(wallet_id: UUID) -> Response:

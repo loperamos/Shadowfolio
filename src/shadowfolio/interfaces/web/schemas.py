@@ -18,6 +18,10 @@ class CreateWalletRequest(BaseModel):
     cash: Decimal
 
 
+class RenameWalletRequest(BaseModel):
+    name: str
+
+
 class CopyWalletRequest(BaseModel):
     name: str
 

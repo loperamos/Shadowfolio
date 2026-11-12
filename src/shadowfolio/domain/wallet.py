@@ -7,7 +7,13 @@ from decimal import Decimal
 from typing import Self
 from uuid import UUID
 
-from shadowfolio.domain.errors import InsufficientCashError, InsufficientSharesError, InvalidAmountError, MissingSettledAmountError
+from shadowfolio.domain.errors import (
+    InsufficientCashError,
+    InsufficientSharesError,
+    InvalidAmountError,
+    InvalidNameError,
+    MissingSettledAmountError,
+)
 from shadowfolio.domain.money import Currency
 from shadowfolio.domain.operations import Buy, Deposit, Operation, Sell, Trade, Withdrawal
 
@@ -19,6 +25,10 @@ class Wallet:
     name: str
     currency: Currency
     operations: tuple[Operation, ...] = ()  # oldest first
+
+    def __post_init__(self) -> None:
+        if not self.name.strip():
+            raise InvalidNameError("name must not be blank")
 
     @property
     def cash(self) -> Decimal:
@@ -34,6 +44,9 @@ class Wallet:
         so the copy's history can change independently."""
         operations = tuple(replace(op, id=new_operation_id()) for op in self.operations)
         return replace(self, id=wallet_id, name=name, operations=operations)
+
+    def rename(self, name: str) -> Self:
+        return replace(self, name=name)
 
     def deposit(self, operation_id: UUID, amount: Decimal, at: datetime) -> Self:
         _require_positive(amount, "amount")
