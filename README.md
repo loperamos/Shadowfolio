@@ -9,6 +9,7 @@ Requires Python 3.13+ and [uv](https://docs.astral.sh/uv/).
 ```bash
 uv sync                     # create .venv and install dev tools
 uv run pytest               # tests
+uv run pytest -m live       # contract tests against real providers (needs keys in .env, uses the network)
 uv run ruff check           # lint
 uv run ruff format --check  # formatting (drop --check to apply)
 uv run mypy                 # type check

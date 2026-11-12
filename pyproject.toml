@@ -5,6 +5,7 @@ description = "Simulated investing wallets priced from real market data."
 requires-python = ">=3.13"
 dependencies = [
     "fastapi",
+    "httpx2",
     "python-dotenv",
     "uvicorn",
 ]
@@ -14,7 +15,6 @@ shadowfolio = "shadowfolio.main:main"
 
 [dependency-groups]
 dev = [
-    "httpx2",
     "mypy",
     "pytest",
     "ruff",
@@ -26,7 +26,9 @@ build-backend = "hatchling.build"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = ["--strict-markers"]
+# Tests marked live call real services; they only run when asked for with `-m live`.
+addopts = ["--strict-markers", "-m", "not live"]
+markers = ["live: calls a real external service; needs credentials and network"]
 
 [tool.ruff]
 line-length = 140

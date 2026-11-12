@@ -7,6 +7,7 @@ from pydantic import AwareDatetime, BaseModel
 
 from shadowfolio.domain.money import Currency
 from shadowfolio.domain.operations import Buy, Deposit, Operation, OperationType, Sell, Trade, Withdrawal
+from shadowfolio.domain.valuation import WalletValuation
 from shadowfolio.domain.wallet import Wallet
 
 
@@ -82,3 +83,30 @@ class OperationResponse(BaseModel):
                     price=trade.price,
                     price_currency=trade.price_currency,
                 )
+
+
+class HoldingValueResponse(BaseModel):
+    symbol: str
+    quantity: Decimal
+    price: Decimal
+    currency: Currency
+    as_of: AwareDatetime
+    value: Decimal
+
+
+class ValuationResponse(BaseModel):
+    holdings: list[HoldingValueResponse]
+    # Cash plus holdings, summed per currency; different currencies are not converted yet.
+    totals: dict[Currency, Decimal]
+
+    @classmethod
+    def from_valuation(cls, valuation: WalletValuation) -> "ValuationResponse":
+        return cls(
+            holdings=[
+                HoldingValueResponse(
+                    symbol=h.symbol, quantity=h.quantity, price=h.quote.price, currency=h.quote.currency, as_of=h.quote.as_of, value=h.value
+                )
+                for h in valuation.holdings
+            ],
+            totals=valuation.totals,
+        )

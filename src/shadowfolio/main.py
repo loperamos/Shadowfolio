@@ -8,10 +8,13 @@ import uvicorn
 from dotenv import load_dotenv
 from fastapi import FastAPI
 
+from shadowfolio.adapters.alpaca_price_data import AlpacaConfig
 from shadowfolio.wiring.local import LocalConfig, build_local_app
 
 ENVIRONMENT_ENV = "SHADOWFOLIO_ENV"
 DB_PATH_ENV = "SHADOWFOLIO_DB"
+ALPACA_KEY_ID_ENV = "ALPACA_API_KEY_ID"
+ALPACA_SECRET_KEY_ENV = "ALPACA_API_SECRET_KEY"
 HOST_ENV = "SHADOWFOLIO_HOST"
 PORT_ENV = "SHADOWFOLIO_PORT"
 
@@ -31,7 +34,8 @@ def main() -> None:
 def _build_app(environment: Environment) -> FastAPI:
     match environment:
         case Environment.LOCAL:
-            return build_local_app(LocalConfig(db_path=Path(_require_env(DB_PATH_ENV))))
+            alpaca = AlpacaConfig(key_id=_require_env(ALPACA_KEY_ID_ENV), secret_key=_require_env(ALPACA_SECRET_KEY_ENV))
+            return build_local_app(LocalConfig(db_path=Path(_require_env(DB_PATH_ENV)), alpaca=alpaca))
 
 
 def _require_env(name: str) -> str:

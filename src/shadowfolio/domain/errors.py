@@ -23,3 +23,7 @@ class MissingSettledAmountError(DomainError):
 
 class FutureTimestampError(DomainError):
     """An operation is dated after now."""
+
+
+class PriceUnavailableError(DomainError):
+    """There is no market price for a symbol that needs one."""
