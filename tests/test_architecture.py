@@ -10,9 +10,9 @@ SRC = Path(__file__).resolve().parents[1] / "src" / PACKAGE
 
 # Layers each layer must not import.
 FORBIDDEN_LAYERS = {
-    "domain": {"application", "ports", "adapters", "interfaces"},
-    "ports": {"application", "adapters", "interfaces"},
-    "application": {"adapters", "interfaces"},
+    "domain": {"usecases", "ports", "adapters", "interfaces"},
+    "ports": {"usecases", "adapters", "interfaces"},
+    "usecases": {"adapters", "interfaces"},
 }
 
 # Modules the pure domain must not import (I/O, network, environment).

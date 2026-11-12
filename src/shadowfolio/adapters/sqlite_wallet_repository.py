@@ -7,6 +7,7 @@ from pathlib import Path
 from uuid import UUID
 
 from shadowfolio.domain.wallet import Currency, Wallet
+from shadowfolio.ports.wallet_repository import WalletRepository
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS wallets (
@@ -19,9 +20,10 @@ CREATE TABLE IF NOT EXISTS wallets (
 """
 
 
-class SqliteWalletRepository:
+class SqliteWalletRepository(WalletRepository):
     def __init__(self, path: Path) -> None:
         self._path = path
+        path.parent.mkdir(parents=True, exist_ok=True)
         with closing(self._connect()) as conn, conn:
             conn.execute(_SCHEMA)
 

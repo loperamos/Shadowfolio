@@ -19,9 +19,14 @@ Format code with:
 uv run ruff format
 ```
 
+Configuration comes from environment variables, loaded from `.env` if present. Start from the template:
 ```bash
-# Run the API at http://127.0.0.1:8000 (docs at /docs); data goes to ./shadowfolio.db
-uv run uvicorn shadowfolio.interfaces.web:create_default_app --factory --reload --host 0.0.0.0
+cp .env.example .env
+```
+
+```bash
+# Run the API at http://127.0.0.1:8000 (docs at /docs)
+uv run shadowfolio
 ```
 
 After changing dependencies, run `uv lock` and commit `uv.lock`; CI installs with `uv sync --locked`.

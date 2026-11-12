@@ -5,8 +5,12 @@ description = "Simulated investing wallets priced from real market data."
 requires-python = ">=3.13"
 dependencies = [
     "fastapi",
+    "python-dotenv",
     "uvicorn",
 ]
+
+[project.scripts]
+shadowfolio = "shadowfolio.main:main"
 
 [dependency-groups]
 dev = [

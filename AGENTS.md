@@ -13,7 +13,7 @@ What to build is in [SPEC.md](SPEC.md). This file is about *how* to work here. K
 
 ## Architecture rules
 
-- Layers: `interfaces → application → domain`, with `ports` defining every external dependency and `adapters` implementing them. See SPEC.md.
+- Layers: `interfaces → usecases → domain`, with `ports` defining every external dependency and `adapters` implementing them. See SPEC.md.
 - The domain is pure: no I/O, no HTTP, no database, no environment variables, and no `datetime.now()`. Time always comes from the `Clock` port.
 - Market data, LLMs and storage are reached only through ports. Never call a provider SDK outside its adapter.
 - The web API and MCP server call the same use cases; no business logic in interfaces.
@@ -25,6 +25,7 @@ What to build is in [SPEC.md](SPEC.md). This file is about *how* to work here. K
 - Absolute imports.
 - Money and quantities are `Decimal`, never `float`; serialize them as strings.
 - Timestamps are timezone-aware and stored in UTC.
+- No magic strings or numbers: give repeated or meaningful literals (env var names, defaults, hosts, ports, identifiers) a named constant or enum.
 - Match the surrounding code's style and comment density.
 
 ## Tests

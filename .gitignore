@@ -15,5 +15,6 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 
-# Local database
+# Local data
+/data/
 *.db

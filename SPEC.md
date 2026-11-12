@@ -92,7 +92,7 @@ Lesson from the prototype: the provider **must** return dividend currency explic
 
 ```text
 interfaces/     web API · MCP server · scheduler jobs      ← thin; call use cases
-application/    use cases (import_statement, add_operation, place_order, compare, ...)
+usecases/       use cases (import_statement, add_operation, place_order, compare, ...)
 domain/         wallets, operations, ledger (FIFO), fill model, valuation, metrics — pure, no I/O
 ports/          interfaces the core depends on
 adapters/       real implementations and fakes for every port
