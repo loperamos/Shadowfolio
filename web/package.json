@@ -12,6 +12,8 @@
     "generate": "cd .. && uv run python -m shadowfolio.wiring.openapi web/openapi.json && cd web && openapi-ts"
   },
   "dependencies": {
+    "@mantine/core": "^9.7.4",
+    "@mantine/hooks": "^9.7.4",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
   },

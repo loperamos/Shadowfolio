@@ -28,6 +28,13 @@ What to build is in [SPEC.md](SPEC.md). This file is about *how* to work here. K
 - No magic strings or numbers: give repeated or meaningful literals (env var names, defaults, hosts, ports, identifiers) a named constant or enum.
 - Match the surrounding code's style and comment density.
 
+## Frontend
+
+- The UI looks the same everywhere. Every element comes from Mantine or from shared wrappers in `web/src/ui/`; pages compose components and do not style elements themselves.
+- Colours, spacing, typography and radii come from the theme in `web/src/ui/theme.ts`; no hard-coded values in components.
+- A new kind of element is added to the shared set first, then used.
+- API calls go through the generated client in `web/src/api/generated`; run `npm run generate` after backend API changes and never edit it by hand.
+
 ## Tests
 
 - Every behaviour change gets a focused test. Prefer tests through a use case or the HTTP/MCP boundary using fake adapters and an in-memory or temporary SQLite repository.
