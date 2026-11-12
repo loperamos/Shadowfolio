@@ -1,6 +1,7 @@
 """Contract every WalletRepository adapter must meet, run against each one."""
 
 from collections.abc import Callable
+from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
 from uuid import uuid4
@@ -14,6 +15,9 @@ from shadowfolio.ports.wallet_repository import WalletRepository
 
 RepositoryFactory = Callable[[], WalletRepository]
 
+T1 = datetime(2026, 3, 2, 15, 0, tzinfo=UTC)
+T2 = datetime(2026, 3, 3, 15, 0, tzinfo=UTC)
+
 
 @pytest.fixture(params=["in_memory", "sqlite"])
 def make_repository(request: pytest.FixtureRequest, tmp_path: Path) -> RepositoryFactory:
@@ -25,13 +29,8 @@ def make_repository(request: pytest.FixtureRequest, tmp_path: Path) -> Repositor
 
 
 def a_wallet() -> Wallet:
-    return Wallet(
-        id=uuid4(),
-        owner_id="owner-1",
-        name="Long term",
-        currency=Currency.EUR,
-        cash=Decimal("1000.50"),
-    )
+    wallet = Wallet(id=uuid4(), owner_id="owner-1", name="Long term", currency=Currency.EUR)
+    return wallet.deposit(uuid4(), Decimal("1000.50"), T1)
 
 
 def test_added_wallet_can_be_read_back(make_repository: RepositoryFactory) -> None:
@@ -42,10 +41,10 @@ def test_added_wallet_can_be_read_back(make_repository: RepositoryFactory) -> No
     assert make_repository().get(wallet.id) == wallet
 
 
-def test_updated_wallet_replaces_the_stored_one(make_repository: RepositoryFactory) -> None:
+def test_update_stores_new_operations(make_repository: RepositoryFactory) -> None:
     wallet = a_wallet()
     make_repository().add(wallet)
-    updated = wallet.deposit(Decimal("10"))
+    updated = wallet.deposit(uuid4(), Decimal("10"), T2)
     make_repository().update(updated)
 
     assert make_repository().get(wallet.id) == updated

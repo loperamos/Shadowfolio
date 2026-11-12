@@ -5,7 +5,12 @@ from uuid import UUID
 from fastapi import FastAPI, HTTPException
 
 from shadowfolio.domain.wallet import InvalidAmountError
-from shadowfolio.interfaces.web.schemas import CreateWalletRequest, DepositRequest, WalletResponse
+from shadowfolio.interfaces.web.schemas import (
+    CreateWalletRequest,
+    DepositRequest,
+    OperationResponse,
+    WalletResponse,
+)
 from shadowfolio.usecases.wallets import Wallets
 
 # Until accounts exist, every wallet belongs to this owner.
@@ -17,7 +22,10 @@ def create_app(wallets: Wallets) -> FastAPI:
 
     @app.post("/wallets", status_code=201)
     def create_wallet(request: CreateWalletRequest) -> WalletResponse:
-        wallet = wallets.create(LOCAL_OWNER, request.name, request.currency, request.cash)
+        try:
+            wallet = wallets.create(LOCAL_OWNER, request.name, request.currency, request.cash)
+        except InvalidAmountError as error:
+            raise _invalid_amount(error) from error
         return WalletResponse.from_wallet(wallet)
 
     @app.get("/wallets/{wallet_id}")
@@ -27,12 +35,19 @@ def create_app(wallets: Wallets) -> FastAPI:
             raise _wallet_not_found()
         return WalletResponse.from_wallet(wallet)
 
+    @app.get("/wallets/{wallet_id}/operations")
+    def list_operations(wallet_id: UUID) -> list[OperationResponse]:
+        wallet = wallets.get(wallet_id)
+        if wallet is None:
+            raise _wallet_not_found()
+        return [OperationResponse.from_operation(op) for op in wallet.operations]
+
     @app.post("/wallets/{wallet_id}/deposits")
     def deposit(wallet_id: UUID, request: DepositRequest) -> WalletResponse:
         try:
             wallet = wallets.deposit(wallet_id, request.amount)
         except InvalidAmountError as error:
-            raise HTTPException(status_code=422, detail=str(error)) from error
+            raise _invalid_amount(error) from error
         if wallet is None:
             raise _wallet_not_found()
         return WalletResponse.from_wallet(wallet)
@@ -42,3 +57,7 @@ def create_app(wallets: Wallets) -> FastAPI:
 
 def _wallet_not_found() -> HTTPException:
     return HTTPException(status_code=404, detail="wallet not found")
+
+
+def _invalid_amount(error: InvalidAmountError) -> HTTPException:
+    return HTTPException(status_code=422, detail=str(error))

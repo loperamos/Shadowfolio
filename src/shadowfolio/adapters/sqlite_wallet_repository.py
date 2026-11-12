@@ -2,11 +2,12 @@
 
 import sqlite3
 from contextlib import closing
+from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
 from uuid import UUID
 
-from shadowfolio.domain.wallet import Currency, Wallet
+from shadowfolio.domain.wallet import Currency, Operation, OperationType, Wallet
 from shadowfolio.ports.wallet_repository import WalletRepository
 
 _SCHEMA = """
@@ -14,9 +15,15 @@ CREATE TABLE IF NOT EXISTS wallets (
     id TEXT PRIMARY KEY,
     owner_id TEXT NOT NULL,
     name TEXT NOT NULL,
-    currency TEXT NOT NULL,
-    cash TEXT NOT NULL
-)
+    currency TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS operations (
+    id TEXT PRIMARY KEY,
+    wallet_id TEXT NOT NULL REFERENCES wallets (id),
+    type TEXT NOT NULL,
+    timestamp TEXT NOT NULL,
+    amount TEXT NOT NULL
+);
 """
 
 
@@ -25,49 +32,70 @@ class SqliteWalletRepository(WalletRepository):
         self._path = path
         path.parent.mkdir(parents=True, exist_ok=True)
         with closing(self._connect()) as conn, conn:
-            conn.execute(_SCHEMA)
+            conn.executescript(_SCHEMA)
 
     def add(self, wallet: Wallet) -> None:
         with closing(self._connect()) as conn, conn:
             conn.execute(
-                "INSERT INTO wallets (id, owner_id, name, currency, cash) VALUES (?, ?, ?, ?, ?)",
-                (
-                    str(wallet.id),
-                    wallet.owner_id,
-                    wallet.name,
-                    wallet.currency.value,
-                    str(wallet.cash),
-                ),
+                "INSERT INTO wallets (id, owner_id, name, currency) VALUES (?, ?, ?, ?)",
+                (str(wallet.id), wallet.owner_id, wallet.name, wallet.currency.value),
             )
+            _insert_new_operations(conn, wallet)
 
     def update(self, wallet: Wallet) -> None:
         with closing(self._connect()) as conn, conn:
             conn.execute(
-                "UPDATE wallets SET owner_id = ?, name = ?, currency = ?, cash = ? WHERE id = ?",
-                (
-                    wallet.owner_id,
-                    wallet.name,
-                    wallet.currency.value,
-                    str(wallet.cash),
-                    str(wallet.id),
-                ),
+                "UPDATE wallets SET owner_id = ?, name = ?, currency = ? WHERE id = ?",
+                (wallet.owner_id, wallet.name, wallet.currency.value, str(wallet.id)),
             )
+            _insert_new_operations(conn, wallet)
 
     def get(self, wallet_id: UUID) -> Wallet | None:
         with closing(self._connect()) as conn:
             row = conn.execute(
-                "SELECT id, owner_id, name, currency, cash FROM wallets WHERE id = ?",
+                "SELECT id, owner_id, name, currency FROM wallets WHERE id = ?",
                 (str(wallet_id),),
             ).fetchone()
-        if row is None:
-            return None
+            if row is None:
+                return None
+            operation_rows = conn.execute(
+                "SELECT id, type, timestamp, amount FROM operations "
+                "WHERE wallet_id = ? ORDER BY timestamp, rowid",
+                (str(wallet_id),),
+            ).fetchall()
         return Wallet(
             id=UUID(row[0]),
             owner_id=row[1],
             name=row[2],
             currency=Currency(row[3]),
-            cash=Decimal(row[4]),
+            operations=tuple(
+                Operation(
+                    id=UUID(op[0]),
+                    type=OperationType(op[1]),
+                    timestamp=datetime.fromisoformat(op[2]),
+                    amount=Decimal(op[3]),
+                )
+                for op in operation_rows
+            ),
         )
 
     def _connect(self) -> sqlite3.Connection:
         return sqlite3.connect(self._path)
+
+
+def _insert_new_operations(conn: sqlite3.Connection, wallet: Wallet) -> None:
+    """Operations are never changed once stored, so already-stored ones are skipped."""
+    conn.executemany(
+        "INSERT OR IGNORE INTO operations (id, wallet_id, type, timestamp, amount) "
+        "VALUES (?, ?, ?, ?, ?)",
+        [
+            (
+                str(op.id),
+                str(wallet.id),
+                op.type.value,
+                op.timestamp.astimezone(UTC).isoformat(),
+                str(op.amount),
+            )
+            for op in wallet.operations
+        ],
+    )

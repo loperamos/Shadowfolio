@@ -1,6 +1,7 @@
-"""Wallet: a cash balance owned by a user."""
+"""Wallet: a timeline of operations owned by a user. Its cash is derived from the operations."""
 
 from dataclasses import dataclass, replace
+from datetime import datetime
 from decimal import Decimal
 from enum import StrEnum
 from typing import Self
@@ -16,15 +17,32 @@ class Currency(StrEnum):
     EUR = "EUR"
 
 
+class OperationType(StrEnum):
+    DEPOSIT = "deposit"
+
+
+@dataclass(frozen=True)
+class Operation:
+    id: UUID
+    type: OperationType
+    timestamp: datetime
+    amount: Decimal
+
+
 @dataclass(frozen=True)
 class Wallet:
     id: UUID
     owner_id: str
     name: str
     currency: Currency
-    cash: Decimal
+    operations: tuple[Operation, ...] = ()
 
-    def deposit(self, amount: Decimal) -> Self:
+    @property
+    def cash(self) -> Decimal:
+        return sum((op.amount for op in self.operations), Decimal(0))
+
+    def deposit(self, operation_id: UUID, amount: Decimal, at: datetime) -> Self:
         if amount <= 0:
             raise InvalidAmountError("deposit amount must be positive")
-        return replace(self, cash=self.cash + amount)
+        operation = Operation(operation_id, OperationType.DEPOSIT, at, amount)
+        return replace(self, operations=(*self.operations, operation))

@@ -1,4 +1,4 @@
-"""Persistence for wallets."""
+"""Persistence for wallets, together with their operations."""
 
 from abc import ABC, abstractmethod
 from uuid import UUID
@@ -11,7 +11,9 @@ class WalletRepository(ABC):
     def add(self, wallet: Wallet) -> None: ...
 
     @abstractmethod
-    def update(self, wallet: Wallet) -> None: ...
+    def update(self, wallet: Wallet) -> None:
+        """Store the wallet's current state, including operations added since it was loaded."""
 
     @abstractmethod
-    def get(self, wallet_id: UUID) -> Wallet | None: ...
+    def get(self, wallet_id: UUID) -> Wallet | None:
+        """The wallet with its operations, oldest first."""
