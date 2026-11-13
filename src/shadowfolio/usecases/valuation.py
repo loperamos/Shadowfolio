@@ -4,9 +4,9 @@ from collections.abc import Callable
 from datetime import UTC, date, datetime, time, timedelta
 from uuid import UUID
 
-from shadowfolio.domain.errors import FutureTimestampError, FxRateUnavailableError, PriceUnavailableError
+from shadowfolio.domain.errors import FutureTimestampError, FxRateUnavailableError, InvalidPeriodError, PriceUnavailableError
 from shadowfolio.domain.money import Currency, FxRate
-from shadowfolio.domain.valuation import Quote, WalletValuation, value_wallet
+from shadowfolio.domain.valuation import DailyValue, Quote, WalletValuation, value_wallet
 from shadowfolio.domain.wallet import Wallet
 from shadowfolio.ports.clock import Clock
 from shadowfolio.ports.fx_rates import FxRates, FxRatesUnavailableError
@@ -46,13 +46,54 @@ class Valuation:
         wallet = self._repo.get(wallet_id)
         if wallet is None:
             return None
-        past = wallet.as_of(datetime.combine(day + timedelta(days=1), time(), tzinfo=UTC))
+        past = wallet.as_of(_end_of(day))
         return self._value(
             past,
             lambda symbol: self._prices.close_on(symbol, day),
             lambda currency: self._fx_rates.rate_on(currency, wallet.currency, day),
             f" on or before {day.isoformat()}",
         )
+
+    def daily(self, wallet_id: UUID, start: date | None = None, end: date | None = None) -> list[DailyValue] | None:
+        """The wallet's value at the end of every day from `start` (default: its first operation's day) to `end`
+        (default: today), as `on` would give each, with one price request per symbol and one rate request per currency.
+
+        Returns None if the wallet does not exist, and an empty list if it has no operations. Fails, as a whole, the
+        same way as `on`, and for a period that ends before it starts.
+        """
+        today = self._clock.now().date()
+        wallet = self._repo.get(wallet_id)
+        if wallet is None:
+            return None
+        if not wallet.operations:
+            return []
+        start = start or wallet.operations[0].timestamp.astimezone(UTC).date()
+        end = end or today
+        if end > today:
+            raise FutureTimestampError("cannot value a wallet on a day that has not happened yet")
+        if end < start:
+            raise InvalidPeriodError("the period must not end before it starts")
+        days = [start + timedelta(days=offset) for offset in range((end - start).days + 1)]
+        states = [wallet.as_of(_end_of(day)) for day in days]
+        closes: dict[str, dict[date, Quote]] = {}
+        for symbol in sorted({symbol for state in states for symbol in state.holdings}):
+            try:
+                closes[symbol] = self._prices.closes_between(symbol, start, end)
+            except PriceDataUnavailableError as error:
+                raise PriceUnavailableError(f"could not fetch the price of {symbol} right now; try again later") from error
+        rates: dict[Currency, dict[date, FxRate]] = {}
+        for currency in {close.currency for by_day in closes.values() for close in by_day.values()} - {wallet.currency}:
+            try:
+                rates[currency] = self._fx_rates.rates_between(currency, wallet.currency, start, end)
+            except FxRatesUnavailableError as error:
+                raise FxRateUnavailableError(f"could not fetch the {currency}→{wallet.currency} rate right now; try again later") from error
+        values = []
+        for day, state in zip(days, states, strict=True):
+            day_closes = {symbol: by_day[day] for symbol, by_day in closes.items() if day in by_day}
+            day_rates = {currency: by_day[day] for currency, by_day in rates.items() if day in by_day}
+            valuation = self._value(state, day_closes.get, day_rates.get, f" on or before {day.isoformat()}")
+            values.append(DailyValue(day, valuation, state.net_deposits))
+        return values
 
     def _value(
         self,
@@ -80,3 +121,8 @@ class Valuation:
                 raise FxRateUnavailableError(f"no {currency}→{wallet.currency} rate{when}")
             rates[currency] = rate
         return value_wallet(wallet, quotes, rates)
+
+
+def _end_of(day: date) -> datetime:
+    """The first moment after `day`, in UTC: operations before it happened on or before that day."""
+    return datetime.combine(day + timedelta(days=1), time(), tzinfo=UTC)

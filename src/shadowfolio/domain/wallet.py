@@ -50,6 +50,11 @@ class Wallet:
         return sum((op.cash_delta for op in self.operations), Decimal(0))
 
     @property
+    def net_deposits(self) -> Decimal:
+        """Money put in less money taken out (deposits minus withdrawals), in the wallet's currency."""
+        return sum((op.cash_delta for op in self.operations if isinstance(op, Deposit | Withdrawal)), Decimal(0))
+
+    @property
     def hindsight(self) -> bool:
         """Whether any trade was priced from market data after the fact, so results are not a forward test."""
         return any(isinstance(op, Buy | Sell) and op.trade.price_source is PriceSource.MARKET for op in self.operations)

@@ -2,7 +2,7 @@
 
 from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 
 from shadowfolio.domain.money import Currency, FxRate, to_cents
@@ -101,6 +101,15 @@ class WalletValuation:
     def total(self) -> Decimal:
         """Cash plus all holdings, in the wallet's currency."""
         return self.cash + sum((h.value_in_wallet_currency for h in self.holdings), Decimal(0))
+
+
+@dataclass(frozen=True)
+class DailyValue:
+    """The wallet at the end of a day, valued at that day's closes, with the money put in up to then."""
+
+    day: date
+    valuation: WalletValuation
+    net_deposits: Decimal
 
 
 def value_wallet(wallet: Wallet, quotes: Mapping[str, Quote], rates: Mapping[Currency, FxRate]) -> WalletValuation:

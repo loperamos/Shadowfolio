@@ -97,3 +97,15 @@ def test_close_on_a_closed_day_is_the_last_trading_days(prices: PriceData) -> No
 
 def test_unknown_symbol_has_no_close(prices: PriceData) -> None:
     assert prices.close_on(UNKNOWN_SYMBOL, SUNDAY) is None
+
+
+def test_closes_between_give_each_day_its_last_close(prices: PriceData) -> None:
+    closes = prices.closes_between(KNOWN_SYMBOL, FRIDAY, SUNDAY)
+
+    assert sorted(closes) == [FRIDAY, date(2024, 6, 29), SUNDAY]
+    assert {close.as_of.date() for close in closes.values()} == {FRIDAY}
+    assert closes[SUNDAY] == prices.close_on(KNOWN_SYMBOL, SUNDAY)
+
+
+def test_unknown_symbol_has_no_closes(prices: PriceData) -> None:
+    assert prices.closes_between(UNKNOWN_SYMBOL, FRIDAY, SUNDAY) == {}

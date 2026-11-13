@@ -13,6 +13,10 @@ class InvalidRateError(DomainError):
     """A rate (e.g. a tax rate) is outside what it can be."""
 
 
+class InvalidPeriodError(DomainError):
+    """A period ends before it starts."""
+
+
 class InvalidAmountError(DomainError):
     """An amount, quantity or price is out of range."""
 

@@ -24,3 +24,10 @@ class FxRates(ABC):
 
         Raises FxRatesUnavailableError when the provider cannot answer.
         """
+
+    @abstractmethod
+    def rates_between(self, base: Currency, quote: Currency, start: date, end: date) -> dict[date, FxRate]:
+        """For each calendar day from `start` to `end`, what `rate_on` would answer for it, without a request per day.
+
+        Days without a rate are left out. Raises FxRatesUnavailableError when the provider cannot answer.
+        """

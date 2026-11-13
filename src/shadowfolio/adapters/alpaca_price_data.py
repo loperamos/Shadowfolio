@@ -13,6 +13,7 @@ from urllib.parse import quote
 
 import httpx2
 
+from shadowfolio.adapters.daily import last_on_or_before
 from shadowfolio.domain.money import Currency
 from shadowfolio.domain.valuation import Quote
 from shadowfolio.ports.price_data import PriceData, PriceDataUnavailableError
@@ -25,6 +26,8 @@ TIMEOUT_SECONDS = 10.0
 BAR_LOOKAHEAD = timedelta(days=7)
 # How far before a requested day to look for the last close (covers weekends and holiday runs).
 CLOSE_LOOKBACK = timedelta(days=10)
+# Most bars Alpaca returns per page; longer ranges come in several pages.
+PAGE_LIMIT = 10_000
 # Alpaca answers these for symbols it does not know.
 _UNKNOWN_SYMBOL_STATUSES = {HTTPStatus.NOT_FOUND, HTTPStatus.UNPROCESSABLE_ENTITY}
 
@@ -60,6 +63,12 @@ class AlpacaPriceData(PriceData):
     def close_on(self, symbol: str, day: date) -> Quote | None:
         try:
             return self._close_on(symbol, day)
+        except httpx2.HTTPError as error:
+            raise PriceDataUnavailableError(f"Alpaca: {error}") from error
+
+    def closes_between(self, symbol: str, start: date, end: date) -> dict[date, Quote]:
+        try:
+            return self._closes_between(symbol, start, end)
         except httpx2.HTTPError as error:
             raise PriceDataUnavailableError(f"Alpaca: {error}") from error
 
@@ -123,6 +132,32 @@ class AlpacaPriceData(PriceData):
         if not bars:
             return None
         return Quote(price=Decimal(bars[0]["c"]), currency=Currency.USD, as_of=datetime.fromisoformat(bars[0]["t"]))
+
+    def _closes_between(self, symbol: str, start: date, end: date) -> dict[date, Quote]:
+        """Every daily bar from `CLOSE_LOOKBACK` before `start` to the end of `end`, page by page, spread over the days."""
+        params: dict[str, str | int] = {
+            "timeframe": "1Day",
+            "start": _rfc3339(datetime.combine(start - CLOSE_LOOKBACK, time(), tzinfo=UTC)),
+            "end": _rfc3339(datetime.combine(end, time.max, tzinfo=UTC)),
+            "limit": PAGE_LIMIT,
+            "sort": "asc",
+            "adjustment": "raw",
+            "feed": FEED,
+        }
+        closes: list[tuple[date, Quote]] = []
+        while True:
+            response = self._client.get(f"/v2/stocks/{quote(symbol, safe='')}/bars", params=params)
+            if response.status_code in _UNKNOWN_SYMBOL_STATUSES:
+                return {}
+            response.raise_for_status()
+            page = json.loads(response.text, parse_float=Decimal)
+            for bar in page.get("bars") or []:
+                close = Quote(price=Decimal(bar["c"]), currency=Currency.USD, as_of=datetime.fromisoformat(bar["t"]))
+                closes.append((close.as_of.date(), close))
+            token = page.get("next_page_token")
+            if not token:
+                return last_on_or_before(closes, start, end, CLOSE_LOOKBACK)
+            params["page_token"] = token
 
 
 def _rfc3339(moment: datetime) -> str:

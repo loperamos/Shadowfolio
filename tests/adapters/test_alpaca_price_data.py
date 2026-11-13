@@ -100,6 +100,30 @@ def test_close_on_a_day_is_the_close_of_the_last_daily_bar_up_to_its_end() -> No
     )
 
 
+def test_closes_between_follow_every_page() -> None:
+    pages = [
+        '{"bars": [{"t": "2024-06-27T04:00:00Z", "c": 118.53}], "next_page_token": "page-2"}',
+        '{"bars": [{"t": "2024-06-28T04:00:00Z", "c": 123.54}], "next_page_token": null}',
+    ]
+    seen: list[httpx2.Request] = []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        seen.append(request)
+        return httpx2.Response(200, text=pages[len(seen) - 1])
+
+    adapter = AlpacaPriceData(CONFIG, transport=httpx2.MockTransport(handler))
+    closes = adapter.closes_between("NVDA", date(2024, 6, 27), date(2024, 6, 30))
+
+    assert [(day.isoformat(), close.price) for day, close in closes.items()] == [
+        ("2024-06-27", Decimal("118.53")),
+        ("2024-06-28", Decimal("123.54")),
+        ("2024-06-29", Decimal("123.54")),
+        ("2024-06-30", Decimal("123.54")),
+    ]
+    assert "page_token" not in seen[0].url.params
+    assert seen[1].url.params["page_token"] == "page-2"
+
+
 def test_no_bars_means_no_historical_price() -> None:
     # Alpaca answers unknown symbols with 200 and no bars.
     assert adapter_answering(200, '{"bars": null, "symbol": "ZZZZ"}').price_at("ZZZZ", datetime(2024, 6, 24, tzinfo=UTC)) is None

@@ -214,3 +214,60 @@ def test_a_day_after_today_cannot_be_valued(client: TestClient) -> None:
     response = client.get(f"/api/wallets/{wallet_id}/valuation", params={"on": "2026-03-03"})
 
     assert (response.status_code, response.json()["detail"]) == (422, "cannot value a wallet on a day that has not happened yet")
+
+
+def nvda_close(day: date, price: str) -> Quote:
+    return Quote(Decimal(price), Currency.USD, datetime(day.year, day.month, day.day, 4, 0, tzinfo=UTC))
+
+
+def test_daily_values_follow_the_holdings_closes_and_rates_of_each_day(
+    client: TestClient, prices: InMemoryPriceData, fx_rates: InMemoryFxRates
+) -> None:
+    wallet_id = wallet_holding(client, NVDA_BUY)  # bought on Monday 24 June 2024
+    prices.add_close("NVDA", nvda_close(date(2024, 6, 24), "118.11"))
+    prices.add_close("NVDA", nvda_close(date(2024, 6, 25), "126.09"))
+    fx_rates.set(FxRate(Currency.USD, Currency.EUR, Decimal("0.9310"), date(2024, 6, 24)))
+    fx_rates.set(FxRate(Currency.USD, Currency.EUR, Decimal("0.9330"), date(2024, 6, 25)))
+
+    response = client.get(f"/api/wallets/{wallet_id}/valuation/daily", params={"start": "2024-06-23", "end": "2024-06-25"})
+
+    assert response.status_code == 200
+    # 8 x 118.11 USD x 0.9310 = 879.68 EUR; 8 x 126.09 USD x 0.9330 = 941.14 EUR.
+    assert [(v["day"], v["cash"], v["holdings_value"], v["total"], v["net_deposits"]) for v in response.json()] == [
+        ("2024-06-23", "3000", "0.00", "3000.00", "3000"),
+        ("2024-06-24", "2090.32", "879.68", "2970.00", "3000"),
+        ("2024-06-25", "2090.32", "941.14", "3031.46", "3000"),
+    ]
+
+
+def test_daily_values_run_from_the_first_operation_to_today_by_default(client: TestClient) -> None:
+    wallet_id: str = client.post("/api/wallets", json={"name": "W", "currency": "EUR", "cash": "0"}).json()["id"]
+    client.post(f"/api/wallets/{wallet_id}/deposits", json={"amount": "100", "timestamp": "2026-02-27T09:00:00Z"})
+    client.post(f"/api/wallets/{wallet_id}/withdrawals", json={"amount": "40", "timestamp": "2026-03-01T09:00:00Z"})
+
+    values = client.get(f"/api/wallets/{wallet_id}/valuation/daily").json()
+
+    assert [(v["day"], v["total"], v["net_deposits"]) for v in values] == [
+        ("2026-02-27", "100.00", "100"),
+        ("2026-02-28", "100.00", "100"),
+        ("2026-03-01", "60.00", "60"),
+        ("2026-03-02", "60.00", "60"),
+    ]
+
+
+def test_a_day_without_a_close_fails_the_daily_values(client: TestClient, prices: InMemoryPriceData, fx_rates: InMemoryFxRates) -> None:
+    wallet_id = wallet_holding(client, NVDA_BUY)
+    prices.add_close("NVDA", nvda_close(date(2024, 6, 25), "126.09"))
+    fx_rates.set(FxRate(Currency.USD, Currency.EUR, Decimal("0.9310"), date(2024, 6, 24)))
+
+    response = client.get(f"/api/wallets/{wallet_id}/valuation/daily", params={"start": "2024-06-24", "end": "2024-06-25"})
+
+    assert (response.status_code, response.json()["detail"]) == (422, "no price for NVDA on or before 2024-06-24")
+
+
+def test_a_period_ending_before_it_starts_is_rejected(client: TestClient) -> None:
+    wallet_id = wallet_holding(client)
+
+    response = client.get(f"/api/wallets/{wallet_id}/valuation/daily", params={"start": "2024-06-25", "end": "2024-06-24"})
+
+    assert (response.status_code, response.json()["detail"]) == (422, "the period must not end before it starts")

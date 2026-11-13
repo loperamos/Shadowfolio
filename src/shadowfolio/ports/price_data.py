@@ -33,3 +33,10 @@ class PriceData(ABC):
         `as_of` is that trading day's start in the exchange's time zone. None if the symbol has no close in the days
         before `day` (unknown, not yet listed, or delisted). Raises PriceDataUnavailableError when the provider cannot answer.
         """
+
+    @abstractmethod
+    def closes_between(self, symbol: str, start: date, end: date) -> dict[date, Quote]:
+        """For each calendar day from `start` to `end`, what `close_on` would answer for it, with one request.
+
+        Days without a close are left out. Raises PriceDataUnavailableError when the provider cannot answer.
+        """

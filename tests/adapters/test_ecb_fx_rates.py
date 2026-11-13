@@ -105,6 +105,26 @@ def test_rates_of_the_current_year_are_asked_for_the_days_needed() -> None:
     assert (seen[0].url.params["startPeriod"], seen[0].url.params["endPeriod"]) == ("2026-06-16", "2026-06-23")
 
 
+def test_rates_between_ask_once_for_the_whole_period() -> None:
+    seen: list[httpx2.Request] = []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        seen.append(request)
+        return httpx2.Response(200, text=HISTORY_CSV)
+
+    adapter = EcbFxRates(CLOCK, transport=httpx2.MockTransport(handler))
+    rates = adapter.rates_between(Currency.USD, Currency.EUR, date(2024, 6, 20), date(2024, 6, 23))
+
+    assert len(seen) == 1
+    assert [(day.isoformat(), rate.as_of.isoformat()) for day, rate in rates.items()] == [
+        ("2024-06-20", "2024-06-20"),
+        ("2024-06-21", "2024-06-21"),
+        ("2024-06-22", "2024-06-21"),
+        ("2024-06-23", "2024-06-21"),
+    ]
+    assert rates[date(2024, 6, 23)].rate == Decimal(1) / Decimal("1.0688")
+
+
 @pytest.mark.parametrize("fetch", ["latest", "historical"])
 def test_network_problems_mean_rates_are_unavailable(fetch: str) -> None:
     def handler(request: httpx2.Request) -> httpx2.Response:

@@ -13,6 +13,7 @@ from http import HTTPStatus
 
 import httpx2
 
+from shadowfolio.adapters.daily import last_on_or_before
 from shadowfolio.domain.money import Currency, FxRate
 from shadowfolio.ports.clock import Clock
 from shadowfolio.ports.fx_rates import FxRates, FxRatesUnavailableError
@@ -57,6 +58,26 @@ class EcbFxRates(FxRates):
         as_of = min((published for published, _ in per_euro.values()), default=day)
         rates = {currency: rate for currency, (_, rate) in per_euro.items()} | {Currency.EUR: Decimal(1)}
         return FxRate(base=base, quote=quote, rate=rates[quote] / rates[base], as_of=as_of)
+
+    def rates_between(self, base: Currency, quote: Currency, start: date, end: date) -> dict[date, FxRate]:
+        """One request per currency other than the euro, for the whole period."""
+        per_euro: dict[Currency, dict[date, tuple[date, Decimal]]] = {}
+        for currency in {base, quote} - {Currency.EUR}:
+            try:
+                series = self._series(currency, start - HISTORY_LOOKBACK, end)
+            except httpx2.HTTPError as error:
+                raise FxRatesUnavailableError(f"ECB: {error}") from error
+            per_euro[currency] = last_on_or_before(((day, (day, rate)) for day, rate in series), start, end, HISTORY_LOOKBACK)
+        rates: dict[date, FxRate] = {}
+        for offset in range((end - start).days + 1):
+            day = start + timedelta(days=offset)
+            if any(day not in days for days in per_euro.values()):
+                continue
+            found = {currency: days[day] for currency, days in per_euro.items()}
+            as_of = min((published for published, _ in found.values()), default=day)
+            units = {currency: rate for currency, (_, rate) in found.items()} | {Currency.EUR: Decimal(1)}
+            rates[day] = FxRate(base=base, quote=quote, rate=units[quote] / units[base], as_of=as_of)
+        return rates
 
     def _per_euro_on(self, currency: Currency, day: date) -> tuple[date, Decimal] | None:
         """Units of `currency` per euro on `day`, or on the last day before it (within a week) with a published rate."""

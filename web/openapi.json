@@ -785,6 +785,95 @@
         }
       }
     },
+    "/api/wallets/{wallet_id}/valuation/daily": {
+      "get": {
+        "summary": "Daily Valuation",
+        "description": "The wallet's value at the end of every day from `start` (default: its first operation) to `end` (default: today).",
+        "operationId": "daily_valuation",
+        "parameters": [
+          {
+            "name": "wallet_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Wallet Id"
+            }
+          },
+          {
+            "name": "start",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start"
+            }
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DailyValueResponse"
+                  },
+                  "title": "Response Daily Valuation"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Malformed request or broken business rule",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/market/quotes/{symbol}": {
       "get": {
         "summary": "Latest Quote",
@@ -1034,6 +1123,41 @@
           "EUR"
         ],
         "title": "Currency"
+      },
+      "DailyValueResponse": {
+        "properties": {
+          "day": {
+            "type": "string",
+            "format": "date",
+            "title": "Day"
+          },
+          "cash": {
+            "type": "string",
+            "title": "Cash"
+          },
+          "holdings_value": {
+            "type": "string",
+            "title": "Holdings Value"
+          },
+          "total": {
+            "type": "string",
+            "title": "Total"
+          },
+          "net_deposits": {
+            "type": "string",
+            "title": "Net Deposits"
+          }
+        },
+        "type": "object",
+        "required": [
+          "day",
+          "cash",
+          "holdings_value",
+          "total",
+          "net_deposits"
+        ],
+        "title": "DailyValueResponse",
+        "description": "The wallet at the end of a day, valued at that day's closing prices, in its currency."
       },
       "DepositEdit": {
         "properties": {

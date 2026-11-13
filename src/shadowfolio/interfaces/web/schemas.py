@@ -9,7 +9,7 @@ from pydantic import AwareDatetime, BaseModel, Field
 
 from shadowfolio.domain.money import Currency
 from shadowfolio.domain.operations import Buy, Deposit, Dividend, Operation, OperationType, PriceSource, Sell, Split, Withdrawal
-from shadowfolio.domain.valuation import WalletValuation
+from shadowfolio.domain.valuation import DailyValue, WalletValuation
 from shadowfolio.domain.wallet import Wallet
 
 
@@ -266,6 +266,22 @@ class ValuationResponse(BaseModel):
             day_change_percent=_ratio_percent(valuation.day_change_ratio),
             total=valuation.total,
         )
+
+
+class DailyValueResponse(BaseModel):
+    """The wallet at the end of a day, valued at that day's closing prices, in its currency."""
+
+    day: date
+    cash: Decimal
+    holdings_value: Decimal
+    total: Decimal  # cash plus holdings
+    net_deposits: Decimal  # deposits minus withdrawals up to then, so a chart can tell money put in from gains
+
+    @classmethod
+    def from_daily_value(cls, value: DailyValue) -> "DailyValueResponse":
+        holdings_value = _cents(value.valuation.total - value.valuation.cash)
+        cash = value.valuation.cash
+        return cls(day=value.day, cash=cash, holdings_value=holdings_value, total=cash + holdings_value, net_deposits=value.net_deposits)
 
 
 class QuoteResponse(BaseModel):

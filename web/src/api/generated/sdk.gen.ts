@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { CopyWalletData, CopyWalletErrors, CopyWalletResponses, CreateWalletData, CreateWalletErrors, CreateWalletResponses, DeleteOperationData, DeleteOperationErrors, DeleteOperationResponses, DeleteWalletData, DeleteWalletErrors, DeleteWalletResponses, DepositData, DepositErrors, DepositResponses, EditOperationData, EditOperationErrors, EditOperationResponses, GetWalletData, GetWalletErrors, GetWalletResponses, LatestQuoteData, LatestQuoteErrors, LatestQuoteResponses, ListOperationsData, ListOperationsErrors, ListOperationsResponses, ListWalletsData, ListWalletsResponses, RecordBuyData, RecordBuyErrors, RecordBuyResponses, RecordSellData, RecordSellErrors, RecordSellResponses, SyncAllWalletsData, SyncAllWalletsErrors, SyncAllWalletsResponses, UpdateWalletData, UpdateWalletErrors, UpdateWalletResponses, WalletValuationData, WalletValuationErrors, WalletValuationResponses, WithdrawData, WithdrawErrors, WithdrawResponses } from './types.gen';
+import type { CopyWalletData, CopyWalletErrors, CopyWalletResponses, CreateWalletData, CreateWalletErrors, CreateWalletResponses, DailyValuationData, DailyValuationErrors, DailyValuationResponses, DeleteOperationData, DeleteOperationErrors, DeleteOperationResponses, DeleteWalletData, DeleteWalletErrors, DeleteWalletResponses, DepositData, DepositErrors, DepositResponses, EditOperationData, EditOperationErrors, EditOperationResponses, GetWalletData, GetWalletErrors, GetWalletResponses, LatestQuoteData, LatestQuoteErrors, LatestQuoteResponses, ListOperationsData, ListOperationsErrors, ListOperationsResponses, ListWalletsData, ListWalletsResponses, RecordBuyData, RecordBuyErrors, RecordBuyResponses, RecordSellData, RecordSellErrors, RecordSellResponses, SyncAllWalletsData, SyncAllWalletsErrors, SyncAllWalletsResponses, UpdateWalletData, UpdateWalletErrors, UpdateWalletResponses, WalletValuationData, WalletValuationErrors, WalletValuationResponses, WithdrawData, WithdrawErrors, WithdrawResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -145,6 +145,13 @@ export const editOperation = <ThrowOnError extends boolean = false>(options: Opt
  * What the wallet is worth now, or, given `on`, at the end of that day at its closing prices.
  */
 export const walletValuation = <ThrowOnError extends boolean = false>(options: Options<WalletValuationData, ThrowOnError>): RequestResult<WalletValuationResponses, WalletValuationErrors, ThrowOnError> => (options.client ?? client).get<WalletValuationResponses, WalletValuationErrors, ThrowOnError>({ url: '/api/wallets/{wallet_id}/valuation', ...options });
+
+/**
+ * Daily Valuation
+ *
+ * The wallet's value at the end of every day from `start` (default: its first operation) to `end` (default: today).
+ */
+export const dailyValuation = <ThrowOnError extends boolean = false>(options: Options<DailyValuationData, ThrowOnError>): RequestResult<DailyValuationResponses, DailyValuationErrors, ThrowOnError> => (options.client ?? client).get<DailyValuationResponses, DailyValuationErrors, ThrowOnError>({ url: '/api/wallets/{wallet_id}/valuation/daily', ...options });
 
 /**
  * Latest Quote

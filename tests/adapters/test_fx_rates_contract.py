@@ -61,3 +61,13 @@ def test_rate_on_a_day_without_one_is_the_last_published_before_it(fx_rates: FxR
     assert rate.as_of == FRIDAY
     assert isinstance(rate.rate, Decimal)
     assert rate.rate > 0
+
+
+def test_rates_between_give_each_day_the_last_published_rate(fx_rates: FxRates) -> None:
+    saturday = date(2024, 6, 22)
+
+    rates = fx_rates.rates_between(Currency.EUR, Currency.USD, FRIDAY, SUNDAY)
+
+    assert sorted(rates) == [FRIDAY, saturday, SUNDAY]
+    assert {rate.as_of for rate in rates.values()} == {FRIDAY}
+    assert rates[SUNDAY] == fx_rates.rate_on(Currency.EUR, Currency.USD, SUNDAY)

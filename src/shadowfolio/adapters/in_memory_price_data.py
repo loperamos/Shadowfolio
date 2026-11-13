@@ -1,6 +1,6 @@
 """PriceData holding quotes, minute bars and daily closes in memory, for tests."""
 
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 from shadowfolio.domain.valuation import Quote
 from shadowfolio.ports.price_data import PriceData
@@ -33,3 +33,7 @@ class InMemoryPriceData(PriceData):
 
     def close_on(self, symbol: str, day: date) -> Quote | None:
         return next((close for close in reversed(self._closes.get(symbol, [])) if close.as_of.date() <= day), None)
+
+    def closes_between(self, symbol: str, start: date, end: date) -> dict[date, Quote]:
+        days = (start + timedelta(days=offset) for offset in range((end - start).days + 1))
+        return {day: close for day in days if (close := self.close_on(symbol, day)) is not None}

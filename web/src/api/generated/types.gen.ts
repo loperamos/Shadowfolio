@@ -91,6 +91,34 @@ export const Currency = { USD: 'USD', EUR: 'EUR' } as const;
 export type Currency = typeof Currency[keyof typeof Currency];
 
 /**
+ * DailyValueResponse
+ *
+ * The wallet at the end of a day, valued at that day's closing prices, in its currency.
+ */
+export type DailyValueResponse = {
+    /**
+     * Day
+     */
+    day: string;
+    /**
+     * Cash
+     */
+    cash: string;
+    /**
+     * Holdings Value
+     */
+    holdings_value: string;
+    /**
+     * Total
+     */
+    total: string;
+    /**
+     * Net Deposits
+     */
+    net_deposits: string;
+};
+
+/**
  * DepositEdit
  */
 export type DepositEdit = {
@@ -999,6 +1027,51 @@ export type WalletValuationResponses = {
 };
 
 export type WalletValuationResponse = WalletValuationResponses[keyof WalletValuationResponses];
+
+export type DailyValuationData = {
+    body?: never;
+    path: {
+        /**
+         * Wallet Id
+         */
+        wallet_id: string;
+    };
+    query?: {
+        /**
+         * Start
+         */
+        start?: string | null;
+        /**
+         * End
+         */
+        end?: string | null;
+    };
+    url: '/api/wallets/{wallet_id}/valuation/daily';
+};
+
+export type DailyValuationErrors = {
+    /**
+     * Not found
+     */
+    404: ErrorResponse;
+    /**
+     * Malformed request or broken business rule
+     */
+    422: ErrorResponse;
+};
+
+export type DailyValuationError = DailyValuationErrors[keyof DailyValuationErrors];
+
+export type DailyValuationResponses = {
+    /**
+     * Response Daily Valuation
+     *
+     * Successful Response
+     */
+    200: Array<DailyValueResponse>;
+};
+
+export type DailyValuationResponse = DailyValuationResponses[keyof DailyValuationResponses];
 
 export type LatestQuoteData = {
     body?: never;

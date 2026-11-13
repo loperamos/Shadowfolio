@@ -1,6 +1,6 @@
 """FxRates holding rates in memory, for tests."""
 
-from datetime import date
+from datetime import date, timedelta
 
 from shadowfolio.domain.money import Currency, FxRate
 from shadowfolio.ports.fx_rates import FxRates
@@ -25,3 +25,7 @@ class InMemoryFxRates(FxRates):
     def rate_on(self, base: Currency, quote: Currency, day: date) -> FxRate | None:
         earlier = [rate for rate in self._rates.get((base, quote), []) if rate.as_of <= day]
         return earlier[-1] if earlier else None
+
+    def rates_between(self, base: Currency, quote: Currency, start: date, end: date) -> dict[date, FxRate]:
+        days = (start + timedelta(days=offset) for offset in range((end - start).days + 1))
+        return {day: rate for day in days if (rate := self.rate_on(base, quote, day)) is not None}
