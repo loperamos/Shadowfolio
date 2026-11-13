@@ -21,6 +21,7 @@ import { AutomaticBadge, HindsightBadge, MarketPriceBadge } from "./HindsightBad
 import { SplitsCheckNotice } from "./SplitsCheckNotice";
 import { WalletActionsMenu } from "./WalletActionsMenu";
 import { WalletSettingsModal } from "./WalletSettingsModal";
+import { WalletValueChart } from "./WalletValueChart";
 import { WalletDayChange, WalletGain, WalletValue } from "./WalletValue";
 
 const NOT_FOUND_STATUS = 404;
@@ -196,6 +197,8 @@ function WalletDetails({ wallet, operations, version, onEditOperation, onDeleteO
           {valuation.message}
         </Alert>
       )}
+
+      <WalletValueChart walletId={wallet.id} currency={wallet.currency} refreshKey={version} />
 
       <div>
         <Title order={2} mb="sm">

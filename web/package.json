@@ -12,6 +12,7 @@
     "generate": "cd .. && uv run python -m shadowfolio.wiring.openapi web/openapi.json && cd web && openapi-ts"
   },
   "dependencies": {
+    "@mantine/charts": "^9.7.4",
     "@mantine/core": "^9.7.4",
     "@mantine/dates": "^9.7.4",
     "@mantine/hooks": "^9.7.4",
@@ -19,7 +20,8 @@
     "dayjs": "^1.11.23",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
-    "react-router": "^8.5.1"
+    "react-router": "^8.5.1",
+    "recharts": "^3.10.1"
   },
   "devDependencies": {
     "@hey-api/openapi-ts": "^0.99.0",

@@ -83,6 +83,11 @@ export function formatAmount(value: string): string {
   return `${negative ? "-" : ""}${grouped}.${fraction.padEnd(MIN_AMOUNT_DECIMALS, "0")}`;
 }
 
+/** A whole amount for chart axes: thousands separators, no decimals, e.g. 4550 → "4,550". */
+export function formatWholeAmount(value: number): string {
+  return formatAmount(Math.round(value).toString()).split(".")[0];
+}
+
 /**
  * A decimal string with its decimal point moved `places` to the right (left when negative), e.g. a rate of 0.15
  * as the percentage 15 (places 2), and back (places -2). Works on the text, so the value never goes through a float.
