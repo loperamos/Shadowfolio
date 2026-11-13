@@ -177,3 +177,40 @@ def test_without_exchange_rates_a_dividend_in_another_currency_is_not_guessed(ac
         "could not fetch exchange rates for dividends right now; try again later",
     )
     assert client.get(f"/api/wallets/{wallet_id}").json()["holdings"] == {}
+
+
+def test_the_wallets_withholding_tax_is_taken_from_every_dividend(actions: CountingCorporateActions) -> None:
+    client = client_for(actions)
+    wallet_id = new_wallet(client)
+    buy_googl(client, wallet_id, "3", "2024-05-01T15:00:00Z")
+
+    response = client.patch(f"/api/wallets/{wallet_id}", json={"withholding_rate": "0.15"})
+
+    assert response.status_code == 200
+    assert (response.json()["withholding_rate"], response.json()["cash"]) == ("0.15", "1490.51")  # 2000 - 510 + 0.51
+    [dividend] = dividends(client, wallet_id)
+    assert (dividend["gross"], dividend["withholding"], dividend["amount"]) == ("0.60", "0.09", "0.51")
+
+
+def test_a_higher_withholding_tax_that_takes_away_dividend_cash_already_spent_is_refused(actions: CountingCorporateActions) -> None:
+    client = client_for(actions)
+    wallet_id = new_wallet(client)
+    buy_googl(client, wallet_id, "3", "2024-05-01T15:00:00Z")
+    client.post(f"/api/wallets/{wallet_id}/withdrawals", json={"amount": "1490.60", "timestamp": "2024-06-20T09:00:00Z"})
+
+    response = client.patch(f"/api/wallets/{wallet_id}", json={"withholding_rate": "0.15"})
+
+    assert response.status_code == 422
+    assert response.json()["detail"].startswith("cash would be -0.09")
+    assert client.get(f"/api/wallets/{wallet_id}").json()["withholding_rate"] == "0"
+
+
+@pytest.mark.parametrize("rate", ["-0.01", "1"])
+def test_a_withholding_tax_outside_0_to_100_percent_is_rejected(actions: CountingCorporateActions, rate: str) -> None:
+    client = client_for(actions)
+    wallet_id = new_wallet(client)
+
+    response = client.patch(f"/api/wallets/{wallet_id}", json={"withholding_rate": rate})
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "withholding tax must be at least 0% and below 100%"

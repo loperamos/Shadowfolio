@@ -125,8 +125,8 @@
     },
     "/api/wallets/{wallet_id}": {
       "patch": {
-        "summary": "Rename Wallet",
-        "operationId": "rename_wallet",
+        "summary": "Update Wallet",
+        "operationId": "update_wallet",
         "parameters": [
           {
             "name": "wallet_id",
@@ -144,7 +144,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/RenameWalletRequest"
+                "$ref": "#/components/schemas/UpdateWalletRequest"
               }
             }
           }
@@ -1354,6 +1354,28 @@
               }
             ],
             "title": "Fx Rate"
+          },
+          "gross": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gross"
+          },
+          "withholding": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Withholding"
           }
         },
         "type": "object",
@@ -1425,19 +1447,6 @@
           "previous_close"
         ],
         "title": "QuoteResponse"
-      },
-      "RenameWalletRequest": {
-        "properties": {
-          "name": {
-            "type": "string",
-            "title": "Name"
-          }
-        },
-        "type": "object",
-        "required": [
-          "name"
-        ],
-        "title": "RenameWalletRequest"
       },
       "SellEdit": {
         "properties": {
@@ -1625,6 +1634,38 @@
         ],
         "title": "TradeRequest"
       },
+      "UpdateWalletRequest": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "withholding_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Withholding Rate"
+          }
+        },
+        "type": "object",
+        "title": "UpdateWalletRequest",
+        "description": "Only the fields given change."
+      },
       "ValuationResponse": {
         "properties": {
           "currency": {
@@ -1715,6 +1756,10 @@
           "currency": {
             "$ref": "#/components/schemas/Currency"
           },
+          "withholding_rate": {
+            "type": "string",
+            "title": "Withholding Rate"
+          },
           "cash": {
             "type": "string",
             "title": "Cash"
@@ -1759,6 +1804,7 @@
           "id",
           "name",
           "currency",
+          "withholding_rate",
           "cash",
           "holdings",
           "cost_basis",

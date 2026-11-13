@@ -15,6 +15,7 @@ from shadowfolio.domain.errors import (
     InsufficientSharesError,
     InvalidAmountError,
     InvalidNameError,
+    InvalidRateError,
     MissingSettledAmountError,
     OperationNotFoundError,
     OperationTypeChangeError,
@@ -35,10 +36,14 @@ class Wallet:
     checked: dict[str, CheckedPeriod] = field(default_factory=dict)
     # Dividend events known for traded symbols; the wallet's Dividend operations are always derived from them.
     dividend_events: tuple[RecordedDividend, ...] = ()
+    # Share of each dividend withheld as tax (e.g. 0.15 for 15%), in [0, 1); 0 pays dividends gross.
+    withholding_rate: Decimal = Decimal(0)
 
     def __post_init__(self) -> None:
         if not self.name.strip():
             raise InvalidNameError("name must not be blank")
+        if not Decimal(0) <= self.withholding_rate < Decimal(1):
+            raise InvalidRateError("withholding tax must be at least 0% and below 100%")
 
     @property
     def cash(self) -> Decimal:
@@ -67,6 +72,10 @@ class Wallet:
 
     def rename(self, name: str) -> Self:
         return replace(self, name=name)
+
+    def set_withholding_rate(self, rate: Decimal) -> Self:
+        """Change the tax withheld from dividends; every dividend is worked out again, and the whole timeline checked."""
+        return replace(self, withholding_rate=rate)._settled(self.operations)
 
     # Every method that records an operation can instead replace an existing one of the same kind (`replacing=<its id>`):
     # the new version takes its place in a single check of the timeline, so an edit never fails halfway.
@@ -215,7 +224,8 @@ class Wallet:
             shares = _holdings(op for op in base if op.timestamp < ex_start).get(event.symbol, Decimal(0))
             if shares <= 0:
                 continue
-            amount = to_cents(shares * event.per_share * (recorded.fx_rate if recorded.fx_rate is not None else Decimal(1)))
+            gross = to_cents(shares * event.per_share * (recorded.fx_rate if recorded.fx_rate is not None else Decimal(1)))
+            withholding = to_cents(gross * self.withholding_rate)
             dividends.append(
                 Dividend(
                     # Stable for this wallet and event, so it stays the same each time it is derived.
@@ -226,8 +236,9 @@ class Wallet:
                     currency=event.currency,
                     shares=shares,
                     fx_rate=recorded.fx_rate,
-                    amount=amount,
+                    amount=gross - withholding,
                     event_id=event.event_id,
+                    withholding=withholding,
                 )
             )
         return dividends

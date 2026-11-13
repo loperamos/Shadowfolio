@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 
 import { apiErrorMessage } from "../api/errors";
-import { getWallet, listOperations, type OperationResponse, OperationType, PriceSource, renameWallet, type WalletResponse } from "../api/generated";
+import { getWallet, listOperations, type OperationResponse, OperationType, PriceSource, updateWallet, type WalletResponse } from "../api/generated";
 import { walletPath, WALLETS_PATH } from "../routes";
 import { EditableTitle } from "../ui/EditableTitle";
 import { GainText } from "../ui/GainText";
@@ -20,6 +20,7 @@ import { type ValuationState, useWalletValuation } from "./useWalletValuation";
 import { AutomaticBadge, HindsightBadge, MarketPriceBadge } from "./HindsightBadges";
 import { SplitsCheckNotice } from "./SplitsCheckNotice";
 import { WalletActionsMenu } from "./WalletActionsMenu";
+import { WalletSettingsModal } from "./WalletSettingsModal";
 import { WalletDayChange, WalletGain, WalletValue } from "./WalletValue";
 
 const NOT_FOUND_STATUS = 404;
@@ -41,6 +42,7 @@ export function WalletPage() {
   // Bumped after the wallet's history changes, to load it (and its value) again.
   const [version, setVersion] = useState(0);
   const [toDuplicate, setToDuplicate] = useState<WalletResponse | null>(null);
+  const [toConfigure, setToConfigure] = useState<WalletResponse | null>(null);
   const [toDelete, setToDelete] = useState<WalletResponse[]>([]);
 
   useEffect(() => {
@@ -75,7 +77,7 @@ export function WalletPage() {
 
   async function rename(name: string): Promise<string | null> {
     try {
-      const { data, error } = await renameWallet({ path: { wallet_id: walletId }, body: { name } });
+      const { data, error } = await updateWallet({ path: { wallet_id: walletId }, body: { name } });
       if (!data) {
         return apiErrorMessage(error);
       }
@@ -116,7 +118,7 @@ export function WalletPage() {
               <Button leftSection={<IconPlus size={ICON_SIZE} />} onClick={() => setOperationDialog({ operation: null })}>
                 Add operation
               </Button>
-              <WalletActionsMenu wallet={state.wallet} onRename={() => setEditingName(true)} onDuplicate={setToDuplicate} onDelete={setToDelete} />
+              <WalletActionsMenu wallet={state.wallet} onRename={() => setEditingName(true)} onSettings={setToConfigure} onDuplicate={setToDuplicate} onDelete={setToDelete} />
             </Group>
           </Group>
           <SplitsCheckNotice wallet={state.wallet} />
@@ -136,6 +138,7 @@ export function WalletPage() {
           />
           <DeleteOperationModal wallet={state.wallet} operation={operationToDelete} onClose={() => setOperationToDelete(null)} onDeleted={reload} />
           {/* Duplicating opens the copy; deleting goes back to the list. */}
+          <WalletSettingsModal wallet={toConfigure} onClose={() => setToConfigure(null)} onSaved={reload} />
           <DuplicateWalletModal wallet={toDuplicate} onClose={() => setToDuplicate(null)} onDuplicated={(copy) => navigate(walletPath(copy.id))} />
           <DeleteWalletsModal wallets={toDelete} onClose={() => setToDelete([])} onDeleted={(allDeleted) => allDeleted && navigate(WALLETS_PATH)} />
         </>
@@ -248,7 +251,7 @@ function WalletDetails({ wallet, operations, version, onEditOperation, onDeleteO
                 <Table.Th ta="right">Quantity</Table.Th>
                 <Table.Th ta="right">Price</Table.Th>
                 <Table.Th ta="right">Amount</Table.Th>
-                <Table.Th ta="right">Fees</Table.Th>
+                <Table.Th ta="right">Fees & tax</Table.Th>
                 <Table.Th w={40} />
               </Table.Tr>
             </Table.Thead>
@@ -277,7 +280,11 @@ function WalletDetails({ wallet, operations, version, onEditOperation, onDeleteO
                     )}
                   </Table.Td>
                   <Table.Td ta="right">{op.type !== OperationType.SPLIT && <Money amount={op.amount} currency={wallet.currency} />}</Table.Td>
-                  <Table.Td ta="right">{op.fees !== "0" && <Money amount={op.fees} currency={wallet.currency} />}</Table.Td>
+                  <Table.Td ta="right">
+                    {/* Dividends: the tax withheld; Amount is what was credited after it. */}
+                    {op.fees !== "0" && <Money amount={op.fees} currency={wallet.currency} />}
+                    {op.withholding != null && Number(op.withholding) !== 0 && <Money amount={op.withholding} currency={wallet.currency} />}
+                  </Table.Td>
                   <Table.Td>
                     {/* Automatic operations have no actions; they are marked in the Type column instead. */}
                     {!op.automatic && <OperationActionsMenu operation={op} onEdit={onEditOperation} onDelete={onDeleteOperation} />}

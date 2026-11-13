@@ -2,7 +2,7 @@ import { Alert, Button, Group, Modal, Stack, TextInput } from "@mantine/core";
 import { type FormEvent, useState } from "react";
 
 import { apiErrorMessage } from "../api/errors";
-import { renameWallet, type WalletResponse } from "../api/generated";
+import { updateWallet, type WalletResponse } from "../api/generated";
 
 type Props = {
   wallet: WalletResponse | null; // the wallet to rename; null when closed
@@ -29,7 +29,7 @@ function RenameForm({ wallet, onClose, onRenamed }: { wallet: WalletResponse; on
     setSaving(true);
     setError(null);
     try {
-      const { data, error } = await renameWallet({ path: { wallet_id: wallet.id }, body: { name } });
+      const { data, error } = await updateWallet({ path: { wallet_id: wallet.id }, body: { name } });
       if (data) {
         onClose();
         onRenamed(data);

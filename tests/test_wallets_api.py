@@ -31,6 +31,7 @@ def test_created_wallet_can_be_read_back(client: TestClient) -> None:
         "id": wallet_id,
         "name": "Long term",
         "currency": "EUR",
+        "withholding_rate": "0",
         "cash": "1000.50",
         "holdings": {},
         "cost_basis": {},

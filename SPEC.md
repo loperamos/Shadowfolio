@@ -81,7 +81,7 @@ A hosted, subscription service where people test investing strategies against re
 4. Each payment is an operation linked to the provider's event ID, so it is never paid twice.
 
 Decisions:
-- **Withholding tax:** pay gross, or apply a rate set per user.
+- **Withholding tax:** a rate per wallet (0% pays gross). Dividends show gross, tax and net; only the net reaches cash. Changing the rate works out every dividend again, and is refused if it takes away cash already spent. With accounts, a per-user default rate for new wallets.
 - **Reinvestment:** reinvesting can be a per-wallet option.
 - **Imported dividends:** match them to known events instead of crediting them twice.
 - **Benchmarks:** they include dividends.
@@ -185,7 +185,7 @@ No paid subscription is needed before the licensed-provider slice.
 ## Open questions
 
 - Rule strategies: how users define them, and what the rule language is.
-- Withholding tax default; dividend reinvestment option.
+- Withholding by the security's country (one rate per wallet while the MVP is US-only); dividend reinvestment option.
 - Comparison metrics and charts beyond the basics.
 - Plans, limits and pricing.
 - Hosting provider.

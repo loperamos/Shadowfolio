@@ -82,3 +82,21 @@ export function formatAmount(value: string): string {
   const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, THOUSANDS_SEPARATOR);
   return `${negative ? "-" : ""}${grouped}.${fraction.padEnd(MIN_AMOUNT_DECIMALS, "0")}`;
 }
+
+/**
+ * A decimal string with its decimal point moved `places` to the right (left when negative), e.g. a rate of 0.15
+ * as the percentage 15 (places 2), and back (places -2). Works on the text, so the value never goes through a float.
+ */
+export function shiftDecimal(value: string, places: number): string {
+  const [whole, fraction = ""] = value.split(".");
+  let digits = whole + fraction;
+  let point = whole.length + places;
+  if (point < 0) {
+    digits = "0".repeat(-point) + digits;
+    point = 0;
+  }
+  digits = digits.padEnd(point, "0");
+  const integer = digits.slice(0, point).replace(/^0+(?=\d)/, "") || "0";
+  const decimals = digits.slice(point).replace(/0+$/, "");
+  return decimals ? `${integer}.${decimals}` : integer;
+}

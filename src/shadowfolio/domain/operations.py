@@ -168,7 +168,8 @@ class Split(BaseOperation):
 @dataclass(frozen=True)
 class Dividend(BaseOperation):
     """A cash dividend, derived by the wallet from a known dividend event: `shares` were held when its ex-date
-    started, each paid `per_share` in `currency`; `amount` is what was credited in the wallet's currency (gross)."""
+    started, each paid `per_share` in `currency`. In the wallet's currency, `withholding` is the tax withheld and
+    `amount` what was credited after it (net)."""
 
     type: ClassVar[OperationType] = OperationType.DIVIDEND
 
@@ -179,6 +180,12 @@ class Dividend(BaseOperation):
     fx_rate: Decimal | None  # into the wallet's currency on the payment date; None when no conversion was needed
     amount: Decimal
     event_id: str
+    withholding: Decimal = Decimal(0)
+
+    @property
+    def gross(self) -> Decimal:
+        """Before tax, in the wallet's currency."""
+        return self.amount + self.withholding
 
     @property
     def cash_delta(self) -> Decimal:

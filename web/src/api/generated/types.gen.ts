@@ -263,6 +263,14 @@ export type OperationResponse = {
      * Fx Rate
      */
     fx_rate?: string | null;
+    /**
+     * Gross
+     */
+    gross?: string | null;
+    /**
+     * Withholding
+     */
+    withholding?: string | null;
 };
 
 /**
@@ -313,16 +321,6 @@ export type QuoteResponse = {
      * Previous Close
      */
     previous_close: string | null;
-};
-
-/**
- * RenameWalletRequest
- */
-export type RenameWalletRequest = {
-    /**
-     * Name
-     */
-    name: string;
 };
 
 /**
@@ -406,6 +404,22 @@ export type TradeRequest = {
 };
 
 /**
+ * UpdateWalletRequest
+ *
+ * Only the fields given change.
+ */
+export type UpdateWalletRequest = {
+    /**
+     * Name
+     */
+    name?: string | null;
+    /**
+     * Withholding Rate
+     */
+    withholding_rate?: number | string | null;
+};
+
+/**
  * ValuationResponse
  */
 export type ValuationResponse = {
@@ -457,6 +471,10 @@ export type WalletResponse = {
      */
     name: string;
     currency: Currency;
+    /**
+     * Withholding Rate
+     */
+    withholding_rate: string;
     /**
      * Cash
      */
@@ -650,8 +668,8 @@ export type GetWalletResponses = {
 
 export type GetWalletResponse = GetWalletResponses[keyof GetWalletResponses];
 
-export type RenameWalletData = {
-    body: RenameWalletRequest;
+export type UpdateWalletData = {
+    body: UpdateWalletRequest;
     path: {
         /**
          * Wallet Id
@@ -662,7 +680,7 @@ export type RenameWalletData = {
     url: '/api/wallets/{wallet_id}';
 };
 
-export type RenameWalletErrors = {
+export type UpdateWalletErrors = {
     /**
      * Not found
      */
@@ -673,16 +691,16 @@ export type RenameWalletErrors = {
     422: ErrorResponse;
 };
 
-export type RenameWalletError = RenameWalletErrors[keyof RenameWalletErrors];
+export type UpdateWalletError = UpdateWalletErrors[keyof UpdateWalletErrors];
 
-export type RenameWalletResponses = {
+export type UpdateWalletResponses = {
     /**
      * Successful Response
      */
     200: WalletResponse;
 };
 
-export type RenameWalletResponse = RenameWalletResponses[keyof RenameWalletResponses];
+export type UpdateWalletResponse = UpdateWalletResponses[keyof UpdateWalletResponses];
 
 export type ListOperationsData = {
     body?: never;

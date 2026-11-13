@@ -20,3 +20,4 @@ export const TABLE_MIN_WIDTH = rem(900);
 
 // Width of tooltips that hold a sentence, so they wrap into a readable block.
 export const TOOLTIP_WIDTH = rem(260);
+export const PERCENT_INPUT_WIDTH = rem(110); // up to 99.99 and the % sign

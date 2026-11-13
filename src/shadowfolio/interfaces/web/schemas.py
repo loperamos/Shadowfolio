@@ -19,8 +19,11 @@ class CreateWalletRequest(BaseModel):
     cash: Decimal
 
 
-class RenameWalletRequest(BaseModel):
-    name: str
+class UpdateWalletRequest(BaseModel):
+    """Only the fields given change."""
+
+    name: str | None = None
+    withholding_rate: Decimal | None = None  # share of each dividend withheld as tax, e.g. 0.15 for 15%
 
 
 class CopyWalletRequest(BaseModel):
@@ -100,6 +103,7 @@ class WalletResponse(BaseModel):
     id: UUID
     name: str
     currency: Currency
+    withholding_rate: Decimal  # share of each dividend withheld as tax, e.g. 0.15 for 15%
     cash: Decimal
     holdings: dict[str, Decimal]
     cost_basis: dict[str, Decimal]  # what each holding cost, in the wallet's currency (FIFO, fees included)
@@ -116,6 +120,7 @@ class WalletResponse(BaseModel):
             id=wallet.id,
             name=wallet.name,
             currency=wallet.currency,
+            withholding_rate=wallet.withholding_rate,
             cash=wallet.cash,
             holdings=wallet.holdings,
             cost_basis={symbol: _cents(position.cost) for symbol, position in ledger.positions.items()},
@@ -142,6 +147,9 @@ class OperationResponse(BaseModel):
     automatic: bool = False  # added by the system from market data; cannot be edited or deleted
     had_effect: bool = True  # false for a split when no shares of its symbol were held then
     fx_rate: Decimal | None = None  # dividends only: the rate into the wallet's currency on the payment date
+    # Dividends only, in the wallet's currency: before tax, and the tax withheld (amount is what was credited).
+    gross: Decimal | None = None
+    withholding: Decimal | None = None
 
     @classmethod
     def from_operation(cls, operation: Operation, had_effect: bool = True) -> "OperationResponse":
@@ -176,7 +184,7 @@ class OperationResponse(BaseModel):
                     had_effect=had_effect,
                 )
             case Dividend():
-                # quantity: the shares that qualified; price: the amount per share, in its currency; amount: credited.
+                # quantity: the shares that qualified; price: the amount per share, in its currency; amount: credited (net).
                 return cls(
                     id=operation.id,
                     type=operation.type,
@@ -188,6 +196,8 @@ class OperationResponse(BaseModel):
                     price=operation.per_share,
                     price_currency=operation.currency,
                     fx_rate=operation.fx_rate,
+                    gross=operation.gross,
+                    withholding=operation.withholding,
                     automatic=True,
                 )
 

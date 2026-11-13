@@ -1,4 +1,4 @@
-"""Routes for creating, renaming, copying, deleting and reading wallets."""
+"""Routes for creating, changing settings of, copying, deleting and reading wallets."""
 
 from uuid import UUID
 
@@ -10,7 +10,7 @@ from shadowfolio.interfaces.web.schemas import (
     CopyWalletRequest,
     CreateWalletRequest,
     OperationResponse,
-    RenameWalletRequest,
+    UpdateWalletRequest,
     WalletResponse,
 )
 from shadowfolio.usecases.wallets import Wallets
@@ -41,9 +41,9 @@ def wallets_router(wallets: Wallets) -> APIRouter:
         return WalletResponse.from_wallet(copy)
 
     @router.patch("/wallets/{wallet_id}", responses=NOT_FOUND | INVALID)
-    def rename_wallet(wallet_id: UUID, request: RenameWalletRequest) -> WalletResponse:
+    def update_wallet(wallet_id: UUID, request: UpdateWalletRequest) -> WalletResponse:
         try:
-            wallet = wallets.rename(wallet_id, request.name)
+            wallet = wallets.update(wallet_id, request.name, request.withholding_rate)
         except DomainError as error:
             raise rule_violation(error) from error
         if wallet is None:

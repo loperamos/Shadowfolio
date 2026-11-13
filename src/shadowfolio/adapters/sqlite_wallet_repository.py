@@ -18,7 +18,8 @@ CREATE TABLE IF NOT EXISTS wallets (
     id TEXT PRIMARY KEY,
     owner_id TEXT NOT NULL,
     name TEXT NOT NULL,
-    currency TEXT NOT NULL
+    currency TEXT NOT NULL,
+    withholding_rate TEXT NOT NULL DEFAULT '0'
 );
 CREATE TABLE IF NOT EXISTS operations (
     id TEXT PRIMARY KEY,
@@ -35,7 +36,8 @@ CREATE TABLE IF NOT EXISTS operations (
     split_old_rate TEXT,
     split_new_rate TEXT,
     event_id TEXT,
-    fx_rate TEXT
+    fx_rate TEXT,
+    withholding TEXT
 );
 CREATE TABLE IF NOT EXISTS checked_periods (
     wallet_id TEXT NOT NULL REFERENCES wallets (id),
@@ -59,14 +61,17 @@ CREATE TABLE IF NOT EXISTS dividend_events (
 
 # Columns added after a database may already exist, with what existing rows get. Trades stored before
 # price_source existed were all typed in from a broker; split and dividend columns only apply to those, added later.
+# Wallets stored before withholding existed paid dividends gross.
 _ADDED_COLUMNS = {
+    "wallets": {"withholding_rate": "TEXT NOT NULL DEFAULT '0'"},
     "operations": {
         "price_source": "TEXT DEFAULT 'entered'",
         "split_old_rate": "TEXT",
         "split_new_rate": "TEXT",
         "event_id": "TEXT",
         "fx_rate": "TEXT",
-    }
+        "withholding": "TEXT",
+    },
 }
 
 
@@ -81,8 +86,8 @@ class SqliteWalletRepository(WalletRepository):
     def add(self, wallet: Wallet) -> None:
         with closing(self._connect()) as conn, conn:
             conn.execute(
-                "INSERT INTO wallets (id, owner_id, name, currency) VALUES (?, ?, ?, ?)",
-                (str(wallet.id), wallet.owner_id, wallet.name, wallet.currency.value),
+                "INSERT INTO wallets (id, owner_id, name, currency, withholding_rate) VALUES (?, ?, ?, ?, ?)",
+                (str(wallet.id), wallet.owner_id, wallet.name, wallet.currency.value, str(wallet.withholding_rate)),
             )
             _insert_operations(conn, wallet)
             _insert_checked_periods(conn, wallet)
@@ -91,8 +96,8 @@ class SqliteWalletRepository(WalletRepository):
     def update(self, wallet: Wallet) -> None:
         with closing(self._connect()) as conn, conn:
             conn.execute(
-                "UPDATE wallets SET owner_id = ?, name = ?, currency = ? WHERE id = ?",
-                (wallet.owner_id, wallet.name, wallet.currency.value, str(wallet.id)),
+                "UPDATE wallets SET owner_id = ?, name = ?, currency = ?, withholding_rate = ? WHERE id = ?",
+                (wallet.owner_id, wallet.name, wallet.currency.value, str(wallet.withholding_rate), str(wallet.id)),
             )
             # Operations can be changed or removed, so they are replaced as a whole, in the same transaction.
             conn.execute("DELETE FROM operations WHERE wallet_id = ?", (str(wallet.id),))
@@ -104,12 +109,14 @@ class SqliteWalletRepository(WalletRepository):
 
     def get(self, wallet_id: UUID) -> Wallet | None:
         with closing(self._connect()) as conn:
-            row = conn.execute("SELECT id, owner_id, name, currency FROM wallets WHERE id = ?", (str(wallet_id),)).fetchone()
+            row = conn.execute(
+                "SELECT id, owner_id, name, currency, withholding_rate FROM wallets WHERE id = ?", (str(wallet_id),)
+            ).fetchone()
             if row is None:
                 return None
             operation_rows = conn.execute(
                 "SELECT id, type, timestamp, amount, fees, symbol, quantity, price, price_currency, price_source, "
-                "split_old_rate, split_new_rate, event_id, fx_rate "
+                "split_old_rate, split_new_rate, event_id, fx_rate, withholding "
                 "FROM operations WHERE wallet_id = ? ORDER BY timestamp, rowid",
                 (str(wallet_id),),
             ).fetchall()
@@ -127,6 +134,7 @@ class SqliteWalletRepository(WalletRepository):
             operations=tuple(_operation_from_row(op) for op in operation_rows),
             checked={symbol: CheckedPeriod(date.fromisoformat(start), date.fromisoformat(end)) for symbol, start, end in period_rows},
             dividend_events=tuple(_dividend_from_row(row) for row in dividend_rows),
+            withholding_rate=Decimal(row[4]),
         )
 
     def delete(self, wallet_id: UUID) -> None:
@@ -154,8 +162,8 @@ def _insert_operations(conn: sqlite3.Connection, wallet: Wallet) -> None:
     # In timeline order, so equal timestamps read back in the same order (ORDER BY timestamp, rowid).
     conn.executemany(
         "INSERT INTO operations (id, wallet_id, type, timestamp, amount, fees, "
-        "symbol, quantity, price, price_currency, price_source, split_old_rate, split_new_rate, event_id, fx_rate) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "symbol, quantity, price, price_currency, price_source, split_old_rate, split_new_rate, event_id, fx_rate, withholding) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         [_operation_to_row(wallet.id, op) for op in wallet.operations],
     )
 
@@ -197,7 +205,7 @@ def _dividend_from_row(row: tuple[str, ...]) -> RecordedDividend:
 
 def _operation_to_row(wallet_id: UUID, op: Operation) -> tuple[str | None, ...]:
     """One row per operation; columns that do not apply to its kind are NULL."""
-    symbol = quantity = price = price_currency = price_source = old_rate = new_rate = event_id = fx_rate = None
+    symbol = quantity = price = price_currency = price_source = old_rate = new_rate = event_id = fx_rate = withholding = None
     match op:
         case Deposit() | Withdrawal():
             amount, fees = op.amount, Decimal(0)
@@ -209,8 +217,8 @@ def _operation_to_row(wallet_id: UUID, op: Operation) -> tuple[str | None, ...]:
             amount, fees = Decimal(0), Decimal(0)
             symbol, old_rate, new_rate, event_id = op.symbol, str(op.old_rate), str(op.new_rate), op.event_id
         case Dividend():
-            # quantity: the shares that qualified; price: the amount per share, in its currency.
-            amount, fees = op.amount, Decimal(0)
+            # quantity: the shares that qualified; price: the amount per share, in its currency; amount: net of withholding.
+            amount, fees, withholding = op.amount, Decimal(0), str(op.withholding)
             symbol, quantity, price, price_currency, event_id = op.symbol, str(op.shares), str(op.per_share), op.currency.value, op.event_id
             fx_rate = None if op.fx_rate is None else str(op.fx_rate)
     return (
@@ -229,6 +237,7 @@ def _operation_to_row(wallet_id: UUID, op: Operation) -> tuple[str | None, ...]:
         new_rate,
         event_id,
         fx_rate,
+        withholding,
     )
 
 
@@ -248,6 +257,7 @@ def _operation_from_row(row: tuple[str | None, ...]) -> Operation:
         new_rate,
         event_id,
         fx_rate,
+        withholding,
     ) = row
     assert op_id and op_type and timestamp and amount and fees
     id_, at, value = UUID(op_id), datetime.fromisoformat(timestamp), Decimal(amount)
@@ -268,7 +278,8 @@ def _operation_from_row(row: tuple[str | None, ...]) -> Operation:
         case OperationType.DIVIDEND:
             assert symbol and quantity and price and price_currency and event_id
             rate = None if fx_rate is None else Decimal(fx_rate)
-            return Dividend(id_, at, symbol, Decimal(price), Currency(price_currency), Decimal(quantity), rate, value, event_id)
+            withheld = Decimal(withholding) if withholding is not None else Decimal(0)
+            return Dividend(id_, at, symbol, Decimal(price), Currency(price_currency), Decimal(quantity), rate, value, event_id, withheld)
 
 
 def _add_missing_columns(conn: sqlite3.Connection) -> None:
