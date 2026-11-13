@@ -19,6 +19,7 @@ import { DuplicateWalletModal } from "./DuplicateWalletModal";
 import { type ValuationState, useWalletValuation } from "./useWalletValuation";
 import { AutomaticBadge, HindsightBadge, MarketPriceBadge } from "./HindsightBadges";
 import { SplitsCheckNotice } from "./SplitsCheckNotice";
+import { UncreditedDividendsNotice } from "./UncreditedDividendsNotice";
 import { WalletActionsMenu } from "./WalletActionsMenu";
 import { WalletSettingsModal } from "./WalletSettingsModal";
 import { WalletValueChart } from "./WalletValueChart";
@@ -123,6 +124,7 @@ export function WalletPage() {
             </Group>
           </Group>
           <SplitsCheckNotice wallet={state.wallet} />
+          <UncreditedDividendsNotice wallet={state.wallet} />
           <WalletDetails
             wallet={state.wallet}
             operations={state.operations}

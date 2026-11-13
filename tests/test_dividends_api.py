@@ -214,3 +214,27 @@ def test_a_withholding_tax_outside_0_to_100_percent_is_rejected(actions: Countin
 
     assert response.status_code == 422
     assert response.json()["detail"] == "withholding tax must be at least 0% and below 100%"
+
+
+# As Alpaca reports dividends from before about April 2020: no payment date.
+UNDATED_DIVIDEND = DividendEvent("GOOGL", date(2024, 6, 10), None, Decimal("0.20"), Currency.USD, "googl-undated")
+
+
+def test_a_dividend_without_a_payment_date_is_listed_but_not_credited() -> None:
+    client = client_for(CountingCorporateActions(UNDATED_DIVIDEND))
+    wallet_id = new_wallet(client)
+    buy_googl(client, wallet_id, "3", "2024-05-01T15:00:00Z")
+
+    wallet = client.get(f"/api/wallets/{wallet_id}").json()
+
+    assert dividends(client, wallet_id) == []
+    assert wallet["cash"] == "1490"  # 2000 - 510, no dividend
+    assert wallet["uncredited_dividends"] == [{"symbol": "GOOGL", "ex_date": "2024-06-10", "per_share": "0.20", "currency": "USD"}]
+
+
+def test_an_undated_dividend_the_wallet_did_not_qualify_for_is_not_listed() -> None:
+    client = client_for(CountingCorporateActions(UNDATED_DIVIDEND))
+    wallet_id = new_wallet(client)
+    buy_googl(client, wallet_id, "3", "2024-06-11T15:00:00Z")  # after the ex-date
+
+    assert client.get(f"/api/wallets/{wallet_id}").json()["uncredited_dividends"] == []

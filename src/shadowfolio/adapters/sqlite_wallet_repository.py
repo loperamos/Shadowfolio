@@ -51,7 +51,7 @@ CREATE TABLE IF NOT EXISTS dividend_events (
     event_id TEXT NOT NULL,
     symbol TEXT NOT NULL,
     ex_date TEXT NOT NULL,
-    payable_date TEXT NOT NULL,
+    payable_date TEXT,
     per_share TEXT NOT NULL,
     currency TEXT NOT NULL,
     fx_rate TEXT,
@@ -185,7 +185,7 @@ def _insert_dividend_events(conn: sqlite3.Connection, wallet: Wallet) -> None:
                 recorded.event.event_id,
                 recorded.event.symbol,
                 recorded.event.ex_date.isoformat(),
-                recorded.event.payable_date.isoformat(),
+                None if recorded.event.payable_date is None else recorded.event.payable_date.isoformat(),
                 str(recorded.event.per_share),
                 recorded.event.currency.value,
                 None if recorded.fx_rate is None else str(recorded.fx_rate),
@@ -198,7 +198,12 @@ def _insert_dividend_events(conn: sqlite3.Connection, wallet: Wallet) -> None:
 def _dividend_from_row(row: tuple[str, ...]) -> RecordedDividend:
     event_id, symbol, ex_date, payable_date, per_share, currency, fx_rate = row
     event = DividendEvent(
-        symbol, date.fromisoformat(ex_date), date.fromisoformat(payable_date), Decimal(per_share), Currency(currency), event_id
+        symbol,
+        date.fromisoformat(ex_date),
+        None if payable_date is None else date.fromisoformat(payable_date),
+        Decimal(per_share),
+        Currency(currency),
+        event_id,
     )
     return RecordedDividend(event, None if fx_rate is None else Decimal(fx_rate))
 

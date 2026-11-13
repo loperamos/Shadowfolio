@@ -142,5 +142,17 @@ def test_dividends_round_trip(make_repository: RepositoryFactory) -> None:
     assert stored.operations[-1].cash_delta == Decimal("0.06")  # 0.07 gross, less 15%
 
 
+def test_dividends_without_a_payment_date_round_trip(make_repository: RepositoryFactory) -> None:
+    nvda = Trade("NVDA", Decimal("8"), Decimal("121.81"), Currency.USD)
+    wallet = a_wallet().buy(uuid4(), nvda, T1, settled_amount=Decimal("907.68"))
+    event = DividendEvent("NVDA", T2.date(), None, Decimal("0.01"), Currency.USD, "nvda-undated")
+    wallet = wallet.record_dividends([RecordedDividend(event, None)])
+    make_repository().add(wallet)
+
+    stored = make_repository().get(wallet.id)
+    assert stored == wallet
+    assert stored is not None and stored.uncredited_dividends == (event,)
+
+
 def test_unknown_wallet_is_none(make_repository: RepositoryFactory) -> None:
     assert make_repository().get(uuid4()) is None

@@ -49,19 +49,21 @@ class AlpacaCorporateActions(CorporateActions):
         return sorted(events, key=lambda event: event.ex_date)
 
     def dividends(self, symbol: str, start: date, end: date) -> list[DividendEvent]:
-        """Alpaca filters by process date, which for a cash dividend is its payment date."""
+        """Alpaca filters by process date, which for a cash dividend is its payment date, or its ex-date when the
+        payment date is unknown."""
         events = [
             DividendEvent(
                 symbol=action["symbol"],
                 ex_date=date.fromisoformat(action["ex_date"]),
-                payable_date=date.fromisoformat(action["payable_date"]),
+                # Missing on dividends before about April 2020.
+                payable_date=date.fromisoformat(action["payable_date"]) if action.get("payable_date") else None,
                 per_share=Decimal(action["rate"]),
                 currency=DIVIDEND_CURRENCY,
                 event_id=action["id"],
             )
             for action in self._actions(symbol, (DIVIDEND_TYPE,), start, end)
         ]
-        return sorted(events, key=lambda event: event.payable_date)
+        return sorted(events, key=lambda event: event.payable_date or event.ex_date)
 
     def _actions(self, symbol: str, types: tuple[str, ...], start: date, end: date) -> list[dict[str, Any]]:
         """Every action of these types, from all pages. Fails as unavailable on any HTTP problem."""

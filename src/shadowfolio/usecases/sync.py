@@ -82,8 +82,9 @@ class Sync:
         return wallet.mark_checked(symbol, CheckedPeriod(start, today))
 
     def _with_fx_rate(self, wallet: Wallet, dividend: DividendEvent) -> RecordedDividend:
-        """The dividend with the rate into the wallet's currency on its payment date, when the currencies differ."""
-        if dividend.currency is wallet.currency:
+        """The dividend with the rate into the wallet's currency on its payment date, when the currencies differ and
+        it has one (a dividend without a payment date is never credited, so it needs no rate)."""
+        if dividend.currency is wallet.currency or dividend.payable_date is None:
             return RecordedDividend(dividend, None)
         try:
             rate = self._fx_rates.rate_on(dividend.currency, wallet.currency, dividend.payable_date)

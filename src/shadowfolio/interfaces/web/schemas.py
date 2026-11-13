@@ -99,6 +99,13 @@ def _checked_through(wallet: Wallet) -> date | None:
     return min(period.end for period in periods if period is not None)
 
 
+class UncreditedDividendResponse(BaseModel):
+    symbol: str
+    ex_date: date
+    per_share: Decimal
+    currency: Currency
+
+
 class WalletResponse(BaseModel):
     id: UUID
     name: str
@@ -112,6 +119,8 @@ class WalletResponse(BaseModel):
     # Corporate actions of the held symbols are applied up to this day (the earliest across them); null when nothing
     # is held, or when a held symbol has never been checked.
     splits_checked_through: date | None
+    # Dividends the wallet qualified for but that were not credited: the data provider has no payment date for them.
+    uncredited_dividends: list[UncreditedDividendResponse]
 
     @classmethod
     def from_wallet(cls, wallet: Wallet) -> "WalletResponse":
@@ -127,6 +136,10 @@ class WalletResponse(BaseModel):
             realized_gain=_cents(ledger.realized_gain),
             hindsight=wallet.hindsight,
             splits_checked_through=_checked_through(wallet),
+            uncredited_dividends=[
+                UncreditedDividendResponse(symbol=e.symbol, ex_date=e.ex_date, per_share=e.per_share, currency=e.currency)
+                for e in wallet.uncredited_dividends
+            ],
         )
 
 

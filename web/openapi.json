@@ -1776,6 +1776,34 @@
         ],
         "title": "TradeRequest"
       },
+      "UncreditedDividendResponse": {
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "ex_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Ex Date"
+          },
+          "per_share": {
+            "type": "string",
+            "title": "Per Share"
+          },
+          "currency": {
+            "$ref": "#/components/schemas/Currency"
+          }
+        },
+        "type": "object",
+        "required": [
+          "symbol",
+          "ex_date",
+          "per_share",
+          "currency"
+        ],
+        "title": "UncreditedDividendResponse"
+      },
       "UpdateWalletRequest": {
         "properties": {
           "name": {
@@ -1939,6 +1967,13 @@
               }
             ],
             "title": "Splits Checked Through"
+          },
+          "uncredited_dividends": {
+            "items": {
+              "$ref": "#/components/schemas/UncreditedDividendResponse"
+            },
+            "type": "array",
+            "title": "Uncredited Dividends"
           }
         },
         "type": "object",
@@ -1952,7 +1987,8 @@
           "cost_basis",
           "realized_gain",
           "hindsight",
-          "splits_checked_through"
+          "splits_checked_through",
+          "uncredited_dividends"
         ],
         "title": "WalletResponse"
       },

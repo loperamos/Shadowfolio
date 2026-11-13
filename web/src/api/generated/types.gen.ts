@@ -432,6 +432,25 @@ export type TradeRequest = {
 };
 
 /**
+ * UncreditedDividendResponse
+ */
+export type UncreditedDividendResponse = {
+    /**
+     * Symbol
+     */
+    symbol: string;
+    /**
+     * Ex Date
+     */
+    ex_date: string;
+    /**
+     * Per Share
+     */
+    per_share: string;
+    currency: Currency;
+};
+
+/**
  * UpdateWalletRequest
  *
  * Only the fields given change.
@@ -531,6 +550,10 @@ export type WalletResponse = {
      * Splits Checked Through
      */
     splits_checked_through: string | null;
+    /**
+     * Uncredited Dividends
+     */
+    uncredited_dividends: Array<UncreditedDividendResponse>;
 };
 
 /**

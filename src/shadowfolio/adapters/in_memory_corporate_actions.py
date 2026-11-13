@@ -22,5 +22,10 @@ class InMemoryCorporateActions(CorporateActions):
         return sorted(found, key=lambda s: s.ex_date)
 
     def dividends(self, symbol: str, start: date, end: date) -> list[DividendEvent]:
-        found = [d for d in self._dividends if d.symbol == symbol and start <= d.payable_date <= end]
-        return sorted(found, key=lambda d: d.payable_date)
+        found = [d for d in self._dividends if d.symbol == symbol and start <= _paid_or_ex(d) <= end]
+        return sorted(found, key=_paid_or_ex)
+
+
+def _paid_or_ex(dividend: DividendEvent) -> date:
+    """The day the provider files the dividend under: its payment date, or its ex-date when that is unknown."""
+    return dividend.payable_date or dividend.ex_date

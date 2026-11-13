@@ -20,7 +20,8 @@ class CorporateActions(ABC):
 
     @abstractmethod
     def dividends(self, symbol: str, start: date, end: date) -> list[DividendEvent]:
-        """The symbol's cash dividends paid from `start` to `end` (both included, by payment date), oldest first.
+        """The symbol's cash dividends paid from `start` to `end` (both included, by payment date, or by ex-date when
+        the payment date is unknown), oldest first.
 
         Raises CorporateActionsUnavailableError when the provider cannot answer.
         """

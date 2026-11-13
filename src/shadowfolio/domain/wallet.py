@@ -7,7 +7,7 @@ from decimal import Decimal
 from typing import Self
 from uuid import UUID, uuid5
 
-from shadowfolio.domain.corporate_actions import CheckedPeriod, RecordedDividend, SplitEvent
+from shadowfolio.domain.corporate_actions import CheckedPeriod, DividendEvent, RecordedDividend, SplitEvent
 from shadowfolio.domain.errors import (
     AutomaticOperationError,
     CorporateActionsNotCheckedError,
@@ -225,12 +225,24 @@ class Wallet:
         _replay(timeline)
         return replace(self, operations=timeline)
 
+    @property
+    def uncredited_dividends(self) -> tuple[DividendEvent, ...]:
+        """Dividends the wallet qualified for but that are not credited, because the provider has no payment date for
+        them. An imported statement is what fills these in."""
+        base = tuple(op for op in self.operations if not isinstance(op, Dividend))
+        return tuple(
+            recorded.event
+            for recorded in self.dividend_events
+            if recorded.event.payable_date is None and _shares_before_ex(base, recorded.event) > 0
+        )
+
     def _dividends_earned(self, base: tuple[Operation, ...]) -> list[Dividend]:
         dividends = []
         for recorded in self.dividend_events:
             event = recorded.event
-            ex_start = datetime.combine(event.ex_date, time(), tzinfo=UTC)
-            shares = _holdings(op for op in base if op.timestamp < ex_start).get(event.symbol, Decimal(0))
+            if event.payable_date is None:  # known, but when its cash arrived is not: see uncredited_dividends
+                continue
+            shares = _shares_before_ex(base, event)
             if shares <= 0:
                 continue
             gross = to_cents(shares * event.per_share * (recorded.fx_rate if recorded.fx_rate is not None else Decimal(1)))
@@ -303,3 +315,9 @@ def _apply(timeline: Iterable[Operation], check_cash: bool) -> dict[str, Decimal
 def _require_positive(value: Decimal, name: str) -> None:
     if value <= 0:
         raise InvalidAmountError(f"{name} must be positive")
+
+
+def _shares_before_ex(base: Iterable[Operation], event: DividendEvent) -> Decimal:
+    """Shares of the dividend's symbol held when its ex-date started: those are the ones that qualify."""
+    ex_start = datetime.combine(event.ex_date, time(), tzinfo=UTC)
+    return _holdings(op for op in base if op.timestamp < ex_start).get(event.symbol, Decimal(0))

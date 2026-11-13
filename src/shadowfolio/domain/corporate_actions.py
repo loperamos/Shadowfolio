@@ -38,11 +38,12 @@ class CheckedPeriod:
 @dataclass(frozen=True)
 class DividendEvent:
     """A cash dividend as the provider reports it: `per_share` in `currency` for every share held before `ex_date`
-    starts, paid on `payable_date`."""
+    starts, paid on `payable_date`. The payment date is None when the provider does not know it (Alpaca, before April
+    2020): such a dividend is known but never credited automatically, since when its cash arrived is unknown."""
 
     symbol: str
     ex_date: date
-    payable_date: date
+    payable_date: date | None
     per_share: Decimal
     currency: Currency
     event_id: str

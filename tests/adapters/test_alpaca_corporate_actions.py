@@ -74,6 +74,21 @@ def test_cash_dividends_are_read_in_dollars() -> None:
     assert seen[0].url.params["types"] == "cash_dividend"
 
 
+def test_a_dividend_without_a_payment_date_is_read_with_none() -> None:
+    # As Alpaca sends dividends from before about April 2020: no payable_date, filed under the ex-date.
+    page = {
+        "corporate_actions": {
+            "cash_dividends": [{"symbol": "IBM", "ex_date": "2020-02-07", "rate": 1.62, "id": "div-0", "special": False}]
+        },
+        "next_page_token": None,
+    }
+    adapter = AlpacaCorporateActions(CONFIG, transport=httpx2.MockTransport(lambda request: httpx2.Response(200, text=json.dumps(page))))
+
+    dividends = adapter.dividends("IBM", date(2020, 1, 1), date(2020, 3, 31))
+
+    assert dividends == [DividendEvent("IBM", date(2020, 2, 7), None, Decimal("1.62"), Currency.USD, "div-0")]
+
+
 def test_http_errors_mean_the_provider_is_unavailable() -> None:
     transport = httpx2.MockTransport(lambda request: httpx2.Response(503, text="down"))
     adapter = AlpacaCorporateActions(CONFIG, transport=transport)
