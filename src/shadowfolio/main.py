@@ -5,7 +5,7 @@ from enum import StrEnum
 from pathlib import Path
 
 import uvicorn
-from dotenv import load_dotenv
+from dotenv import find_dotenv, load_dotenv
 from fastapi import FastAPI
 
 from shadowfolio.adapters.alpaca_price_data import AlpacaConfig
@@ -24,18 +24,28 @@ class Environment(StrEnum):
 
 
 def main() -> None:
-    load_dotenv()
-    app = _build_app(Environment(_require_env(ENVIRONMENT_ENV)))
+    env_file = find_dotenv()  # searched upwards from this package, so found whatever folder the server starts in
+    load_dotenv(env_file)
+    # Relative paths in the config mean relative to the folder holding .env (the repo root), never to where the
+    # server happens to be started; without a .env file, they are relative to the current folder.
+    config_dir = Path(env_file).parent if env_file else Path.cwd()
+    app = _build_app(Environment(_require_env(ENVIRONMENT_ENV)), config_dir)
     host = _require_env(HOST_ENV)
     port = int(_require_env(PORT_ENV))
     uvicorn.run(app, host=host, port=port)
 
 
-def _build_app(environment: Environment) -> FastAPI:
+def _build_app(environment: Environment, config_dir: Path) -> FastAPI:
     match environment:
         case Environment.LOCAL:
             alpaca = AlpacaConfig(key_id=_require_env(ALPACA_KEY_ID_ENV), secret_key=_require_env(ALPACA_SECRET_KEY_ENV))
-            return build_local_app(LocalConfig(db_path=Path(_require_env(DB_PATH_ENV)), alpaca=alpaca))
+            return build_local_app(LocalConfig(db_path=resolve_config_path(_require_env(DB_PATH_ENV), config_dir), alpaca=alpaca))
+
+
+def resolve_config_path(value: str, config_dir: Path) -> Path:
+    """A path from the config: absolute paths as given, relative ones from `config_dir`."""
+    path = Path(value)
+    return path if path.is_absolute() else config_dir / path
 
 
 def _require_env(name: str) -> str:
