@@ -28,8 +28,8 @@ def build_local_app(config: LocalConfig) -> FastAPI:
     clock = SystemClock()
     wallet_repository = SqliteWalletRepository(config.db_path)
     prices = AlpacaPriceData(config.alpaca)
-    fx_rates = EcbFxRates()
-    sync = Sync(wallet_repository, clock, AlpacaCorporateActions(config.alpaca))
+    fx_rates = EcbFxRates(clock)
+    sync = Sync(wallet_repository, clock, AlpacaCorporateActions(config.alpaca), fx_rates)
     return create_app(
         wallets=Wallets(wallet_repository, clock),
         history=History(wallet_repository, clock, prices, fx_rates, sync),

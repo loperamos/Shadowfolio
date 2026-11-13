@@ -1,13 +1,13 @@
 """Wallet: a timeline of operations owned by a user. Cash and holdings are derived from it."""
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field, replace
-from datetime import datetime
+from datetime import UTC, datetime, time
 from decimal import Decimal
 from typing import Self
-from uuid import UUID
+from uuid import UUID, uuid5
 
-from shadowfolio.domain.corporate_actions import CheckedPeriod, SplitEvent
+from shadowfolio.domain.corporate_actions import CheckedPeriod, RecordedDividend, SplitEvent
 from shadowfolio.domain.errors import (
     AutomaticOperationError,
     CorporateActionsNotCheckedError,
@@ -20,8 +20,8 @@ from shadowfolio.domain.errors import (
     OperationTypeChangeError,
 )
 from shadowfolio.domain.ledger import Ledger, build_ledger
-from shadowfolio.domain.money import Currency
-from shadowfolio.domain.operations import Buy, Deposit, Operation, PriceSource, Sell, Split, Trade, Withdrawal
+from shadowfolio.domain.money import Currency, to_cents
+from shadowfolio.domain.operations import Buy, Deposit, Dividend, Operation, PriceSource, Sell, Split, Trade, Withdrawal
 
 
 @dataclass(frozen=True)
@@ -33,6 +33,8 @@ class Wallet:
     operations: tuple[Operation, ...] = ()  # oldest first
     # Per symbol, the days whose corporate actions have been applied; trades in a symbol must fall inside its period.
     checked: dict[str, CheckedPeriod] = field(default_factory=dict)
+    # Dividend events known for traded symbols; the wallet's Dividend operations are always derived from them.
+    dividend_events: tuple[RecordedDividend, ...] = ()
 
     def __post_init__(self) -> None:
         if not self.name.strip():
@@ -60,8 +62,8 @@ class Wallet:
     def copy(self, wallet_id: UUID, name: str, new_operation_id: Callable[[], UUID]) -> Self:
         """A new wallet with the same owner, currency and history. Every operation gets a new id,
         so the copy's history can change independently."""
-        operations = tuple(replace(op, id=new_operation_id()) for op in self.operations)
-        return replace(self, id=wallet_id, name=name, operations=operations)
+        operations = tuple(replace(op, id=new_operation_id()) for op in self.operations if not isinstance(op, Dividend))
+        return replace(self, id=wallet_id, name=name)._settled(operations)
 
     def rename(self, name: str) -> Self:
         return replace(self, name=name)
@@ -116,17 +118,23 @@ class Wallet:
         _require_positive(event.new_rate, "split new rate")
         return self._with(Split(operation_id, at, event.symbol, event.old_rate, event.new_rate, event.event_id))
 
+    def record_dividends(self, dividends: Iterable[RecordedDividend]) -> Self:
+        """Add dividend events (each once, by event id) and credit what they pay on the shares held."""
+        known = {recorded.event.event_id for recorded in self.dividend_events}
+        new = tuple(recorded for recorded in dividends if recorded.event.event_id not in known)
+        if not new:
+            return self
+        return replace(self, dividend_events=self.dividend_events + new)._settled(self.operations)
+
     def holdings_at(self, moment: datetime) -> dict[str, Decimal]:
         """Shares held per symbol just before `moment`."""
-        return _replay(tuple(op for op in self.operations if op.timestamp < moment))
+        return _holdings(op for op in self.operations if op.timestamp < moment)
 
     def remove_operation(self, operation_id: UUID) -> Self:
         """Remove an operation; what is left must still be a valid timeline."""
         if self._get(operation_id).automatic:
             raise AutomaticOperationError("operations added from market data (e.g. splits) cannot be deleted")
-        remaining = self._without(operation_id)
-        _replay(remaining)
-        return replace(self, operations=remaining)._without_untraded_symbols()
+        return self._without_untraded_symbols(self._without(operation_id))
 
     def had_effect(self, operation: Operation) -> bool:
         """Whether the operation changed the wallet: a split only does when shares of its symbol were held then."""
@@ -170,22 +178,59 @@ class Wallet:
         if replacing is not None and self._get(replacing).type is not operation.type:
             raise OperationTypeChangeError("the type of an operation cannot change; delete it and add a new one")
         others = self.operations if replacing is None else self._without(replacing)
-        timeline = tuple(sorted((*others, operation), key=lambda op: op.timestamp))
-        _replay(timeline)
-        updated = replace(self, operations=timeline)
+        operations = (*others, operation)
         # An edit can move a trade to another symbol, leaving the old one without trades. (Not when adding: splits
         # are fetched for a symbol just before its first trade is added.)
-        return updated._without_untraded_symbols() if replacing is not None else updated
+        return self._without_untraded_symbols(operations) if replacing is not None else self._settled(operations)
 
-    def _without_untraded_symbols(self) -> Self:
-        """Drops the automatic operations and the checked period of every symbol that has no trades left, so the
-        wallet looks as if it never touched it. They are fetched again if the symbol is traded again."""
-        traded = {op.trade.symbol for op in self.operations if isinstance(op, Buy | Sell)}
-        operations = tuple(op for op in self.operations if not (isinstance(op, Split) and op.symbol not in traded))
-        checked = {symbol: period for symbol, period in self.checked.items() if symbol in traded}
-        if operations == self.operations and checked == self.checked:
-            return self
-        return replace(self, operations=operations, checked=checked)
+    def _without_untraded_symbols(self, operations: tuple[Operation, ...]) -> Self:
+        """The wallet with `operations`, minus the automatic operations, checked period and dividend events of every
+        symbol that has no trades left, so it looks as if it never touched it. They are fetched again if the symbol
+        is traded again."""
+        traded = {op.trade.symbol for op in operations if isinstance(op, Buy | Sell)}
+        kept = tuple(op for op in operations if not (isinstance(op, Split) and op.symbol not in traded))
+        pruned = replace(
+            self,
+            checked={symbol: period for symbol, period in self.checked.items() if symbol in traded},
+            dividend_events=tuple(recorded for recorded in self.dividend_events if recorded.event.symbol in traded),
+        )
+        return pruned._settled(kept)
+
+    def _settled(self, operations: Iterable[Operation]) -> Self:
+        """The wallet with `operations` and the dividends they earn, oldest first, after checking the whole timeline.
+
+        Dividends are always derived again here from the known events and the shares held at each ex-date, so they
+        follow any change to the history; equal timestamps keep their order, dividends coming last.
+        """
+        base = tuple(sorted((op for op in operations if not isinstance(op, Dividend)), key=lambda op: op.timestamp))
+        timeline = tuple(sorted((*base, *self._dividends_earned(base)), key=lambda op: op.timestamp))
+        _replay(timeline)
+        return replace(self, operations=timeline)
+
+    def _dividends_earned(self, base: tuple[Operation, ...]) -> list[Dividend]:
+        dividends = []
+        for recorded in self.dividend_events:
+            event = recorded.event
+            ex_start = datetime.combine(event.ex_date, time(), tzinfo=UTC)
+            shares = _holdings(op for op in base if op.timestamp < ex_start).get(event.symbol, Decimal(0))
+            if shares <= 0:
+                continue
+            amount = to_cents(shares * event.per_share * (recorded.fx_rate if recorded.fx_rate is not None else Decimal(1)))
+            dividends.append(
+                Dividend(
+                    # Stable for this wallet and event, so it stays the same each time it is derived.
+                    id=uuid5(self.id, event.event_id),
+                    timestamp=datetime.combine(event.payable_date, time(), tzinfo=UTC),
+                    symbol=event.symbol,
+                    per_share=event.per_share,
+                    currency=event.currency,
+                    shares=shares,
+                    fx_rate=recorded.fx_rate,
+                    amount=amount,
+                    event_id=event.event_id,
+                )
+            )
+        return dividends
 
     def _get(self, operation_id: UUID) -> Operation:
         for op in self.operations:
@@ -203,11 +248,21 @@ class Wallet:
 def _replay(timeline: tuple[Operation, ...]) -> dict[str, Decimal]:
     """Apply operations in order and return the holdings, failing if cash or a holding would
     go negative at any point."""
+    return _apply(timeline, check_cash=True)
+
+
+def _holdings(timeline: Iterable[Operation]) -> dict[str, Decimal]:
+    """Shares held after the operations (oldest first), without checking cash: used to work out dividends, which
+    the cash at that point may depend on."""
+    return _apply(timeline, check_cash=False)
+
+
+def _apply(timeline: Iterable[Operation], check_cash: bool) -> dict[str, Decimal]:
     cash = Decimal(0)
     held: dict[str, Decimal] = {}
     for op in timeline:
         cash += op.cash_delta
-        if cash < 0:
+        if check_cash and cash < 0:
             raise InsufficientCashError(f"cash would be {cash} on {op.timestamp.isoformat()}")
         change = op.holding_change
         if change is not None:

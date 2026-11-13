@@ -11,6 +11,7 @@ import pytest
 
 from shadowfolio.adapters.ecb_fx_rates import EcbFxRates
 from shadowfolio.adapters.in_memory_fx_rates import InMemoryFxRates
+from shadowfolio.adapters.system_clock import SystemClock
 from shadowfolio.domain.money import Currency, FxRate
 from shadowfolio.ports.fx_rates import FxRates
 
@@ -28,7 +29,7 @@ def _in_memory() -> FxRates:
     )
 
 
-ADAPTERS: dict[str, Callable[[], FxRates]] = {"in_memory": _in_memory, "ecb": EcbFxRates}
+ADAPTERS: dict[str, Callable[[], FxRates]] = {"in_memory": _in_memory, "ecb": lambda: EcbFxRates(SystemClock())}
 
 
 @pytest.fixture(params=["in_memory", pytest.param("ecb", marks=pytest.mark.live)])

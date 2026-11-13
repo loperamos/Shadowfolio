@@ -3,7 +3,7 @@
 from abc import ABC, abstractmethod
 from datetime import date
 
-from shadowfolio.domain.corporate_actions import SplitEvent
+from shadowfolio.domain.corporate_actions import DividendEvent, SplitEvent
 
 
 class CorporateActionsUnavailableError(Exception):
@@ -14,6 +14,13 @@ class CorporateActions(ABC):
     @abstractmethod
     def splits(self, symbol: str, start: date, end: date) -> list[SplitEvent]:
         """The symbol's splits with an ex-date from `start` to `end` (both included), oldest first; empty if none.
+
+        Raises CorporateActionsUnavailableError when the provider cannot answer.
+        """
+
+    @abstractmethod
+    def dividends(self, symbol: str, start: date, end: date) -> list[DividendEvent]:
+        """The symbol's cash dividends paid from `start` to `end` (both included, by payment date), oldest first.
 
         Raises CorporateActionsUnavailableError when the provider cannot answer.
         """

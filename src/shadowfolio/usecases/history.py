@@ -4,17 +4,16 @@ Each returns the updated wallet, or None if the wallet does not exist; an unknow
 """
 
 from datetime import datetime
-from decimal import ROUND_HALF_EVEN, Decimal
+from decimal import Decimal
 from uuid import UUID, uuid4
 
 from shadowfolio.domain.errors import FutureTimestampError, FxRateUnavailableError, MissingPriceCurrencyError, PriceUnavailableError
-from shadowfolio.domain.money import Currency
+from shadowfolio.domain.money import Currency, to_cents
 from shadowfolio.domain.operations import PriceSource, Trade
-from shadowfolio.domain.valuation import CENT
 from shadowfolio.domain.wallet import Wallet
 from shadowfolio.ports.clock import Clock
-from shadowfolio.ports.fx_rates import FxRates
-from shadowfolio.ports.price_data import PriceData
+from shadowfolio.ports.fx_rates import FxRates, FxRatesUnavailableError
+from shadowfolio.ports.price_data import PriceData, PriceDataUnavailableError
 from shadowfolio.ports.wallet_repository import WalletRepository
 from shadowfolio.usecases.sync import Sync
 
@@ -120,16 +119,24 @@ class History:
             if price_currency is None:
                 raise MissingPriceCurrencyError("a price needs its currency")
             return Trade(symbol, quantity, price, price_currency), settled_amount
-        quote = self._prices.price_at(symbol, at)
+        try:
+            quote = self._prices.price_at(symbol, at)
+        except PriceDataUnavailableError as error:
+            raise PriceUnavailableError(f"could not fetch the price of {symbol} right now; try again later") from error
         if quote is None:
             raise PriceUnavailableError(f"no market price for {symbol} at or after {at.isoformat()}")
         rate = Decimal(1)
         if quote.currency is not wallet.currency:
-            fx = self._fx_rates.rate_on(quote.currency, wallet.currency, at.date())
+            try:
+                fx = self._fx_rates.rate_on(quote.currency, wallet.currency, at.date())
+            except FxRatesUnavailableError as error:
+                raise FxRateUnavailableError(
+                    f"could not fetch the {quote.currency}→{wallet.currency} rate right now; try again later"
+                ) from error
             if fx is None:
                 raise FxRateUnavailableError(f"no {quote.currency}→{wallet.currency} rate for {at.date().isoformat()}")
             rate = fx.rate
-        settled = (quantity * quote.price * rate).quantize(CENT, rounding=ROUND_HALF_EVEN)
+        settled = to_cents(quantity * quote.price * rate)
         return Trade(symbol, quantity, quote.price, quote.currency, PriceSource.MARKET), settled
 
     def _at(self, timestamp: datetime | None) -> datetime:

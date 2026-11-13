@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 from shadowfolio.adapters.in_memory_price_data import InMemoryPriceData
 from shadowfolio.domain.money import Currency
 from shadowfolio.domain.valuation import Quote
+from shadowfolio.ports.price_data import PriceDataUnavailableError
 from shadowfolio.wiring.test import build_test_app
 
 
@@ -32,3 +33,15 @@ def test_symbol_without_price_returns_404() -> None:
     response = client.get("/api/market/quotes/ZZZZ")
     assert response.status_code == 404
     assert response.json()["detail"] == "no price for ZZZZ"
+
+
+class UnavailablePriceData(InMemoryPriceData):
+    def latest_price(self, symbol: str) -> Quote | None:
+        raise PriceDataUnavailableError("down")
+
+
+def test_a_quote_is_refused_cleanly_when_prices_cannot_be_fetched() -> None:
+    client = TestClient(build_test_app(prices=UnavailablePriceData()))
+
+    response = client.get("/api/market/quotes/NVDA")
+    assert (response.status_code, response.json()["detail"]) == (422, "could not fetch the price of NVDA right now; try again later")

@@ -14,7 +14,8 @@ from http import HTTPStatus
 import httpx2
 
 from shadowfolio.domain.money import Currency, FxRate
-from shadowfolio.ports.fx_rates import FxRates
+from shadowfolio.ports.clock import Clock
+from shadowfolio.ports.fx_rates import FxRates, FxRatesUnavailableError
 
 DAILY_RATES_URL = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml"
 # Daily reference rates over a period, one currency against the euro: {currency} → e.g. USD.
@@ -25,12 +26,18 @@ TIMEOUT_SECONDS = 10.0
 
 
 class EcbFxRates(FxRates):
-    def __init__(self, transport: httpx2.BaseTransport | None = None) -> None:
-        """`transport` replaces the network in tests."""
+    def __init__(self, clock: Clock, transport: httpx2.BaseTransport | None = None) -> None:
+        """`clock` tells which years are over (their rates are fetched once and kept); `transport` replaces the network in tests."""
+        self._clock = clock
         self._client = httpx2.Client(timeout=TIMEOUT_SECONDS, transport=transport)
+        # Past years' rates never change: per currency and year, every published (day, units per euro), oldest first.
+        self._past_years: dict[tuple[Currency, int], list[tuple[date, Decimal]]] = {}
 
     def latest_rate(self, base: Currency, quote: Currency) -> FxRate | None:
-        as_of, per_euro = self._daily_rates()
+        try:
+            as_of, per_euro = self._daily_rates()
+        except httpx2.HTTPError as error:
+            raise FxRatesUnavailableError(f"ECB: {error}") from error
         per_euro[Currency.EUR] = Decimal(1)
         if base not in per_euro or quote not in per_euro:
             return None
@@ -40,7 +47,10 @@ class EcbFxRates(FxRates):
     def rate_on(self, base: Currency, quote: Currency, day: date) -> FxRate | None:
         per_euro: dict[Currency, tuple[date, Decimal]] = {}
         for currency in {base, quote} - {Currency.EUR}:
-            found = self._per_euro_on(currency, day)
+            try:
+                found = self._per_euro_on(currency, day)
+            except httpx2.HTTPError as error:
+                raise FxRatesUnavailableError(f"ECB: {error}") from error
             if found is None:
                 return None
             per_euro[currency] = found
@@ -49,17 +59,30 @@ class EcbFxRates(FxRates):
         return FxRate(base=base, quote=quote, rate=rates[quote] / rates[base], as_of=as_of)
 
     def _per_euro_on(self, currency: Currency, day: date) -> tuple[date, Decimal] | None:
-        """Units of `currency` per euro on `day`, or on the last day before it with a published rate."""
-        params = {"startPeriod": (day - HISTORY_LOOKBACK).isoformat(), "endPeriod": day.isoformat(), "format": "csvdata"}
+        """Units of `currency` per euro on `day`, or on the last day before it (within a week) with a published rate."""
+        if day.year < self._clock.now().year:
+            series = self._past_year(currency, day.year)
+        else:  # the current year still grows every working day, so ask for just the days needed
+            series = self._series(currency, day - HISTORY_LOOKBACK, day)
+        earlier = [(published, rate) for published, rate in series if day - HISTORY_LOOKBACK <= published <= day]
+        return earlier[-1] if earlier else None
+
+    def _past_year(self, currency: Currency, year: int) -> list[tuple[date, Decimal]]:
+        """A finished year's rates (and the week before it, for the first days of January), fetched once."""
+        key = (currency, year)
+        if key not in self._past_years:
+            self._past_years[key] = self._series(currency, date(year, 1, 1) - HISTORY_LOOKBACK, date(year, 12, 31))
+        return self._past_years[key]
+
+    def _series(self, currency: Currency, start: date, end: date) -> list[tuple[date, Decimal]]:
+        """Every published (day, units per euro) from `start` to `end`, oldest first."""
+        params = {"startPeriod": start.isoformat(), "endPeriod": end.isoformat(), "format": "csvdata"}
         response = self._client.get(HISTORY_URL.format(currency=currency.value), params=params)
         if response.status_code == HTTPStatus.NOT_FOUND:  # no observations in the period
-            return None
+            return []
         response.raise_for_status()
         rows = [row for row in csv.DictReader(io.StringIO(response.text)) if row.get("OBS_VALUE")]
-        if not rows:
-            return None
-        latest = max(rows, key=lambda row: row["TIME_PERIOD"])
-        return date.fromisoformat(latest["TIME_PERIOD"]), Decimal(latest["OBS_VALUE"])
+        return sorted((date.fromisoformat(row["TIME_PERIOD"]), Decimal(row["OBS_VALUE"])) for row in rows)
 
     def _daily_rates(self) -> tuple[date, dict[Currency, Decimal]]:
         """The publication date and, for each supported currency, its units per euro."""

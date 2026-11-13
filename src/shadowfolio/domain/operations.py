@@ -21,6 +21,7 @@ class OperationType(StrEnum):
     BUY = "buy"
     SELL = "sell"
     SPLIT = "split"
+    DIVIDEND = "dividend"
 
 
 class PriceSource(StrEnum):
@@ -164,6 +165,34 @@ class Split(BaseOperation):
         return True
 
 
+@dataclass(frozen=True)
+class Dividend(BaseOperation):
+    """A cash dividend, derived by the wallet from a known dividend event: `shares` were held when its ex-date
+    started, each paid `per_share` in `currency`; `amount` is what was credited in the wallet's currency (gross)."""
+
+    type: ClassVar[OperationType] = OperationType.DIVIDEND
+
+    symbol: str
+    per_share: Decimal
+    currency: Currency
+    shares: Decimal
+    fx_rate: Decimal | None  # into the wallet's currency on the payment date; None when no conversion was needed
+    amount: Decimal
+    event_id: str
+
+    @property
+    def cash_delta(self) -> Decimal:
+        return self.amount
+
+    @property
+    def holding_change(self) -> tuple[str, Decimal] | None:
+        return None
+
+    @property
+    def automatic(self) -> bool:
+        return True
+
+
 # Every concrete kind. Code that handles each kind matches on this, so mypy reports a kind
 # that is not handled.
-Operation = Deposit | Withdrawal | Buy | Sell | Split
+Operation = Deposit | Withdrawal | Buy | Sell | Split | Dividend

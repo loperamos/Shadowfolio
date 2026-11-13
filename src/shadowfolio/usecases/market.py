@@ -1,7 +1,8 @@
 """Market use cases: reading market information."""
 
+from shadowfolio.domain.errors import PriceUnavailableError
 from shadowfolio.domain.valuation import Quote
-from shadowfolio.ports.price_data import PriceData
+from shadowfolio.ports.price_data import PriceData, PriceDataUnavailableError
 
 
 class Market:
@@ -10,4 +11,7 @@ class Market:
 
     def latest_quote(self, symbol: str) -> Quote | None:
         """The latest price for the symbol, or None if the provider has none."""
-        return self._prices.latest_price(symbol)
+        try:
+            return self._prices.latest_price(symbol)
+        except PriceDataUnavailableError as error:
+            raise PriceUnavailableError(f"could not fetch the price of {symbol} right now; try again later") from error

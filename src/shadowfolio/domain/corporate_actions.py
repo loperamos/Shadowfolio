@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
 
+from shadowfolio.domain.money import Currency
+
 
 @dataclass(frozen=True)
 class SplitEvent:
@@ -31,3 +33,25 @@ class CheckedPeriod:
     def including(self, other: "CheckedPeriod") -> "CheckedPeriod":
         """This period extended to also cover `other` (the two always overlap or touch when this is used)."""
         return CheckedPeriod(min(self.start, other.start), max(self.end, other.end))
+
+
+@dataclass(frozen=True)
+class DividendEvent:
+    """A cash dividend as the provider reports it: `per_share` in `currency` for every share held before `ex_date`
+    starts, paid on `payable_date`."""
+
+    symbol: str
+    ex_date: date
+    payable_date: date
+    per_share: Decimal
+    currency: Currency
+    event_id: str
+
+
+@dataclass(frozen=True)
+class RecordedDividend:
+    """A dividend event a wallet knows about, with the rate into the wallet's currency on its payment date (None when
+    the dividend is already in that currency). The wallet derives its Dividend operations from these."""
+
+    event: DividendEvent
+    fx_rate: Decimal | None

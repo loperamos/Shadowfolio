@@ -14,7 +14,8 @@ from dotenv import load_dotenv
 from shadowfolio.adapters.alpaca_corporate_actions import AlpacaCorporateActions
 from shadowfolio.adapters.alpaca_price_data import AlpacaConfig
 from shadowfolio.adapters.in_memory_corporate_actions import InMemoryCorporateActions
-from shadowfolio.domain.corporate_actions import SplitEvent
+from shadowfolio.domain.corporate_actions import DividendEvent, SplitEvent
+from shadowfolio.domain.money import Currency
 from shadowfolio.ports.corporate_actions import CorporateActions
 
 # NVIDIA's real 10-for-1 split.
@@ -22,8 +23,15 @@ NVDA_SPLIT_DAY = date(2024, 6, 10)
 YEAR_2024 = (date(2024, 1, 1), date(2024, 12, 31))
 
 
+# Alphabet's real dividend: 0.20 USD, ex-date 10 June 2024, paid 17 June 2024.
+GOOGL_EX_DATE, GOOGL_PAYMENT = date(2024, 6, 10), date(2024, 6, 17)
+
+
 def _in_memory() -> CorporateActions:
-    return InMemoryCorporateActions(SplitEvent("NVDA", NVDA_SPLIT_DAY, Decimal(1), Decimal(10), "nvda-2024-split"))
+    return InMemoryCorporateActions(
+        SplitEvent("NVDA", NVDA_SPLIT_DAY, Decimal(1), Decimal(10), "nvda-2024-split"),
+        DividendEvent("GOOGL", GOOGL_EX_DATE, GOOGL_PAYMENT, Decimal("0.20"), Currency.USD, "googl-2024-06"),
+    )
 
 
 def _alpaca() -> CorporateActions:
@@ -55,3 +63,15 @@ def test_a_period_without_splits_is_empty(corporate_actions: CorporateActions) -
 
 def test_unknown_symbol_has_no_splits(corporate_actions: CorporateActions) -> None:
     assert corporate_actions.splits("ZZZZZZZZ", *YEAR_2024) == []
+
+
+def test_a_known_dividend_is_reported_by_payment_date_with_its_currency(corporate_actions: CorporateActions) -> None:
+    [dividend] = corporate_actions.dividends("GOOGL", date(2024, 6, 12), date(2024, 6, 20))
+
+    assert (dividend.symbol, dividend.ex_date, dividend.payable_date) == ("GOOGL", GOOGL_EX_DATE, GOOGL_PAYMENT)
+    assert (dividend.per_share, dividend.currency) == (Decimal("0.20"), Currency.USD)
+    assert dividend.event_id
+
+
+def test_unknown_symbol_has_no_dividends(corporate_actions: CorporateActions) -> None:
+    assert corporate_actions.dividends("ZZZZZZZZ", *YEAR_2024) == []

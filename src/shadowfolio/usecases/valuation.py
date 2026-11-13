@@ -5,8 +5,8 @@ from uuid import UUID
 from shadowfolio.domain.errors import FxRateUnavailableError, PriceUnavailableError
 from shadowfolio.domain.money import Currency, FxRate
 from shadowfolio.domain.valuation import Quote, WalletValuation, value_wallet
-from shadowfolio.ports.fx_rates import FxRates
-from shadowfolio.ports.price_data import PriceData
+from shadowfolio.ports.fx_rates import FxRates, FxRatesUnavailableError
+from shadowfolio.ports.price_data import PriceData, PriceDataUnavailableError
 from shadowfolio.ports.wallet_repository import WalletRepository
 
 
@@ -26,13 +26,19 @@ class Valuation:
             return None
         quotes: dict[str, Quote] = {}
         for symbol in wallet.holdings:
-            quote = self._prices.latest_price(symbol)
+            try:
+                quote = self._prices.latest_price(symbol)
+            except PriceDataUnavailableError as error:
+                raise PriceUnavailableError(f"could not fetch the price of {symbol} right now; try again later") from error
             if quote is None:
                 raise PriceUnavailableError(f"no price for {symbol}")
             quotes[symbol] = quote
         rates: dict[Currency, FxRate] = {}
         for currency in {q.currency for q in quotes.values()} - {wallet.currency}:
-            rate = self._fx_rates.latest_rate(currency, wallet.currency)
+            try:
+                rate = self._fx_rates.latest_rate(currency, wallet.currency)
+            except FxRatesUnavailableError as error:
+                raise FxRateUnavailableError(f"could not fetch the {currency}→{wallet.currency} rate right now; try again later") from error
             if rate is None:
                 raise FxRateUnavailableError(f"no {currency}→{wallet.currency} rate")
             rates[currency] = rate

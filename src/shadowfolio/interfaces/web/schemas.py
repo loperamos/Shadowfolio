@@ -8,7 +8,7 @@ from uuid import UUID
 from pydantic import AwareDatetime, BaseModel, Field
 
 from shadowfolio.domain.money import Currency
-from shadowfolio.domain.operations import Buy, Deposit, Operation, OperationType, PriceSource, Sell, Split, Withdrawal
+from shadowfolio.domain.operations import Buy, Deposit, Dividend, Operation, OperationType, PriceSource, Sell, Split, Withdrawal
 from shadowfolio.domain.valuation import WalletValuation
 from shadowfolio.domain.wallet import Wallet
 
@@ -141,6 +141,7 @@ class OperationResponse(BaseModel):
     split_new_rate: Decimal | None = None
     automatic: bool = False  # added by the system from market data; cannot be edited or deleted
     had_effect: bool = True  # false for a split when no shares of its symbol were held then
+    fx_rate: Decimal | None = None  # dividends only: the rate into the wallet's currency on the payment date
 
     @classmethod
     def from_operation(cls, operation: Operation, had_effect: bool = True) -> "OperationResponse":
@@ -173,6 +174,21 @@ class OperationResponse(BaseModel):
                     split_new_rate=operation.new_rate,
                     automatic=True,
                     had_effect=had_effect,
+                )
+            case Dividend():
+                # quantity: the shares that qualified; price: the amount per share, in its currency; amount: credited.
+                return cls(
+                    id=operation.id,
+                    type=operation.type,
+                    timestamp=operation.timestamp,
+                    amount=operation.amount,
+                    fees=Decimal(0),
+                    symbol=operation.symbol,
+                    quantity=operation.shares,
+                    price=operation.per_share,
+                    price_currency=operation.currency,
+                    fx_rate=operation.fx_rate,
+                    automatic=True,
                 )
 
 
@@ -252,4 +268,4 @@ class QuoteResponse(BaseModel):
 
 class SyncSummaryResponse(BaseModel):
     wallets: int  # wallets checked
-    splits_added: int
+    added: int

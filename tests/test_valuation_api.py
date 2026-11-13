@@ -10,6 +10,7 @@ from shadowfolio.adapters.in_memory_fx_rates import InMemoryFxRates
 from shadowfolio.adapters.in_memory_price_data import InMemoryPriceData
 from shadowfolio.domain.money import Currency, FxRate
 from shadowfolio.domain.valuation import Quote
+from shadowfolio.ports.price_data import PriceDataUnavailableError
 from shadowfolio.wiring.test import build_test_app
 
 NOW = datetime(2026, 3, 2, 15, 0, tzinfo=UTC)
@@ -150,3 +151,16 @@ def test_missing_exchange_rate_fails_the_valuation(client: TestClient, prices: I
 
 def test_unknown_wallet_valuation_returns_404(client: TestClient) -> None:
     assert client.get(f"/api/wallets/{uuid4()}/valuation").status_code == 404
+
+
+class UnavailablePriceData(InMemoryPriceData):
+    def latest_price(self, symbol: str) -> Quote | None:
+        raise PriceDataUnavailableError("down")
+
+
+def test_a_valuation_is_refused_cleanly_when_prices_cannot_be_fetched() -> None:
+    client = TestClient(build_test_app(clock=FixedClock(NOW), prices=UnavailablePriceData()))
+    wallet_id = wallet_holding(client, NVDA_BUY)
+
+    response = client.get(f"/api/wallets/{wallet_id}/valuation")
+    assert (response.status_code, response.json()["detail"]) == (422, "could not fetch the price of NVDA right now; try again later")

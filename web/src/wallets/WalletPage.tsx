@@ -256,8 +256,8 @@ function WalletDetails({ wallet, operations, version, onEditOperation, onDeleteO
               {/* Newest first, as in a statement. */}
               {[...shownOperations].reverse().map((op) => (
                 <Table.Tr key={op.id}>
-                  {/* A split is a date-only event (its ex-date), so it shows no time. */}
-                  <Table.Td>{op.type === OperationType.SPLIT ? formatDate(op.timestamp.slice(0, 10)) : formatDateTime(op.timestamp)}</Table.Td>
+                  {/* Automatic operations (splits, dividends) happen on a date, not at a time. */}
+                  <Table.Td>{op.automatic ? formatDate(op.timestamp.slice(0, 10)) : formatDateTime(op.timestamp)}</Table.Td>
                   <Table.Td>
                     <Group gap={6} wrap="nowrap">
                       <Text span inherit tt="capitalize">

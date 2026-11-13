@@ -15,7 +15,7 @@ import httpx2
 
 from shadowfolio.domain.money import Currency
 from shadowfolio.domain.valuation import Quote
-from shadowfolio.ports.price_data import PriceData
+from shadowfolio.ports.price_data import PriceData, PriceDataUnavailableError
 
 BASE_URL = "https://data.alpaca.markets"
 # The free plan only includes the IEX exchange's feed.
@@ -44,6 +44,18 @@ class AlpacaPriceData(PriceData):
         )
 
     def latest_price(self, symbol: str) -> Quote | None:
+        try:
+            return self._latest_price(symbol)
+        except httpx2.HTTPError as error:
+            raise PriceDataUnavailableError(f"Alpaca: {error}") from error
+
+    def price_at(self, symbol: str, at: datetime) -> Quote | None:
+        try:
+            return self._price_at(symbol, at)
+        except httpx2.HTTPError as error:
+            raise PriceDataUnavailableError(f"Alpaca: {error}") from error
+
+    def _latest_price(self, symbol: str) -> Quote | None:
         """The last trade's price and the previous day's close. Alpaca only covers US listings, so prices are in USD."""
         response = self._client.get(f"/v2/stocks/{quote(symbol, safe='')}/snapshot", params={"feed": FEED})
         if response.status_code in _UNKNOWN_SYMBOL_STATUSES:
@@ -62,7 +74,7 @@ class AlpacaPriceData(PriceData):
             previous_close=Decimal(previous_bar["c"]) if previous_bar else None,
         )
 
-    def price_at(self, symbol: str, at: datetime) -> Quote | None:
+    def _price_at(self, symbol: str, at: datetime) -> Quote | None:
         """The open of the first one-minute bar at or after `at`. Raw prices (not adjusted for later splits), as traded then."""
         params: dict[str, str | int] = {
             "timeframe": "1Min",

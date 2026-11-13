@@ -11,6 +11,8 @@ from shadowfolio.adapters.in_memory_fx_rates import InMemoryFxRates
 from shadowfolio.adapters.in_memory_price_data import InMemoryPriceData
 from shadowfolio.domain.money import Currency, FxRate
 from shadowfolio.domain.valuation import Quote
+from shadowfolio.ports.fx_rates import FxRatesUnavailableError
+from shadowfolio.ports.price_data import PriceDataUnavailableError
 from shadowfolio.wiring.test import build_test_app
 
 NOW = datetime(2026, 3, 2, 15, 0, tzinfo=UTC)
@@ -98,3 +100,30 @@ def test_a_market_priced_buy_without_a_rate_for_that_day_is_rejected(prices: InM
 
     response = client.post(f"/api/wallets/{wallet_id}/buys", json={"symbol": "NVDA", "quantity": "1", "timestamp": TRADE_TIME})
     assert (response.status_code, response.json()["detail"]) == (422, "no USD→EUR rate for 2024-06-24")
+
+
+class UnavailableFxRates(InMemoryFxRates):
+    def rate_on(self, base: Currency, quote: Currency, day: date) -> FxRate | None:
+        raise FxRatesUnavailableError("down")
+
+
+def test_a_market_priced_buy_is_refused_when_rates_cannot_be_fetched(prices: InMemoryPriceData) -> None:
+    client = TestClient(build_test_app(clock=FixedClock(NOW), prices=prices, fx_rates=UnavailableFxRates()))
+    wallet_id = funded_wallet(client, "EUR")
+
+    response = client.post(f"/api/wallets/{wallet_id}/buys", json={"symbol": "NVDA", "quantity": "1", "timestamp": TRADE_TIME})
+    assert (response.status_code, response.json()["detail"]) == (422, "could not fetch the USD→EUR rate right now; try again later")
+
+
+class UnavailablePriceData(InMemoryPriceData):
+    def price_at(self, symbol: str, at: datetime) -> Quote | None:
+        raise PriceDataUnavailableError("down")
+
+
+def test_a_market_priced_buy_is_refused_when_prices_cannot_be_fetched() -> None:
+    client = TestClient(build_test_app(clock=FixedClock(NOW), prices=UnavailablePriceData()))
+    wallet_id = funded_wallet(client, "USD")
+
+    response = client.post(f"/api/wallets/{wallet_id}/buys", json={"symbol": "NVDA", "quantity": "1", "timestamp": TRADE_TIME})
+    assert (response.status_code, response.json()["detail"]) == (422, "could not fetch the price of NVDA right now; try again later")
+    assert client.get(f"/api/wallets/{wallet_id}").json()["holdings"] == {}

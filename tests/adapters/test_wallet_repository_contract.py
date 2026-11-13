@@ -13,7 +13,7 @@ import pytest
 
 from shadowfolio.adapters.in_memory_wallet_repository import InMemoryWalletRepository
 from shadowfolio.adapters.sqlite_wallet_repository import SqliteWalletRepository
-from shadowfolio.domain.corporate_actions import CheckedPeriod, SplitEvent
+from shadowfolio.domain.corporate_actions import CheckedPeriod, DividendEvent, RecordedDividend, SplitEvent
 from shadowfolio.domain.money import Currency
 from shadowfolio.domain.operations import PriceSource, Trade
 from shadowfolio.domain.wallet import Wallet
@@ -127,6 +127,18 @@ def test_a_split_round_trips(make_repository: RepositoryFactory) -> None:
     stored = make_repository().get(wallet.id)
     assert stored == wallet
     assert stored is not None and stored.holdings == {"NVDA": Decimal("80")}
+
+
+def test_dividends_round_trip(make_repository: RepositoryFactory) -> None:
+    nvda = Trade("NVDA", Decimal("8"), Decimal("121.81"), Currency.USD)
+    wallet = a_wallet().buy(uuid4(), nvda, T1, settled_amount=Decimal("907.68"))
+    event = DividendEvent("NVDA", T2.date(), T2.date(), Decimal("0.01"), Currency.USD, "nvda-dividend")
+    wallet = wallet.record_dividends([RecordedDividend(event, Decimal("0.93"))])
+    make_repository().add(wallet)
+
+    stored = make_repository().get(wallet.id)
+    assert stored == wallet
+    assert stored is not None and [op.type for op in stored.operations][-1] == "dividend"
 
 
 def test_unknown_wallet_is_none(make_repository: RepositoryFactory) -> None:

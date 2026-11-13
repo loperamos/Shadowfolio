@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 from datetime import date
-from decimal import Decimal
+from decimal import ROUND_HALF_EVEN, Decimal
 from enum import StrEnum
 
 
@@ -19,3 +19,11 @@ class FxRate:
     quote: Currency
     rate: Decimal
     as_of: date
+
+
+CENT = Decimal("0.01")
+
+
+def to_cents(amount: Decimal) -> Decimal:
+    """Rounded to cents, half to even (banker's rounding), so rounding errors do not drift one way."""
+    return amount.quantize(CENT, rounding=ROUND_HALF_EVEN)

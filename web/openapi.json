@@ -1343,6 +1343,17 @@
             "type": "boolean",
             "title": "Had Effect",
             "default": true
+          },
+          "fx_rate": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fx Rate"
           }
         },
         "type": "object",
@@ -1362,7 +1373,8 @@
           "withdrawal",
           "buy",
           "sell",
-          "split"
+          "split",
+          "dividend"
         ],
         "title": "OperationType"
       },
@@ -1520,15 +1532,15 @@
             "type": "integer",
             "title": "Wallets"
           },
-          "splits_added": {
+          "added": {
             "type": "integer",
-            "title": "Splits Added"
+            "title": "Added"
           }
         },
         "type": "object",
         "required": [
           "wallets",
-          "splits_added"
+          "added"
         ],
         "title": "SyncSummaryResponse"
       },

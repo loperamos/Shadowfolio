@@ -37,7 +37,7 @@ def build_test_app(
     fx_rates = fx_rates or InMemoryFxRates()
     corporate_actions = corporate_actions or InMemoryCorporateActions()
     wallet_repository = wallet_repository or InMemoryWalletRepository()
-    sync = Sync(wallet_repository, clock, corporate_actions)
+    sync = Sync(wallet_repository, clock, corporate_actions, fx_rates)
     return create_app(
         wallets=Wallets(wallet_repository, clock),
         history=History(wallet_repository, clock, prices, fx_rates, sync),

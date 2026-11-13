@@ -88,7 +88,7 @@ def test_the_provider_is_only_asked_for_days_outside_the_checked_period(client: 
     assert len(actions.calls) == 2
 
 
-def test_a_trade_is_refused_and_nothing_changes_when_splits_cannot_be_checked(
+def test_a_trade_is_refused_and_nothing_changes_when_corporate_actions_cannot_be_checked(
     client: TestClient, actions: CountingCorporateActions
 ) -> None:
     wallet_id = new_wallet(client)
@@ -98,7 +98,10 @@ def test_a_trade_is_refused_and_nothing_changes_when_splits_cannot_be_checked(
         f"/api/wallets/{wallet_id}/buys",
         json={"symbol": "NVDA", "quantity": "8", "price": "900", "price_currency": "USD", "timestamp": "2024-05-01T15:00:00Z"},
     )
-    assert (response.status_code, response.json()["detail"]) == (422, "could not check splits of NVDA right now; try again later")
+    assert (response.status_code, response.json()["detail"]) == (
+        422,
+        "could not check corporate actions of NVDA right now; try again later",
+    )
     wallet = client.get(f"/api/wallets/{wallet_id}").json()
     assert (wallet["holdings"], wallet["splits_checked_through"]) == ({}, None)
 
@@ -112,12 +115,12 @@ def test_the_daily_sync_applies_splits_published_since_and_late_ones(actions: Co
 
     clock.set(datetime(2024, 6, 11, 12, 0, tzinfo=UTC))  # the day after the split
     summary = client.post("/api/sync").json()
-    assert summary == {"wallets": 1, "splits_added": 1}
+    assert summary == {"wallets": 1, "added": 1}
     wallet = client.get(f"/api/wallets/{wallet_id}").json()
     assert (wallet["holdings"], wallet["splits_checked_through"]) == ({"NVDA": "80"}, "2024-06-11")
     # The run looked back a week before the last checked day, for actions published late.
     assert actions.calls[-1] == ("NVDA", date(2024, 5, 25), date(2024, 6, 11))
-    assert client.post("/api/sync").json() == {"wallets": 1, "splits_added": 0}
+    assert client.post("/api/sync").json() == {"wallets": 1, "added": 0}
 
 
 def test_a_split_while_no_shares_are_held_changes_nothing(client: TestClient) -> None:
@@ -151,7 +154,7 @@ def test_the_daily_sync_also_checks_trades_recorded_before_periods_existed(actio
     assert stored is not None
     repository.update(replace(stored, operations=tuple(op for op in stored.operations if not op.automatic), checked={}))
 
-    assert client.post("/api/sync").json() == {"wallets": 1, "splits_added": 1}
+    assert client.post("/api/sync").json() == {"wallets": 1, "added": 1}
     assert client.get(f"/api/wallets/{wallet_id}").json()["holdings"] == {"NVDA": "80"}
 
 

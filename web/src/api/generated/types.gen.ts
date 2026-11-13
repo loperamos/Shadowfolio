@@ -259,6 +259,10 @@ export type OperationResponse = {
      * Had Effect
      */
     had_effect?: boolean;
+    /**
+     * Fx Rate
+     */
+    fx_rate?: string | null;
 };
 
 /**
@@ -269,7 +273,8 @@ export const OperationType = {
     WITHDRAWAL: 'withdrawal',
     BUY: 'buy',
     SELL: 'sell',
-    SPLIT: 'split'
+    SPLIT: 'split',
+    DIVIDEND: 'dividend'
 } as const;
 
 /**
@@ -364,9 +369,9 @@ export type SyncSummaryResponse = {
      */
     wallets: number;
     /**
-     * Splits Added
+     * Added
      */
-    splits_added: number;
+    added: number;
 };
 
 /**

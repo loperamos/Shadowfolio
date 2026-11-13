@@ -17,6 +17,6 @@ def sync_router(sync: Sync) -> APIRouter:
             summary = sync.all_wallets()
         except DomainError as error:
             raise rule_violation(error) from error
-        return SyncSummaryResponse(wallets=summary.wallets, splits_added=summary.splits_added)
+        return SyncSummaryResponse(wallets=summary.wallets, added=summary.added)
 
     return router

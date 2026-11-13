@@ -11,7 +11,9 @@ import httpx2
 
 from shadowfolio.adapters.alpaca_corporate_actions import AlpacaCorporateActions
 from shadowfolio.adapters.alpaca_price_data import AlpacaConfig
-from shadowfolio.domain.corporate_actions import SplitEvent
+from shadowfolio.domain.corporate_actions import DividendEvent, SplitEvent
+from shadowfolio.domain.money import Currency
+from shadowfolio.ports.corporate_actions import CorporateActionsUnavailableError
 
 CONFIG = AlpacaConfig(key_id="test-key", secret_key="test-secret")
 
@@ -47,3 +49,37 @@ def test_forward_and_reverse_splits_are_read_from_every_page_oldest_first() -> N
 def test_no_actions_means_no_splits() -> None:
     transport = httpx2.MockTransport(lambda request: httpx2.Response(200, text='{"corporate_actions": {}, "next_page_token": null}'))
     assert AlpacaCorporateActions(CONFIG, transport=transport).splits("ZZZZ", date(2024, 1, 1), date(2024, 12, 31)) == []
+
+
+def test_cash_dividends_are_read_in_dollars() -> None:
+    page = {
+        "corporate_actions": {
+            "cash_dividends": [
+                {"symbol": "GOOGL", "ex_date": "2024-06-10", "payable_date": "2024-06-17", "rate": 0.2, "id": "div-1", "special": False}
+            ]
+        },
+        "next_page_token": None,
+    }
+    seen: list[httpx2.Request] = []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        seen.append(request)
+        return httpx2.Response(200, text=json.dumps(page))
+
+    dividends = AlpacaCorporateActions(CONFIG, transport=httpx2.MockTransport(handler)).dividends(
+        "GOOGL", date(2024, 6, 1), date(2024, 6, 30)
+    )
+
+    assert dividends == [DividendEvent("GOOGL", date(2024, 6, 10), date(2024, 6, 17), Decimal("0.2"), Currency.USD, "div-1")]
+    assert seen[0].url.params["types"] == "cash_dividend"
+
+
+def test_http_errors_mean_the_provider_is_unavailable() -> None:
+    transport = httpx2.MockTransport(lambda request: httpx2.Response(503, text="down"))
+    adapter = AlpacaCorporateActions(CONFIG, transport=transport)
+    for fetch in (adapter.splits, adapter.dividends):
+        try:
+            fetch("NVDA", date(2024, 1, 1), date(2024, 12, 31))
+        except CorporateActionsUnavailableError:
+            continue
+        raise AssertionError("expected CorporateActionsUnavailableError")

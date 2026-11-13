@@ -16,6 +16,7 @@ from dotenv import load_dotenv
 from shadowfolio.adapters.alpaca_price_data import BASE_URL, AlpacaConfig, AlpacaPriceData
 from shadowfolio.domain.money import Currency
 from shadowfolio.domain.valuation import Quote
+from shadowfolio.ports.price_data import PriceDataUnavailableError
 
 CONFIG = AlpacaConfig(key_id="test-key", secret_key="test-secret")
 
@@ -88,9 +89,14 @@ def test_unknown_symbol_is_none(status: int) -> None:
     assert adapter_answering(status, '{"message": "not found"}').latest_price("ZZZZ") is None
 
 
-def test_other_errors_are_raised() -> None:
-    with pytest.raises(httpx2.HTTPStatusError):
-        adapter_answering(500, "oops").latest_price("NVDA")
+@pytest.mark.parametrize("fetch", ["latest", "historical"])
+def test_other_errors_mean_prices_are_unavailable(fetch: str) -> None:
+    adapter = adapter_answering(500, "oops")
+    with pytest.raises(PriceDataUnavailableError):
+        if fetch == "latest":
+            adapter.latest_price("NVDA")
+        else:
+            adapter.price_at("NVDA", datetime(2024, 6, 24, 14, 26, tzinfo=UTC))
 
 
 def _real_client() -> httpx2.Client:

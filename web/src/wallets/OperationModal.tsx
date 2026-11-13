@@ -28,8 +28,8 @@ import {
 } from "../ui/format";
 import { DATE_INPUT_WIDTH, ICON_SIZE, TIME_INPUT_WIDTH } from "../ui/theme";
 
-// The kinds a person records; others (e.g. splits) are only added automatically from market data.
-type ManualOperationType = Exclude<OperationType, typeof OperationType.SPLIT>;
+// The kinds a person records; others (splits, dividends) are only added automatically from market data.
+type ManualOperationType = Exclude<OperationType, typeof OperationType.SPLIT | typeof OperationType.DIVIDEND>;
 
 const OPERATION_LABELS: Record<ManualOperationType, string> = {
   [OperationType.BUY]: "Buy",
