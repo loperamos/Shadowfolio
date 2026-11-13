@@ -82,6 +82,14 @@ def _percent(part: Decimal, whole: Decimal) -> Decimal:
     return (part / whole * 100).quantize(CENT, rounding=ROUND_HALF_EVEN)
 
 
+def _ratio_percent(ratio: Decimal | None) -> Decimal | None:
+    return None if ratio is None else (ratio * 100).quantize(CENT, rounding=ROUND_HALF_EVEN)
+
+
+def _optional_cents(amount: Decimal | None) -> Decimal | None:
+    return None if amount is None else _cents(amount)
+
+
 class WalletResponse(BaseModel):
     id: UUID
     name: str
@@ -153,6 +161,9 @@ class HoldingValueResponse(BaseModel):
     cost: Decimal  # in the wallet's currency
     gain: Decimal  # unrealized, in the wallet's currency; negative for a loss
     gain_percent: Decimal  # of the cost
+    previous_close: Decimal | None  # in the price's currency
+    day_change: Decimal | None  # since the previous close, in the wallet's currency (price only, not exchange rates)
+    day_change_percent: Decimal | None  # the price's move since the previous close
 
 
 class ValuationResponse(BaseModel):
@@ -162,6 +173,8 @@ class ValuationResponse(BaseModel):
     cost: Decimal  # of all holdings, in the wallet's currency
     gain: Decimal  # unrealized gain of all holdings
     gain_percent: Decimal | None  # of the cost; null when nothing is held
+    day_change: Decimal | None  # of all holdings since the previous close; null if any holding has no previous close
+    day_change_percent: Decimal | None  # of the holdings' value at the previous close
     total: Decimal  # cash plus holdings, in the wallet's currency
 
     @classmethod
@@ -182,12 +195,17 @@ class ValuationResponse(BaseModel):
                     cost=_cents(h.cost),
                     gain=_cents(h.gain),
                     gain_percent=_percent(h.gain, h.cost),
+                    previous_close=h.quote.previous_close,
+                    day_change=_optional_cents(h.day_change),
+                    day_change_percent=_ratio_percent(h.day_change_ratio),
                 )
                 for h in valuation.holdings
             ],
             cost=_cents(valuation.cost),
             gain=_cents(valuation.gain),
             gain_percent=_percent(valuation.gain, valuation.cost) if valuation.cost else None,
+            day_change=_optional_cents(valuation.day_change),
+            day_change_percent=_ratio_percent(valuation.day_change_ratio),
             total=valuation.total,
         )
 
@@ -197,3 +215,4 @@ class QuoteResponse(BaseModel):
     price: Decimal
     currency: Currency
     as_of: AwareDatetime
+    previous_close: Decimal | None

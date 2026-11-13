@@ -1146,6 +1146,39 @@
           "gain_percent": {
             "type": "string",
             "title": "Gain Percent"
+          },
+          "previous_close": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Close"
+          },
+          "day_change": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Day Change"
+          },
+          "day_change_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Day Change Percent"
           }
         },
         "type": "object",
@@ -1160,7 +1193,10 @@
           "value_in_wallet_currency",
           "cost",
           "gain",
-          "gain_percent"
+          "gain_percent",
+          "previous_close",
+          "day_change",
+          "day_change_percent"
         ],
         "title": "HoldingValueResponse"
       },
@@ -1268,6 +1304,17 @@
             "type": "string",
             "format": "date-time",
             "title": "As Of"
+          },
+          "previous_close": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Close"
           }
         },
         "type": "object",
@@ -1275,7 +1322,8 @@
           "symbol",
           "price",
           "currency",
-          "as_of"
+          "as_of",
+          "previous_close"
         ],
         "title": "QuoteResponse"
       },
@@ -1479,6 +1527,28 @@
             ],
             "title": "Gain Percent"
           },
+          "day_change": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Day Change"
+          },
+          "day_change_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Day Change Percent"
+          },
           "total": {
             "type": "string",
             "title": "Total"
@@ -1492,6 +1562,8 @@
           "cost",
           "gain",
           "gain_percent",
+          "day_change",
+          "day_change_percent",
           "total"
         ],
         "title": "ValuationResponse"

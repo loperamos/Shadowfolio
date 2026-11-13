@@ -17,7 +17,7 @@ import { DeleteWalletsModal } from "./DeleteWalletsModal";
 import { DuplicateWalletModal } from "./DuplicateWalletModal";
 import { type ValuationState, useWalletValuation } from "./useWalletValuation";
 import { WalletActionsMenu } from "./WalletActionsMenu";
-import { WalletGain, WalletValue } from "./WalletValue";
+import { WalletDayChange, WalletGain, WalletValue } from "./WalletValue";
 
 const NOT_FOUND_STATUS = 404;
 // Exchange rates are shown to this many decimals in tooltips; the valuation uses the exact rate.
@@ -164,6 +164,12 @@ function WalletDetails({ wallet, operations, version, onEditOperation, onDeleteO
         </div>
         <div>
           <Text c="dimmed" size="sm">
+            Today
+          </Text>
+          <WalletDayChange state={valuation} size="xl" fw={600} />
+        </div>
+        <div>
+          <Text c="dimmed" size="sm">
             Unrealized gain
           </Text>
           <WalletGain state={valuation} size="xl" fw={600} />
@@ -196,6 +202,7 @@ function WalletDetails({ wallet, operations, version, onEditOperation, onDeleteO
                 <Table.Th ta="right">Cost</Table.Th>
                 <Table.Th ta="right">Price</Table.Th>
                 <Table.Th ta="right">Value</Table.Th>
+                <Table.Th ta="right">Today</Table.Th>
                 <Table.Th ta="right">Gain</Table.Th>
               </Table.Tr>
             </Table.Thead>
@@ -261,7 +268,7 @@ function WalletDetails({ wallet, operations, version, onEditOperation, onDeleteO
   );
 }
 
-/** The holding's latest price, its value in the wallet's currency and its gain, once the valuation has loaded. */
+/** The holding's latest price, its value in the wallet's currency, today's change and its gain, once the valuation has loaded. */
 function HoldingPriceAndValue({ symbol, valuation }: { symbol: string; valuation: ValuationState }) {
   const loaded = valuation.status === "loaded" ? valuation.valuation : null;
   const holding = loaded?.holdings.find((h) => h.symbol === symbol);
@@ -269,6 +276,7 @@ function HoldingPriceAndValue({ symbol, valuation }: { symbol: string; valuation
     return (
       <>
         <Table.Td ta="right">{valuation.status === "loading" ? <Loader size="xs" /> : "—"}</Table.Td>
+        <Table.Td ta="right">—</Table.Td>
         <Table.Td ta="right">—</Table.Td>
         <Table.Td ta="right">—</Table.Td>
       </>
@@ -289,6 +297,13 @@ function HoldingPriceAndValue({ symbol, valuation }: { symbol: string; valuation
       </Table.Td>
       <Table.Td ta="right">
         {holding.value_in_wallet_currency} {loaded.currency}
+      </Table.Td>
+      <Table.Td ta="right">
+        {holding.day_change != null ? (
+          <GainText amount={holding.day_change} currency={loaded.currency} percent={holding.day_change_percent} />
+        ) : (
+          "—"
+        )}
       </Table.Td>
       <Table.Td ta="right">
         <GainText amount={holding.gain} currency={loaded.currency} percent={holding.gain_percent} />

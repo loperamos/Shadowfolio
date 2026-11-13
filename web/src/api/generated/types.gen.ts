@@ -194,6 +194,18 @@ export type HoldingValueResponse = {
      * Gain Percent
      */
     gain_percent: string;
+    /**
+     * Previous Close
+     */
+    previous_close: string | null;
+    /**
+     * Day Change
+     */
+    day_change: string | null;
+    /**
+     * Day Change Percent
+     */
+    day_change_percent: string | null;
 };
 
 /**
@@ -264,6 +276,10 @@ export type QuoteResponse = {
      * As Of
      */
     as_of: string;
+    /**
+     * Previous Close
+     */
+    previous_close: string | null;
 };
 
 /**
@@ -367,6 +383,14 @@ export type ValuationResponse = {
      * Gain Percent
      */
     gain_percent: string | null;
+    /**
+     * Day Change
+     */
+    day_change: string | null;
+    /**
+     * Day Change Percent
+     */
+    day_change_percent: string | null;
     /**
      * Total
      */

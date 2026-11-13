@@ -5,7 +5,7 @@ import type { WalletResponse } from "../api/generated";
 import { walletPath } from "../routes";
 import { useWalletValuation } from "./useWalletValuation";
 import { WalletActionsMenu } from "./WalletActionsMenu";
-import { WalletGain, WalletValue } from "./WalletValue";
+import { WalletDayChange, WalletGain, WalletValue } from "./WalletValue";
 
 type Props = {
   wallets: WalletResponse[] | null;
@@ -56,6 +56,7 @@ export function WalletTable({ wallets, error, selectedIds, onSelectionChange, on
           <Table.Th>Name</Table.Th>
           <Table.Th ta="right">Cash</Table.Th>
           <Table.Th ta="right">Value</Table.Th>
+          <Table.Th ta="right">Today</Table.Th>
           <Table.Th ta="right">Gain</Table.Th>
           <Table.Th>Holdings</Table.Th>
           <Table.Th w={40} />
@@ -91,13 +92,16 @@ export function WalletTable({ wallets, error, selectedIds, onSelectionChange, on
   );
 }
 
-/** The Value and Gain cells of a row, from one valuation of the wallet. */
+/** The Value, Today and Gain cells of a row, from one valuation of the wallet. */
 function WalletValuationCells({ walletId }: { walletId: string }) {
   const valuation = useWalletValuation(walletId);
   return (
     <>
       <Table.Td ta="right">
         <WalletValue state={valuation} />
+      </Table.Td>
+      <Table.Td ta="right">
+        <WalletDayChange state={valuation} />
       </Table.Td>
       <Table.Td ta="right">
         <WalletGain state={valuation} />

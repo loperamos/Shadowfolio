@@ -71,6 +71,8 @@ def test_cash_only_wallet_is_worth_its_cash(client: TestClient) -> None:
         "cost": "0.00",
         "gain": "0.00",
         "gain_percent": None,
+        "day_change": None,
+        "day_change_percent": None,
         "total": "3000",
     }
 
@@ -100,6 +102,32 @@ def test_holdings_are_valued_at_latest_prices_and_converted_into_the_wallet_curr
         ("1479.15", "70.85", "4.79"),
     ]
     assert (valuation["cost"], valuation["gain"], valuation["gain_percent"]) == ("2388.83", "139.48", "5.84")
+
+
+def test_day_change_is_the_price_move_since_the_previous_close(
+    client: TestClient, prices: InMemoryPriceData, fx_rates: InMemoryFxRates
+) -> None:
+    wallet_id = wallet_holding(client, NVDA_BUY, TSLA_BUY)
+    prices.set("NVDA", Quote(Decimal("135.50"), Currency.USD, QUOTE_TIME, previous_close=Decimal("133.00")))
+    prices.set("TSLA", Quote(Decimal("310.00"), Currency.EUR, QUOTE_TIME, previous_close=Decimal("315.00")))
+    fx_rates.set(FxRate(Currency.USD, Currency.EUR, Decimal("0.9025"), date(2026, 3, 2)))
+
+    valuation = client.get(f"/api/wallets/{wallet_id}/valuation").json()
+    # NVDA: 8 x +2.50 USD = +20.00 USD = +18.05 EUR at today's rate (+1.88%); TSLA: 5 x -5.00 EUR = -25.00 EUR (-1.59%).
+    assert [(h["previous_close"], h["day_change"], h["day_change_percent"]) for h in valuation["holdings"]] == [
+        ("133.00", "18.05", "1.88"),
+        ("315.00", "-25.00", "-1.59"),
+    ]
+    # -6.95 EUR, against what the holdings were worth at the previous close: 978.31 - 18.05 + 1550.00 + 25.00.
+    assert (valuation["day_change"], valuation["day_change_percent"]) == ("-6.95", "-0.27")
+
+
+def test_day_change_is_unknown_when_a_previous_close_is_missing(client: TestClient, prices: InMemoryPriceData) -> None:
+    wallet_id = wallet_holding(client, TSLA_BUY)
+    prices.set("TSLA", Quote(Decimal("310.00"), Currency.EUR, QUOTE_TIME))
+
+    valuation = client.get(f"/api/wallets/{wallet_id}/valuation").json()
+    assert (valuation["holdings"][0]["day_change"], valuation["day_change"]) == (None, None)
 
 
 def test_missing_price_fails_the_valuation(client: TestClient, prices: InMemoryPriceData) -> None:

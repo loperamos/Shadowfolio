@@ -42,13 +42,20 @@ class AlpacaPriceData(PriceData):
         )
 
     def latest_price(self, symbol: str) -> Quote | None:
-        """The last trade's price. Alpaca only covers US listings, so prices are in USD."""
-        response = self._client.get(f"/v2/stocks/{quote(symbol, safe='')}/trades/latest", params={"feed": FEED})
+        """The last trade's price and the previous day's close. Alpaca only covers US listings, so prices are in USD."""
+        response = self._client.get(f"/v2/stocks/{quote(symbol, safe='')}/snapshot", params={"feed": FEED})
         if response.status_code in _UNKNOWN_SYMBOL_STATUSES:
             return None
         response.raise_for_status()
         # Parse numbers as Decimal directly, never through float.
-        trade = json.loads(response.text, parse_float=Decimal).get("trade")
+        snapshot = json.loads(response.text, parse_float=Decimal)
+        trade = snapshot.get("latestTrade")
         if not trade:
             return None
-        return Quote(price=Decimal(trade["p"]), currency=Currency.USD, as_of=datetime.fromisoformat(trade["t"]))
+        previous_bar = snapshot.get("prevDailyBar")
+        return Quote(
+            price=Decimal(trade["p"]),
+            currency=Currency.USD,
+            as_of=datetime.fromisoformat(trade["t"]),
+            previous_close=Decimal(previous_bar["c"]) if previous_bar else None,
+        )

@@ -37,3 +37,16 @@ export function WalletGain({ state, ...textProps }: { state: ValuationState } & 
   const { gain, gain_percent, currency } = state.valuation;
   return <GainText amount={gain} currency={currency} percent={gain_percent} {...textProps} />;
 }
+
+/** How much the wallet's holdings moved since the previous close; "—" while loading or when unknown. */
+export function WalletDayChange({ state, ...textProps }: { state: ValuationState } & TextProps) {
+  if (state.status !== "loaded" || state.valuation.day_change == null) {
+    return (
+      <Text c="dimmed" {...textProps}>
+        —
+      </Text>
+    );
+  }
+  const { day_change, day_change_percent, currency } = state.valuation;
+  return <GainText amount={day_change} currency={currency} percent={day_change_percent} {...textProps} />;
+}

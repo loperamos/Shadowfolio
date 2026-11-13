@@ -15,6 +15,8 @@ def market_router(market: Market) -> APIRouter:
         quote = market.latest_quote(symbol)
         if quote is None:
             raise HTTPException(status_code=404, detail=f"no price for {symbol}")
-        return QuoteResponse(symbol=symbol, price=quote.price, currency=quote.currency, as_of=quote.as_of)
+        return QuoteResponse(
+            symbol=symbol, price=quote.price, currency=quote.currency, as_of=quote.as_of, previous_close=quote.previous_close
+        )
 
     return router

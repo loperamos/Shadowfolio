@@ -13,11 +13,12 @@ CENT = Decimal("0.01")
 
 @dataclass(frozen=True)
 class Quote:
-    """A market price for one share, in the listing's currency, as of a time."""
+    """A market price for one share, in the listing's currency, as of a time, with the previous trading day's close."""
 
     price: Decimal
     currency: Currency
     as_of: datetime
+    previous_close: Decimal | None = None  # None when the provider has none (e.g. a new listing)
 
 
 @dataclass(frozen=True)
@@ -45,6 +46,25 @@ class HoldingValue:
         """Unrealized gain (negative for a loss), in the wallet's currency."""
         return self.value_in_wallet_currency - self.cost
 
+    @property
+    def day_change(self) -> Decimal | None:
+        """How much the holding's value moved since the previous close, in the wallet's currency.
+
+        From the price only, converted at the current rate; exchange-rate moves are not included. Shares bought today
+        are also compared with the previous close.
+        """
+        if self.quote.previous_close is None:
+            return None
+        change = self.quantity * (self.quote.price - self.quote.previous_close)
+        return change if self.fx_rate is None else (change * self.fx_rate.rate).quantize(CENT, rounding=ROUND_HALF_EVEN)
+
+    @property
+    def day_change_ratio(self) -> Decimal | None:
+        """The price's move since the previous close, as a fraction of it."""
+        if not self.quote.previous_close:
+            return None
+        return (self.quote.price - self.quote.previous_close) / self.quote.previous_close
+
 
 @dataclass(frozen=True)
 class WalletValuation:
@@ -61,6 +81,23 @@ class WalletValuation:
     def gain(self) -> Decimal:
         """Unrealized gain of all holdings, in the wallet's currency."""
         return sum((h.gain for h in self.holdings), Decimal(0))
+
+    @property
+    def day_change(self) -> Decimal | None:
+        """How much the holdings moved since the previous close; None if any holding has no previous close."""
+        changes = [h.day_change for h in self.holdings]
+        if not changes or any(change is None for change in changes):
+            return None
+        return sum((change for change in changes if change is not None), Decimal(0))
+
+    @property
+    def day_change_ratio(self) -> Decimal | None:
+        """The day change as a fraction of what the holdings were worth at the previous close."""
+        change = self.day_change
+        if change is None:
+            return None
+        previous_value = sum((h.value_in_wallet_currency for h in self.holdings), Decimal(0)) - change
+        return change / previous_value if previous_value else None
 
     @property
     def total(self) -> Decimal:

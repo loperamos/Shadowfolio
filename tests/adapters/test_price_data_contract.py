@@ -24,7 +24,9 @@ UNKNOWN_SYMBOL = "ZZZZZZZZ"
 
 
 def _in_memory() -> PriceData:
-    return InMemoryPriceData({KNOWN_SYMBOL: Quote(Decimal("135.50"), Currency.USD, datetime(2026, 3, 2, 21, 0, tzinfo=UTC))})
+    return InMemoryPriceData(
+        {KNOWN_SYMBOL: Quote(Decimal("135.50"), Currency.USD, datetime(2026, 3, 2, 21, 0, tzinfo=UTC), Decimal("133.04"))}
+    )
 
 
 def _alpaca() -> PriceData:
@@ -51,6 +53,8 @@ def test_known_symbol_has_a_usable_quote(prices: PriceData) -> None:
     assert quote.price > 0
     assert quote.currency is Currency.USD
     assert quote.as_of.utcoffset() is not None
+    assert isinstance(quote.previous_close, Decimal)
+    assert quote.previous_close > 0
 
 
 def test_unknown_symbol_has_no_price(prices: PriceData) -> None:

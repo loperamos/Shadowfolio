@@ -29,22 +29,32 @@ def adapter_answering(status: int, body: str, seen: list[httpx2.Request] | None 
     return AlpacaPriceData(CONFIG, transport=httpx2.MockTransport(handler))
 
 
-# What the fakes answer, as Alpaca does.
-LATEST_TRADE_BODY = '{"symbol": "NVDA", "trade": {"t": "2026-03-02T20:59:59.123456789Z", "p": 135.505, "s": 100}}'
+# What the fakes answer, as Alpaca does (trimmed to the fields the adapter reads).
+SNAPSHOT_BODY = (
+    '{"symbol": "NVDA", "latestTrade": {"t": "2026-03-02T20:59:59.123456789Z", "p": 135.505, "s": 100},'
+    ' "prevDailyBar": {"t": "2026-02-27T05:00:00Z", "o": 131.2, "h": 134.0, "l": 130.1, "c": 133.04, "v": 1000}}'
+)
 UNKNOWN_SYMBOL_STATUSES = [404, 422]
 
 
-def test_latest_trade_becomes_an_exact_usd_quote() -> None:
+def test_snapshot_becomes_an_exact_usd_quote_with_the_previous_close() -> None:
     seen: list[httpx2.Request] = []
-    body = LATEST_TRADE_BODY
 
-    quote = adapter_answering(200, body, seen).latest_price("NVDA")
+    quote = adapter_answering(200, SNAPSHOT_BODY, seen).latest_price("NVDA")
 
-    assert quote == Quote(Decimal("135.505"), Currency.USD, datetime(2026, 3, 2, 20, 59, 59, 123456, tzinfo=UTC))
+    assert quote == Quote(Decimal("135.505"), Currency.USD, datetime(2026, 3, 2, 20, 59, 59, 123456, tzinfo=UTC), Decimal("133.04"))
     request = seen[0]
-    assert request.url.path == "/v2/stocks/NVDA/trades/latest"
+    assert request.url.path == "/v2/stocks/NVDA/snapshot"
     assert request.url.params["feed"] == "iex"
     assert request.headers["APCA-API-KEY-ID"] == "test-key"
+
+
+def test_snapshot_without_a_previous_day_has_no_previous_close() -> None:
+    body = json.dumps({key: value for key, value in json.loads(SNAPSHOT_BODY).items() if key != "prevDailyBar"})
+
+    quote = adapter_answering(200, body).latest_price("NVDA")
+
+    assert quote is not None and quote.previous_close is None
 
 
 @pytest.mark.parametrize("status", UNKNOWN_SYMBOL_STATUSES)
@@ -66,19 +76,21 @@ def _real_client() -> httpx2.Client:
 
 
 @pytest.mark.live
-def test_real_latest_trade_has_the_shape_the_fake_uses() -> None:
-    response = _real_client().get("/v2/stocks/NVDA/trades/latest", params={"feed": "iex"})
+def test_real_snapshot_has_the_shape_the_fake_uses() -> None:
+    response = _real_client().get("/v2/stocks/NVDA/snapshot", params={"feed": "iex"})
 
     assert response.status_code == 200
-    real, fake = json.loads(response.text), json.loads(LATEST_TRADE_BODY)
+    real, fake = json.loads(response.text), json.loads(SNAPSHOT_BODY)
     assert fake.keys() <= real.keys()
-    assert fake["trade"].keys() <= real["trade"].keys()
-    assert isinstance(real["trade"]["p"], int | float)
-    assert datetime.fromisoformat(real["trade"]["t"]).utcoffset() is not None
+    for part in ("latestTrade", "prevDailyBar"):
+        assert fake[part].keys() <= real[part].keys()
+    assert isinstance(real["latestTrade"]["p"], int | float)
+    assert isinstance(real["prevDailyBar"]["c"], int | float)
+    assert datetime.fromisoformat(real["latestTrade"]["t"]).utcoffset() is not None
 
 
 @pytest.mark.live
 def test_real_unknown_symbol_answers_a_status_the_fake_uses() -> None:
-    response = _real_client().get("/v2/stocks/ZZZZZZZZ/trades/latest", params={"feed": "iex"})
+    response = _real_client().get("/v2/stocks/ZZZZZZZZ/snapshot", params={"feed": "iex"})
 
     assert response.status_code in UNKNOWN_SYMBOL_STATUSES
