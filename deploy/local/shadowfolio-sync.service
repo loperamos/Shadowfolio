@@ -1,0 +1,12 @@
+# Applies corporate actions (splits) to every wallet by calling the backend's sync endpoint.
+# Installed by install-sync-timer.sh, which replaces @REPO_DIR@ with the repository's path.
+[Unit]
+Description=Shadowfolio daily sync of corporate actions
+
+[Service]
+Type=oneshot
+# The backend's address comes from the repo's .env, read at every run, so changing it there is enough.
+# The backend must be running; it alone decides where the database is (SHADOWFOLIO_DB).
+EnvironmentFile=@REPO_DIR@/.env
+# A backend listening on every interface (0.0.0.0) is reached through the loopback address.
+ExecStart=/bin/sh -c 'host="$${SHADOWFOLIO_HOST}"; [ "$$host" = "0.0.0.0" ] && host=127.0.0.1; exec /usr/bin/curl --fail --silent --show-error --max-time 300 -X POST "http://$$host:$${SHADOWFOLIO_PORT}/api/sync"'

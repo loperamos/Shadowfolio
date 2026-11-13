@@ -22,5 +22,8 @@ class InMemoryWalletRepository(WalletRepository):
     def delete(self, wallet_id: UUID) -> None:
         self._wallets.pop(wallet_id, None)
 
+    def all_ids(self) -> list[UUID]:
+        return list(self._wallets)
+
     def list_by_owner(self, owner_id: str) -> list[Wallet]:
         return [wallet for wallet in self._wallets.values() if wallet.owner_id == owner_id]

@@ -11,3 +11,7 @@ class FixedClock(Clock):
 
     def now(self) -> datetime:
         return self._at
+
+    def set(self, at: datetime) -> None:
+        """Moves "now", e.g. to the day after an event in a test."""
+        self._at = at

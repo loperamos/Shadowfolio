@@ -26,3 +26,14 @@ export function MarketPriceBadge() {
     </Tooltip>
   );
 }
+
+/** Marks an operation the system added from market data (e.g. a split), which cannot be edited or deleted. */
+export function AutomaticBadge() {
+  return (
+    <Tooltip label="Added automatically from market data when syncing; it cannot be edited or deleted." multiline w={TOOLTIP_WIDTH}>
+      <Badge color="gray" variant="light" size="xs" style={KEEP_SIZE}>
+        Automatic
+      </Badge>
+    </Tooltip>
+  );
+}

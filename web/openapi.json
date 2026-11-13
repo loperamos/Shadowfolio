@@ -815,6 +815,34 @@
           }
         }
       }
+    },
+    "/api/sync": {
+      "post": {
+        "summary": "Sync All Wallets",
+        "operationId": "sync_all_wallets",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncSummaryResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Malformed request or broken business rule",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1283,6 +1311,33 @@
                 "type": "null"
               }
             ]
+          },
+          "split_old_rate": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Split Old Rate"
+          },
+          "split_new_rate": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Split New Rate"
+          },
+          "automatic": {
+            "type": "boolean",
+            "title": "Automatic",
+            "default": false
           }
         },
         "type": "object",
@@ -1301,7 +1356,8 @@
           "deposit",
           "withdrawal",
           "buy",
-          "sell"
+          "sell",
+          "split"
         ],
         "title": "OperationType"
       },
@@ -1452,6 +1508,24 @@
           "type"
         ],
         "title": "SellEdit"
+      },
+      "SyncSummaryResponse": {
+        "properties": {
+          "wallets": {
+            "type": "integer",
+            "title": "Wallets"
+          },
+          "splits_added": {
+            "type": "integer",
+            "title": "Splits Added"
+          }
+        },
+        "type": "object",
+        "required": [
+          "wallets",
+          "splits_added"
+        ],
+        "title": "SyncSummaryResponse"
       },
       "TradeRequest": {
         "properties": {
@@ -1649,6 +1723,18 @@
           "hindsight": {
             "type": "boolean",
             "title": "Hindsight"
+          },
+          "splits_checked_through": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Splits Checked Through"
           }
         },
         "type": "object",
@@ -1660,7 +1746,8 @@
           "holdings",
           "cost_basis",
           "realized_gain",
-          "hindsight"
+          "hindsight",
+          "splits_checked_through"
         ],
         "title": "WalletResponse"
       },

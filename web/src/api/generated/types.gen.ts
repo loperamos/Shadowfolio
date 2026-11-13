@@ -243,6 +243,18 @@ export type OperationResponse = {
     price?: string | null;
     price_currency?: Currency | null;
     price_source?: PriceSource | null;
+    /**
+     * Split Old Rate
+     */
+    split_old_rate?: string | null;
+    /**
+     * Split New Rate
+     */
+    split_new_rate?: string | null;
+    /**
+     * Automatic
+     */
+    automatic?: boolean;
 };
 
 /**
@@ -252,7 +264,8 @@ export const OperationType = {
     DEPOSIT: 'deposit',
     WITHDRAWAL: 'withdrawal',
     BUY: 'buy',
-    SELL: 'sell'
+    SELL: 'sell',
+    SPLIT: 'split'
 } as const;
 
 /**
@@ -336,6 +349,20 @@ export type SellEdit = {
      * Type
      */
     type: 'sell';
+};
+
+/**
+ * SyncSummaryResponse
+ */
+export type SyncSummaryResponse = {
+    /**
+     * Wallets
+     */
+    wallets: number;
+    /**
+     * Splits Added
+     */
+    splits_added: number;
 };
 
 /**
@@ -445,6 +472,10 @@ export type WalletResponse = {
      * Hindsight
      */
     hindsight: boolean;
+    /**
+     * Splits Checked Through
+     */
+    splits_checked_through: string | null;
 };
 
 /**
@@ -970,3 +1001,28 @@ export type LatestQuoteResponses = {
 };
 
 export type LatestQuoteResponse = LatestQuoteResponses[keyof LatestQuoteResponses];
+
+export type SyncAllWalletsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/sync';
+};
+
+export type SyncAllWalletsErrors = {
+    /**
+     * Malformed request or broken business rule
+     */
+    422: ErrorResponse;
+};
+
+export type SyncAllWalletsError = SyncAllWalletsErrors[keyof SyncAllWalletsErrors];
+
+export type SyncAllWalletsResponses = {
+    /**
+     * Successful Response
+     */
+    200: SyncSummaryResponse;
+};
+
+export type SyncAllWalletsResponse = SyncAllWalletsResponses[keyof SyncAllWalletsResponses];

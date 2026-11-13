@@ -8,7 +8,7 @@ from uuid import UUID
 from pydantic import AwareDatetime, BaseModel, Field
 
 from shadowfolio.domain.money import Currency
-from shadowfolio.domain.operations import Buy, Deposit, Operation, OperationType, PriceSource, Sell, Withdrawal
+from shadowfolio.domain.operations import Buy, Deposit, Operation, OperationType, PriceSource, Sell, Split, Withdrawal
 from shadowfolio.domain.valuation import WalletValuation
 from shadowfolio.domain.wallet import Wallet
 
@@ -88,6 +88,14 @@ def _optional_cents(amount: Decimal | None) -> Decimal | None:
     return None if amount is None else _cents(amount)
 
 
+def _checked_through(wallet: Wallet) -> date | None:
+    held = wallet.holdings
+    periods = [wallet.checked.get(symbol) for symbol in held]
+    if not held or any(period is None for period in periods):
+        return None
+    return min(period.end for period in periods if period is not None)
+
+
 class WalletResponse(BaseModel):
     id: UUID
     name: str
@@ -97,6 +105,9 @@ class WalletResponse(BaseModel):
     cost_basis: dict[str, Decimal]  # what each holding cost, in the wallet's currency (FIFO, fees included)
     realized_gain: Decimal  # from all sells so far, in the wallet's currency
     hindsight: bool  # some trade was priced from market data after the fact, so results are not a forward test
+    # Corporate actions of the held symbols are applied up to this day (the earliest across them); null when nothing
+    # is held, or when a held symbol has never been checked.
+    splits_checked_through: date | None
 
     @classmethod
     def from_wallet(cls, wallet: Wallet) -> "WalletResponse":
@@ -110,6 +121,7 @@ class WalletResponse(BaseModel):
             cost_basis={symbol: _cents(position.cost) for symbol, position in ledger.positions.items()},
             realized_gain=_cents(ledger.realized_gain),
             hindsight=wallet.hindsight,
+            splits_checked_through=_checked_through(wallet),
         )
 
 
@@ -124,6 +136,10 @@ class OperationResponse(BaseModel):
     price: Decimal | None = None
     price_currency: Currency | None = None
     price_source: PriceSource | None = None  # trades only: entered (from the broker) or market (filled from market data)
+    # Splits only: old_rate shares became new_rate shares (e.g. 1 → 10).
+    split_old_rate: Decimal | None = None
+    split_new_rate: Decimal | None = None
+    automatic: bool = False  # added by the system from market data; cannot be edited or deleted
 
     @classmethod
     def from_operation(cls, operation: Operation) -> "OperationResponse":
@@ -143,6 +159,18 @@ class OperationResponse(BaseModel):
                     price=trade.price,
                     price_currency=trade.price_currency,
                     price_source=trade.price_source,
+                )
+            case Split():
+                return cls(
+                    id=operation.id,
+                    type=operation.type,
+                    timestamp=operation.timestamp,
+                    amount=Decimal(0),
+                    fees=Decimal(0),
+                    symbol=operation.symbol,
+                    split_old_rate=operation.old_rate,
+                    split_new_rate=operation.new_rate,
+                    automatic=True,
                 )
 
 
@@ -218,3 +246,8 @@ class QuoteResponse(BaseModel):
     currency: Currency
     as_of: AwareDatetime
     previous_close: Decimal | None
+
+
+class SyncSummaryResponse(BaseModel):
+    wallets: int  # wallets checked
+    splits_added: int

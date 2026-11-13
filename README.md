@@ -32,6 +32,21 @@ uv run shadowfolio
 
 After changing dependencies, run `uv lock` and commit `uv.lock`; CI installs with `uv sync --locked`.
 
+## Daily sync
+
+Corporate actions (splits) are applied to every wallet by `POST /api/sync`. Recording a trade also applies its symbol's splits first, so the daily run is what keeps holdings right as time passes. Locally it runs as a systemd user timer, every day at 07:00 New York time (before the US market opens), against the running backend:
+
+```bash
+./deploy/local/install-sync-timer.sh   # install and start the timer
+loginctl enable-linger "$USER"          # optional: run it even when you are not logged in
+systemctl --user list-timers shadowfolio-sync.timer
+./deploy/local/uninstall-sync-timer.sh # stop and remove it (e.g. before moving the repo, then install again)
+```
+
+The timer reads the backend's address from `.env` at every run, and only the backend reads `SHADOWFOLIO_DB`, so changing either in `.env` needs no reinstall. Moving the repository does.
+
+Lingering is a setting for all your user services, not part of the timer, so uninstalling leaves it as it is. If nothing else needs it, turn it off with `loginctl disable-linger "$USER"` (check it with `loginctl show-user "$USER" --property=Linger`).
+
 ## Frontend
 
 The web app lives in `web/` (Vite, React, TypeScript). It needs Node 24 LTS; with [nvm](https://github.com/nvm-sh/nvm), run `nvm use` inside `web/`.

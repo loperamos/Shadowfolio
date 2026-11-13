@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 
 import { apiErrorMessage } from "../api/errors";
-import { getWallet, listOperations, type OperationResponse, PriceSource, renameWallet, type WalletResponse } from "../api/generated";
+import { getWallet, listOperations, type OperationResponse, OperationType, PriceSource, renameWallet, type WalletResponse } from "../api/generated";
 import { walletPath, WALLETS_PATH } from "../routes";
 import { EditableTitle } from "../ui/EditableTitle";
 import { GainText } from "../ui/GainText";
@@ -17,7 +17,8 @@ import { OperationModal } from "./OperationModal";
 import { DeleteWalletsModal } from "./DeleteWalletsModal";
 import { DuplicateWalletModal } from "./DuplicateWalletModal";
 import { type ValuationState, useWalletValuation } from "./useWalletValuation";
-import { HindsightBadge, MarketPriceBadge } from "./HindsightBadges";
+import { AutomaticBadge, HindsightBadge, MarketPriceBadge } from "./HindsightBadges";
+import { SplitsCheckNotice } from "./SplitsCheckNotice";
 import { WalletActionsMenu } from "./WalletActionsMenu";
 import { WalletDayChange, WalletGain, WalletValue } from "./WalletValue";
 
@@ -118,6 +119,7 @@ export function WalletPage() {
               <WalletActionsMenu wallet={state.wallet} onRename={() => setEditingName(true)} onDuplicate={setToDuplicate} onDelete={setToDelete} />
             </Group>
           </Group>
+          <SplitsCheckNotice wallet={state.wallet} />
           <WalletDetails
             wallet={state.wallet}
             operations={state.operations}
@@ -252,10 +254,18 @@ function WalletDetails({ wallet, operations, version, onEditOperation, onDeleteO
               {/* Newest first, as in a statement. */}
               {[...operations].reverse().map((op) => (
                 <Table.Tr key={op.id}>
-                  <Table.Td>{formatDateTime(op.timestamp)}</Table.Td>
-                  <Table.Td tt="capitalize">{op.type}</Table.Td>
+                  {/* A split is a date-only event (its ex-date), so it shows no time. */}
+                  <Table.Td>{op.type === OperationType.SPLIT ? formatDate(op.timestamp.slice(0, 10)) : formatDateTime(op.timestamp)}</Table.Td>
+                  <Table.Td>
+                    <Group gap={6} wrap="nowrap">
+                      <Text span inherit tt="capitalize">
+                        {op.type}
+                      </Text>
+                      {op.automatic && <AutomaticBadge />}
+                    </Group>
+                  </Table.Td>
                   <Table.Td>{op.symbol ?? ""}</Table.Td>
-                  <Table.Td ta="right">{op.quantity ?? ""}</Table.Td>
+                  <Table.Td ta="right">{op.type === OperationType.SPLIT ? `${op.split_old_rate} → ${op.split_new_rate}` : (op.quantity ?? "")}</Table.Td>
                   <Table.Td ta="right">
                     {op.price != null && op.price_currency && (
                       <Group gap={6} justify="flex-end" wrap="nowrap">
@@ -264,12 +274,11 @@ function WalletDetails({ wallet, operations, version, onEditOperation, onDeleteO
                       </Group>
                     )}
                   </Table.Td>
-                  <Table.Td ta="right">
-                    <Money amount={op.amount} currency={wallet.currency} />
-                  </Table.Td>
+                  <Table.Td ta="right">{op.type !== OperationType.SPLIT && <Money amount={op.amount} currency={wallet.currency} />}</Table.Td>
                   <Table.Td ta="right">{op.fees !== "0" && <Money amount={op.fees} currency={wallet.currency} />}</Table.Td>
                   <Table.Td>
-                    <OperationActionsMenu operation={op} onEdit={onEditOperation} onDelete={onDeleteOperation} />
+                    {/* Automatic operations have no actions; they are marked in the Type column instead. */}
+                    {!op.automatic && <OperationActionsMenu operation={op} onEdit={onEditOperation} onDelete={onDeleteOperation} />}
                   </Table.Td>
                 </Table.Tr>
               ))}

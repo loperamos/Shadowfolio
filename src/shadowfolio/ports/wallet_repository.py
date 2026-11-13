@@ -12,7 +12,8 @@ class WalletRepository(ABC):
 
     @abstractmethod
     def update(self, wallet: Wallet) -> None:
-        """Store the wallet's current state, its operations exactly as they are now (added, changed or removed)."""
+        """Store the wallet's current state: its operations exactly as they are now (added, changed or removed) and its
+        checked periods, together."""
 
     @abstractmethod
     def get(self, wallet_id: UUID) -> Wallet | None:
@@ -21,6 +22,10 @@ class WalletRepository(ABC):
     @abstractmethod
     def delete(self, wallet_id: UUID) -> None:
         """Remove the wallet and its operations. Does nothing if it does not exist."""
+
+    @abstractmethod
+    def all_ids(self) -> list[UUID]:
+        """Every wallet's id, whoever owns it. For system jobs."""
 
     @abstractmethod
     def list_by_owner(self, owner_id: str) -> list[Wallet]:

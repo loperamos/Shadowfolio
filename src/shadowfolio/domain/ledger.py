@@ -9,7 +9,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from decimal import Decimal
 
-from shadowfolio.domain.operations import Buy, Operation, Sell
+from shadowfolio.domain.operations import Buy, Operation, Sell, Split
 
 
 @dataclass(frozen=True)
@@ -42,7 +42,7 @@ class Ledger:
 
 
 def build_ledger(timeline: Iterable[Operation]) -> Ledger:
-    """Replay a valid timeline (oldest first): buys open lots, sells close the oldest lots first."""
+    """Replay a valid timeline (oldest first): buys open lots, sells close the oldest lots first, splits resize them."""
     lots: dict[str, list[Lot]] = {}
     realized = Decimal(0)
     for op in timeline:
@@ -52,6 +52,10 @@ def build_ledger(timeline: Iterable[Operation]) -> Ledger:
             case Sell():
                 cost_sold = _close_oldest(lots[op.trade.symbol], op.trade.quantity)
                 realized += op.settled_amount - op.fees - cost_sold
+            case Split():
+                # More (or fewer) shares, for the same total cost.
+                factor = op.new_rate / op.old_rate
+                lots[op.symbol] = [Lot(lot.quantity * factor, lot.cost) for lot in lots.get(op.symbol, [])]
     positions = {symbol: Position(tuple(open_lots)) for symbol, open_lots in lots.items() if open_lots}
     return Ledger(positions=positions, realized_gain=realized)
 

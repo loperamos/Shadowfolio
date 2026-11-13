@@ -28,7 +28,10 @@ import {
 } from "../ui/format";
 import { DATE_INPUT_WIDTH, ICON_SIZE, TIME_INPUT_WIDTH } from "../ui/theme";
 
-const OPERATION_LABELS: Record<OperationType, string> = {
+// The kinds a person records; others (e.g. splits) are only added automatically from market data.
+type ManualOperationType = Exclude<OperationType, typeof OperationType.SPLIT>;
+
+const OPERATION_LABELS: Record<ManualOperationType, string> = {
   [OperationType.BUY]: "Buy",
   [OperationType.SELL]: "Sell",
   [OperationType.DEPOSIT]: "Deposit",
@@ -50,7 +53,7 @@ type Props = {
 /** Record something that already happened in the wallet (a trade or a cash movement, at its real date), or correct one. */
 export function OperationModal({ wallet, opened, operation, onClose, onSaved }: Props) {
   return (
-    <Modal opened={opened} onClose={onClose} title={operation ? `Edit ${OPERATION_LABELS[operation.type].toLowerCase()}` : "Add operation"} size="lg">
+    <Modal opened={opened} onClose={onClose} title={operation ? `Edit ${OPERATION_LABELS[operation.type as ManualOperationType].toLowerCase()}` : "Add operation"} size="lg">
       {/* Rendered only while open, so the form starts fresh (empty, or from the operation) each time. */}
       {opened && <OperationForm wallet={wallet} operation={operation} onClose={onClose} onSaved={onSaved} />}
     </Modal>
@@ -59,7 +62,7 @@ export function OperationModal({ wallet, opened, operation, onClose, onSaved }: 
 
 function OperationForm({ wallet, operation, onClose, onSaved }: Omit<Props, "opened">) {
   const isTradeOperation = operation?.symbol != null;
-  const [type, setType] = useState<OperationType>(operation?.type ?? OperationType.BUY);
+  const [type, setType] = useState<ManualOperationType>((operation?.type as ManualOperationType | undefined) ?? OperationType.BUY);
   // Amounts are kept as text and sent as strings, so they stay exact (never through a float).
   // Local date and time, entered separately as on broker statements; a new operation starts at now, the most common case.
   const [date, setDate] = useState<string | null>(() => (operation ? dateInputValueOf(operation.timestamp) : todayAsInputValue())); // "2024-06-24"
@@ -182,7 +185,7 @@ function OperationForm({ wallet, operation, onClose, onSaved }: Omit<Props, "ope
       <Stack>
         {/* An operation keeps its type; to change it, delete it and add a new one. */}
         {!operation && (
-          <SegmentedControl fullWidth data={OPERATION_OPTIONS} value={type} onChange={(value) => setType(value as OperationType)} />
+          <SegmentedControl fullWidth data={OPERATION_OPTIONS} value={type} onChange={(value) => setType(value as ManualOperationType)} />
         )}
 
         {dateAndTime}

@@ -13,6 +13,18 @@ class InvalidAmountError(DomainError):
     """An amount, quantity or price is out of range."""
 
 
+class CorporateActionsNotCheckedError(DomainError):
+    """A trade is dated on a day its symbol's corporate actions (e.g. splits) have not been checked for."""
+
+
+class CorporateActionsUnavailableNowError(DomainError):
+    """Corporate actions could not be fetched, so a trade that needs them cannot be checked yet."""
+
+
+class AutomaticOperationError(DomainError):
+    """An operation the system added from market data (e.g. a split) cannot be edited or deleted."""
+
+
 class OperationTypeChangeError(DomainError):
     """An edit tries to turn an operation into another kind (e.g. a buy into a sell)."""
 

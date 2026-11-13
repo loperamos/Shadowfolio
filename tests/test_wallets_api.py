@@ -36,6 +36,7 @@ def test_created_wallet_can_be_read_back(client: TestClient) -> None:
         "cost_basis": {},
         "realized_gain": "0.00",
         "hindsight": False,
+        "splits_checked_through": None,
     }
 
 

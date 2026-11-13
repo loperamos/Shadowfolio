@@ -13,6 +13,7 @@ import pytest
 
 from shadowfolio.adapters.in_memory_wallet_repository import InMemoryWalletRepository
 from shadowfolio.adapters.sqlite_wallet_repository import SqliteWalletRepository
+from shadowfolio.domain.corporate_actions import CheckedPeriod, SplitEvent
 from shadowfolio.domain.money import Currency
 from shadowfolio.domain.operations import PriceSource, Trade
 from shadowfolio.domain.wallet import Wallet
@@ -34,8 +35,9 @@ def make_repository(request: pytest.FixtureRequest, tmp_path: Path) -> Repositor
 
 
 def a_wallet() -> Wallet:
+    """An EUR wallet with a deposit, whose NVDA splits are checked from T1 to T2 (so NVDA can be traded then)."""
     wallet = Wallet(id=uuid4(), owner_id="owner-1", name="Long term", currency=Currency.EUR)
-    return wallet.deposit(uuid4(), Decimal("1000.50"), T1)
+    return wallet.deposit(uuid4(), Decimal("1000.50"), T1).mark_checked("NVDA", CheckedPeriod(T1.date(), T2.date()))
 
 
 def test_added_wallet_can_be_read_back(make_repository: RepositoryFactory) -> None:
@@ -114,6 +116,17 @@ def test_sqlite_upgrades_a_database_created_before_price_sources(tmp_path: Path)
         conn.execute("ALTER TABLE operations DROP COLUMN price_source")
 
     assert SqliteWalletRepository(path).get(wallet.id) == wallet
+
+
+def test_a_split_round_trips(make_repository: RepositoryFactory) -> None:
+    nvda = Trade("NVDA", Decimal("8"), Decimal("121.81"), Currency.USD)
+    wallet = a_wallet().buy(uuid4(), nvda, T1, settled_amount=Decimal("907.68"))
+    wallet = wallet.apply_split(uuid4(), SplitEvent("NVDA", T2.date(), Decimal(1), Decimal(10), "nvda-split"), T2)
+    make_repository().add(wallet)
+
+    stored = make_repository().get(wallet.id)
+    assert stored == wallet
+    assert stored is not None and stored.holdings == {"NVDA": Decimal("80")}
 
 
 def test_unknown_wallet_is_none(make_repository: RepositoryFactory) -> None:

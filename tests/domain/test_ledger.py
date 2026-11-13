@@ -6,7 +6,7 @@ from uuid import uuid4
 
 from shadowfolio.domain.ledger import Lot, build_ledger
 from shadowfolio.domain.money import Currency
-from shadowfolio.domain.operations import Buy, Deposit, Operation, Sell, Trade
+from shadowfolio.domain.operations import Buy, Deposit, Operation, Sell, Split, Trade
 
 START = datetime(2024, 1, 2, 9, 0, tzinfo=UTC)
 
@@ -45,3 +45,12 @@ def test_a_loss_is_a_negative_gain() -> None:
 
     assert ledger.realized_gain == Decimal("-100")
     assert "AAPL" not in ledger.positions
+
+
+def test_a_split_resizes_the_lots_and_keeps_their_cost() -> None:
+    split = Split(uuid4(), START + timedelta(days=3), "AAPL", Decimal(1), Decimal(4), "aapl-split")
+    ledger = build_ledger(timeline(buy(1, "10", "1000"), buy(2, "5", "600"), split, sell(4, "45", "1200")))
+
+    # 60 shares after the split: the first lot (40 shares, 1000) and 5 of the second (20 shares, 600 → 150) are sold.
+    assert ledger.positions["AAPL"].lots == (Lot(Decimal("15"), Decimal("450")),)
+    assert ledger.realized_gain == Decimal("50")

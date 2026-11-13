@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { CopyWalletData, CopyWalletErrors, CopyWalletResponses, CreateWalletData, CreateWalletErrors, CreateWalletResponses, CurrentValuationData, CurrentValuationErrors, CurrentValuationResponses, DeleteOperationData, DeleteOperationErrors, DeleteOperationResponses, DeleteWalletData, DeleteWalletErrors, DeleteWalletResponses, DepositData, DepositErrors, DepositResponses, EditOperationData, EditOperationErrors, EditOperationResponses, GetWalletData, GetWalletErrors, GetWalletResponses, LatestQuoteData, LatestQuoteErrors, LatestQuoteResponses, ListOperationsData, ListOperationsErrors, ListOperationsResponses, ListWalletsData, ListWalletsResponses, RecordBuyData, RecordBuyErrors, RecordBuyResponses, RecordSellData, RecordSellErrors, RecordSellResponses, RenameWalletData, RenameWalletErrors, RenameWalletResponses, WithdrawData, WithdrawErrors, WithdrawResponses } from './types.gen';
+import type { CopyWalletData, CopyWalletErrors, CopyWalletResponses, CreateWalletData, CreateWalletErrors, CreateWalletResponses, CurrentValuationData, CurrentValuationErrors, CurrentValuationResponses, DeleteOperationData, DeleteOperationErrors, DeleteOperationResponses, DeleteWalletData, DeleteWalletErrors, DeleteWalletResponses, DepositData, DepositErrors, DepositResponses, EditOperationData, EditOperationErrors, EditOperationResponses, GetWalletData, GetWalletErrors, GetWalletResponses, LatestQuoteData, LatestQuoteErrors, LatestQuoteResponses, ListOperationsData, ListOperationsErrors, ListOperationsResponses, ListWalletsData, ListWalletsResponses, RecordBuyData, RecordBuyErrors, RecordBuyResponses, RecordSellData, RecordSellErrors, RecordSellResponses, RenameWalletData, RenameWalletErrors, RenameWalletResponses, SyncAllWalletsData, SyncAllWalletsErrors, SyncAllWalletsResponses, WithdrawData, WithdrawErrors, WithdrawResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -148,3 +148,8 @@ export const currentValuation = <ThrowOnError extends boolean = false>(options: 
  * Latest Quote
  */
 export const latestQuote = <ThrowOnError extends boolean = false>(options: Options<LatestQuoteData, ThrowOnError>): RequestResult<LatestQuoteResponses, LatestQuoteErrors, ThrowOnError> => (options.client ?? client).get<LatestQuoteResponses, LatestQuoteErrors, ThrowOnError>({ url: '/api/market/quotes/{symbol}', ...options });
+
+/**
+ * Sync All Wallets
+ */
+export const syncAllWallets = <ThrowOnError extends boolean = false>(options?: Options<SyncAllWalletsData, ThrowOnError>): RequestResult<SyncAllWalletsResponses, SyncAllWalletsErrors, ThrowOnError> => (options?.client ?? client).post<SyncAllWalletsResponses, SyncAllWalletsErrors, ThrowOnError>({ url: '/api/sync', ...options });

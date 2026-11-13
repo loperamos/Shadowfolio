@@ -1,0 +1,11 @@
+# Runs the daily sync before the US market opens, after providers have published the night's corporate actions.
+[Unit]
+Description=Daily Shadowfolio sync of corporate actions
+
+[Timer]
+OnCalendar=*-*-* 07:00:00 America/New_York
+# If the machine was off at that time, run as soon as it is back on.
+Persistent=true
+
+[Install]
+WantedBy=timers.target

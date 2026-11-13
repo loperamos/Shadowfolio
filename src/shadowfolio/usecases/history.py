@@ -16,14 +16,16 @@ from shadowfolio.ports.clock import Clock
 from shadowfolio.ports.fx_rates import FxRates
 from shadowfolio.ports.price_data import PriceData
 from shadowfolio.ports.wallet_repository import WalletRepository
+from shadowfolio.usecases.sync import Sync
 
 
 class History:
-    def __init__(self, repo: WalletRepository, clock: Clock, prices: PriceData, fx_rates: FxRates) -> None:
+    def __init__(self, repo: WalletRepository, clock: Clock, prices: PriceData, fx_rates: FxRates, sync: Sync) -> None:
         self._repo = repo
         self._clock = clock
         self._prices = prices
         self._fx_rates = fx_rates
+        self._sync = sync
 
     # Every recording method can instead replace an existing operation (`replacing=<its id>`), keeping its id.
 
@@ -62,6 +64,8 @@ class History:
         if wallet is None:
             return None
         at = self._at(timestamp)
+        # Splits first, so the trade is checked against the shares really held then. Saved with the trade.
+        wallet = self._sync.ensure_checked(wallet, symbol, at.date())
         trade, settled_amount = self._priced(wallet, symbol, quantity, at, price, price_currency, settled_amount)
         updated = wallet.buy(replacing or uuid4(), trade, at, settled_amount, fees, replacing)
         self._repo.update(updated)
@@ -84,6 +88,8 @@ class History:
         if wallet is None:
             return None
         at = self._at(timestamp)
+        # Splits first, so the trade is checked against the shares really held then. Saved with the trade.
+        wallet = self._sync.ensure_checked(wallet, symbol, at.date())
         trade, settled_amount = self._priced(wallet, symbol, quantity, at, price, price_currency, settled_amount)
         updated = wallet.sell(replacing or uuid4(), trade, at, settled_amount, fees, replacing)
         self._repo.update(updated)

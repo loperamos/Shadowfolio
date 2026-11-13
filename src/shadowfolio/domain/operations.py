@@ -20,6 +20,7 @@ class OperationType(StrEnum):
     WITHDRAWAL = "withdrawal"
     BUY = "buy"
     SELL = "sell"
+    SPLIT = "split"
 
 
 class PriceSource(StrEnum):
@@ -56,6 +57,16 @@ class BaseOperation(ABC):
     @abstractmethod
     def holding_change(self) -> tuple[str, Decimal] | None:
         """The symbol whose holding changes and the signed quantity, or None."""
+
+    @property
+    def share_factor(self) -> tuple[str, Decimal] | None:
+        """The symbol whose holding is multiplied, and by how much (e.g. 10 for a 1:10 split), or None."""
+        return None
+
+    @property
+    def automatic(self) -> bool:
+        """Whether the system added it from market data (so nobody edits or deletes it)."""
+        return False
 
 
 @dataclass(frozen=True)
@@ -124,6 +135,35 @@ class Sell(_TradeOperation):
         return self.trade.symbol, -self.trade.quantity
 
 
+@dataclass(frozen=True)
+class Split(BaseOperation):
+    """A stock split, added automatically from market data: every share held becomes new_rate / old_rate shares.
+    No cash moves, and what the shares cost does not change."""
+
+    type: ClassVar[OperationType] = OperationType.SPLIT
+
+    symbol: str
+    old_rate: Decimal
+    new_rate: Decimal
+    event_id: str  # the provider's id for this split, so it is applied only once
+
+    @property
+    def cash_delta(self) -> Decimal:
+        return Decimal(0)
+
+    @property
+    def holding_change(self) -> tuple[str, Decimal] | None:
+        return None
+
+    @property
+    def share_factor(self) -> tuple[str, Decimal] | None:
+        return self.symbol, self.new_rate / self.old_rate
+
+    @property
+    def automatic(self) -> bool:
+        return True
+
+
 # Every concrete kind. Code that handles each kind matches on this, so mypy reports a kind
 # that is not handled.
-Operation = Deposit | Withdrawal | Buy | Sell
+Operation = Deposit | Withdrawal | Buy | Sell | Split

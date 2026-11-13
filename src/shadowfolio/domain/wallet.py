@@ -1,13 +1,16 @@
 """Wallet: a timeline of operations owned by a user. Cash and holdings are derived from it."""
 
 from collections.abc import Callable
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from datetime import datetime
 from decimal import Decimal
 from typing import Self
 from uuid import UUID
 
+from shadowfolio.domain.corporate_actions import CheckedPeriod, SplitEvent
 from shadowfolio.domain.errors import (
+    AutomaticOperationError,
+    CorporateActionsNotCheckedError,
     InsufficientCashError,
     InsufficientSharesError,
     InvalidAmountError,
@@ -18,7 +21,7 @@ from shadowfolio.domain.errors import (
 )
 from shadowfolio.domain.ledger import Ledger, build_ledger
 from shadowfolio.domain.money import Currency
-from shadowfolio.domain.operations import Buy, Deposit, Operation, PriceSource, Sell, Trade, Withdrawal
+from shadowfolio.domain.operations import Buy, Deposit, Operation, PriceSource, Sell, Split, Trade, Withdrawal
 
 
 @dataclass(frozen=True)
@@ -28,6 +31,8 @@ class Wallet:
     name: str
     currency: Currency
     operations: tuple[Operation, ...] = ()  # oldest first
+    # Per symbol, the days whose corporate actions have been applied; trades in a symbol must fall inside its period.
+    checked: dict[str, CheckedPeriod] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if not self.name.strip():
@@ -97,8 +102,28 @@ class Wallet:
         currency."""
         return self._trade(Sell, operation_id, trade, at, settled_amount, fees, replacing)
 
+    def mark_checked(self, symbol: str, period: CheckedPeriod) -> Self:
+        """Record that `symbol`'s corporate actions have been applied for `period` (merged with what was already checked)."""
+        current = self.checked.get(symbol)
+        return replace(self, checked=self.checked | {symbol: current.including(period) if current else period})
+
+    def apply_split(self, operation_id: UUID, event: SplitEvent, at: datetime) -> Self:
+        """Add a split at `at` (its ex-date), whether or not shares were held then (if none, it changes nothing).
+        A split already applied (same event) is not added again."""
+        if any(isinstance(op, Split) and op.event_id == event.event_id for op in self.operations):
+            return self
+        _require_positive(event.old_rate, "split old rate")
+        _require_positive(event.new_rate, "split new rate")
+        return self._with(Split(operation_id, at, event.symbol, event.old_rate, event.new_rate, event.event_id))
+
+    def holdings_at(self, moment: datetime) -> dict[str, Decimal]:
+        """Shares held per symbol just before `moment`."""
+        return _replay(tuple(op for op in self.operations if op.timestamp < moment))
+
     def remove_operation(self, operation_id: UUID) -> Self:
         """Remove an operation; what is left must still be a valid timeline."""
+        if self._get(operation_id).automatic:
+            raise AutomaticOperationError("operations added from market data (e.g. splits) cannot be deleted")
         remaining = self._without(operation_id)
         _replay(remaining)
         return replace(self, operations=remaining)
@@ -124,6 +149,9 @@ class Wallet:
                 raise MissingSettledAmountError(f"price is in {trade.price_currency}; settled amount in {self.currency} needed")
             settled_amount = trade.quantity * trade.price
         _require_positive(settled_amount, "settled amount")
+        period = self.checked.get(trade.symbol)
+        if period is None or not period.covers(at.date()):
+            raise CorporateActionsNotCheckedError(f"splits of {trade.symbol} have not been checked for {at.date().isoformat()}")
         return self._with(kind(operation_id, at, trade, settled_amount, fees), replacing)
 
     def _with(self, operation: Operation, replacing: UUID | None = None) -> Self:
@@ -131,6 +159,8 @@ class Wallet:
 
         Operations with equal timestamps keep the order in which they were added.
         """
+        if replacing is not None and self._get(replacing).automatic:
+            raise AutomaticOperationError("operations added from market data (e.g. splits) cannot be edited")
         if replacing is not None and self._get(replacing).type is not operation.type:
             raise OperationTypeChangeError("the type of an operation cannot change; delete it and add a new one")
         others = self.operations if replacing is None else self._without(replacing)
@@ -170,6 +200,9 @@ def _replay(timeline: tuple[Operation, ...]) -> dict[str, Decimal]:
                 held[symbol] = quantity
             else:
                 held.pop(symbol, None)
+        factor = op.share_factor
+        if factor is not None and factor[0] in held:
+            held[factor[0]] *= factor[1]
     return held
 
 
