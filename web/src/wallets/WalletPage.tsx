@@ -9,7 +9,9 @@ import { walletPath, WALLETS_PATH } from "../routes";
 import { EditableTitle } from "../ui/EditableTitle";
 import { formatDate, formatDateTime, shortDecimal } from "../ui/format";
 import { ICON_SIZE } from "../ui/theme";
-import { AddOperationModal } from "./AddOperationModal";
+import { DeleteOperationModal } from "./DeleteOperationModal";
+import { OperationActionsMenu } from "./OperationActionsMenu";
+import { OperationModal } from "./OperationModal";
 import { DeleteWalletsModal } from "./DeleteWalletsModal";
 import { DuplicateWalletModal } from "./DuplicateWalletModal";
 import { type ValuationState, useWalletValuation } from "./useWalletValuation";
@@ -29,7 +31,9 @@ export function WalletPage() {
   const navigate = useNavigate();
   const [state, setState] = useState<State>({ status: "loading" });
   const [editingName, setEditingName] = useState(false);
-  const [adding, setAdding] = useState(false);
+  // The operation dialog: closed, adding a new operation, or editing an existing one.
+  const [operationDialog, setOperationDialog] = useState<{ operation: OperationResponse | null } | null>(null);
+  const [operationToDelete, setOperationToDelete] = useState<OperationResponse | null>(null);
   // Bumped after the wallet's history changes, to load it (and its value) again.
   const [version, setVersion] = useState(0);
   const [toDuplicate, setToDuplicate] = useState<WalletResponse | null>(null);
@@ -60,6 +64,10 @@ export function WalletPage() {
       <Text>{current}</Text>
     </Breadcrumbs>
   );
+
+  function reload() {
+    setVersion((v) => v + 1);
+  }
 
   async function rename(name: string): Promise<string | null> {
     try {
@@ -98,14 +106,27 @@ export function WalletPage() {
           <Group justify="space-between" mb="lg">
             <EditableTitle value={state.wallet.name} editing={editingName} onEditingChange={setEditingName} onSave={rename} label="Wallet name" />
             <Group gap="xs" wrap="nowrap">
-              <Button leftSection={<IconPlus size={ICON_SIZE} />} onClick={() => setAdding(true)}>
+              <Button leftSection={<IconPlus size={ICON_SIZE} />} onClick={() => setOperationDialog({ operation: null })}>
                 Add operation
               </Button>
               <WalletActionsMenu wallet={state.wallet} onRename={() => setEditingName(true)} onDuplicate={setToDuplicate} onDelete={setToDelete} />
             </Group>
           </Group>
-          <WalletDetails wallet={state.wallet} operations={state.operations} version={version} />
-          <AddOperationModal wallet={state.wallet} opened={adding} onClose={() => setAdding(false)} onAdded={() => setVersion((v) => v + 1)} />
+          <WalletDetails
+            wallet={state.wallet}
+            operations={state.operations}
+            version={version}
+            onEditOperation={(operation) => setOperationDialog({ operation })}
+            onDeleteOperation={setOperationToDelete}
+          />
+          <OperationModal
+            wallet={state.wallet}
+            opened={operationDialog !== null}
+            operation={operationDialog?.operation ?? null}
+            onClose={() => setOperationDialog(null)}
+            onSaved={reload}
+          />
+          <DeleteOperationModal wallet={state.wallet} operation={operationToDelete} onClose={() => setOperationToDelete(null)} onDeleted={reload} />
           {/* Duplicating opens the copy; deleting goes back to the list. */}
           <DuplicateWalletModal wallet={toDuplicate} onClose={() => setToDuplicate(null)} onDuplicated={(copy) => navigate(walletPath(copy.id))} />
           <DeleteWalletsModal wallets={toDelete} onClose={() => setToDelete([])} onDeleted={(allDeleted) => allDeleted && navigate(WALLETS_PATH)} />
@@ -114,7 +135,13 @@ export function WalletPage() {
   }
 }
 
-function WalletDetails({ wallet, operations, version }: Loaded & { version: number }) {
+type DetailsProps = Loaded & {
+  version: number;
+  onEditOperation: (operation: OperationResponse) => void;
+  onDeleteOperation: (operation: OperationResponse) => void;
+};
+
+function WalletDetails({ wallet, operations, version, onEditOperation, onDeleteOperation }: DetailsProps) {
   const holdings = Object.entries(wallet.holdings);
   const valuation = useWalletValuation(wallet.id, version);
   return (
@@ -187,6 +214,7 @@ function WalletDetails({ wallet, operations, version }: Loaded & { version: numb
                 <Table.Th ta="right">Price</Table.Th>
                 <Table.Th ta="right">Amount</Table.Th>
                 <Table.Th ta="right">Fees</Table.Th>
+                <Table.Th w={40} />
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
@@ -202,6 +230,9 @@ function WalletDetails({ wallet, operations, version }: Loaded & { version: numb
                     {op.amount} {wallet.currency}
                   </Table.Td>
                   <Table.Td ta="right">{op.fees !== "0" ? `${op.fees} ${wallet.currency}` : ""}</Table.Td>
+                  <Table.Td>
+                    <OperationActionsMenu operation={op} onEdit={onEditOperation} onDelete={onDeleteOperation} />
+                  </Table.Td>
                 </Table.Tr>
               ))}
             </Table.Tbody>

@@ -47,7 +47,7 @@ class SqliteWalletRepository(WalletRepository):
                 "INSERT INTO wallets (id, owner_id, name, currency) VALUES (?, ?, ?, ?)",
                 (str(wallet.id), wallet.owner_id, wallet.name, wallet.currency.value),
             )
-            _insert_new_operations(conn, wallet)
+            _insert_operations(conn, wallet)
 
     def update(self, wallet: Wallet) -> None:
         with closing(self._connect()) as conn, conn:
@@ -55,7 +55,9 @@ class SqliteWalletRepository(WalletRepository):
                 "UPDATE wallets SET owner_id = ?, name = ?, currency = ? WHERE id = ?",
                 (wallet.owner_id, wallet.name, wallet.currency.value, str(wallet.id)),
             )
-            _insert_new_operations(conn, wallet)
+            # Operations can be changed or removed, so they are replaced as a whole, in the same transaction.
+            conn.execute("DELETE FROM operations WHERE wallet_id = ?", (str(wallet.id),))
+            _insert_operations(conn, wallet)
 
     def get(self, wallet_id: UUID) -> Wallet | None:
         with closing(self._connect()) as conn:
@@ -90,10 +92,10 @@ class SqliteWalletRepository(WalletRepository):
         return sqlite3.connect(self._path)
 
 
-def _insert_new_operations(conn: sqlite3.Connection, wallet: Wallet) -> None:
-    """Operations are never changed once stored, so already-stored ones are skipped."""
+def _insert_operations(conn: sqlite3.Connection, wallet: Wallet) -> None:
+    # In timeline order, so equal timestamps read back in the same order (ORDER BY timestamp, rowid).
     conn.executemany(
-        "INSERT OR IGNORE INTO operations (id, wallet_id, type, timestamp, amount, fees, "
+        "INSERT INTO operations (id, wallet_id, type, timestamp, amount, fees, "
         "symbol, quantity, price, price_currency) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         [_operation_to_row(wallet.id, op) for op in wallet.operations],
     )

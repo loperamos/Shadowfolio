@@ -5,6 +5,41 @@ export type ClientOptions = {
 };
 
 /**
+ * BuyEdit
+ */
+export type BuyEdit = {
+    /**
+     * Symbol
+     */
+    symbol: string;
+    /**
+     * Quantity
+     */
+    quantity: number | string;
+    /**
+     * Price
+     */
+    price: number | string;
+    price_currency: Currency;
+    /**
+     * Timestamp
+     */
+    timestamp: string;
+    /**
+     * Settled Amount
+     */
+    settled_amount?: number | string | null;
+    /**
+     * Fees
+     */
+    fees?: number | string;
+    /**
+     * Type
+     */
+    type: 'buy';
+};
+
+/**
  * CashMovementRequest
  *
  * A deposit or a withdrawal.
@@ -54,6 +89,24 @@ export const Currency = { USD: 'USD', EUR: 'EUR' } as const;
  * Currency
  */
 export type Currency = typeof Currency[keyof typeof Currency];
+
+/**
+ * DepositEdit
+ */
+export type DepositEdit = {
+    /**
+     * Amount
+     */
+    amount: number | string;
+    /**
+     * Timestamp
+     */
+    timestamp?: string | null;
+    /**
+     * Type
+     */
+    type: 'deposit';
+};
 
 /**
  * ErrorResponse
@@ -212,6 +265,41 @@ export type RenameWalletRequest = {
 };
 
 /**
+ * SellEdit
+ */
+export type SellEdit = {
+    /**
+     * Symbol
+     */
+    symbol: string;
+    /**
+     * Quantity
+     */
+    quantity: number | string;
+    /**
+     * Price
+     */
+    price: number | string;
+    price_currency: Currency;
+    /**
+     * Timestamp
+     */
+    timestamp: string;
+    /**
+     * Settled Amount
+     */
+    settled_amount?: number | string | null;
+    /**
+     * Fees
+     */
+    fees?: number | string;
+    /**
+     * Type
+     */
+    type: 'sell';
+};
+
+/**
  * TradeRequest
  */
 export type TradeRequest = {
@@ -284,6 +372,24 @@ export type WalletResponse = {
     holdings: {
         [key: string]: string;
     };
+};
+
+/**
+ * WithdrawalEdit
+ */
+export type WithdrawalEdit = {
+    /**
+     * Amount
+     */
+    amount: number | string;
+    /**
+     * Timestamp
+     */
+    timestamp?: string | null;
+    /**
+     * Type
+     */
+    type: 'withdrawal';
 };
 
 export type ListWalletsData = {
@@ -636,6 +742,93 @@ export type RecordSellResponses = {
 };
 
 export type RecordSellResponse = RecordSellResponses[keyof RecordSellResponses];
+
+export type DeleteOperationData = {
+    body?: never;
+    path: {
+        /**
+         * Wallet Id
+         */
+        wallet_id: string;
+        /**
+         * Operation Id
+         */
+        operation_id: string;
+    };
+    query?: never;
+    url: '/api/wallets/{wallet_id}/operations/{operation_id}';
+};
+
+export type DeleteOperationErrors = {
+    /**
+     * Not found
+     */
+    404: ErrorResponse;
+    /**
+     * Malformed request or broken business rule
+     */
+    422: ErrorResponse;
+};
+
+export type DeleteOperationError = DeleteOperationErrors[keyof DeleteOperationErrors];
+
+export type DeleteOperationResponses = {
+    /**
+     * Successful Response
+     */
+    200: WalletResponse;
+};
+
+export type DeleteOperationResponse = DeleteOperationResponses[keyof DeleteOperationResponses];
+
+export type EditOperationData = {
+    /**
+     * Request
+     */
+    body: ({
+        type: 'deposit';
+    } & DepositEdit) | ({
+        type: 'withdrawal';
+    } & WithdrawalEdit) | ({
+        type: 'buy';
+    } & BuyEdit) | ({
+        type: 'sell';
+    } & SellEdit);
+    path: {
+        /**
+         * Wallet Id
+         */
+        wallet_id: string;
+        /**
+         * Operation Id
+         */
+        operation_id: string;
+    };
+    query?: never;
+    url: '/api/wallets/{wallet_id}/operations/{operation_id}';
+};
+
+export type EditOperationErrors = {
+    /**
+     * Not found
+     */
+    404: ErrorResponse;
+    /**
+     * Malformed request or broken business rule
+     */
+    422: ErrorResponse;
+};
+
+export type EditOperationError = EditOperationErrors[keyof EditOperationErrors];
+
+export type EditOperationResponses = {
+    /**
+     * Successful Response
+     */
+    200: WalletResponse;
+};
+
+export type EditOperationResponse = EditOperationResponses[keyof EditOperationResponses];
 
 export type CurrentValuationData = {
     body?: never;

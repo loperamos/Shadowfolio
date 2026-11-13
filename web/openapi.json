@@ -566,6 +566,157 @@
         }
       }
     },
+    "/api/wallets/{wallet_id}/operations/{operation_id}": {
+      "put": {
+        "summary": "Edit Operation",
+        "operationId": "edit_operation",
+        "parameters": [
+          {
+            "name": "wallet_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Wallet Id"
+            }
+          },
+          {
+            "name": "operation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Operation Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/DepositEdit"
+                  },
+                  {
+                    "$ref": "#/components/schemas/WithdrawalEdit"
+                  },
+                  {
+                    "$ref": "#/components/schemas/BuyEdit"
+                  },
+                  {
+                    "$ref": "#/components/schemas/SellEdit"
+                  }
+                ],
+                "discriminator": {
+                  "propertyName": "type",
+                  "mapping": {
+                    "deposit": "#/components/schemas/DepositEdit",
+                    "withdrawal": "#/components/schemas/WithdrawalEdit",
+                    "buy": "#/components/schemas/BuyEdit",
+                    "sell": "#/components/schemas/SellEdit"
+                  }
+                },
+                "title": "Request"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WalletResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Malformed request or broken business rule",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete Operation",
+        "operationId": "delete_operation",
+        "parameters": [
+          {
+            "name": "wallet_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Wallet Id"
+            }
+          },
+          {
+            "name": "operation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Operation Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WalletResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Malformed request or broken business rule",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/wallets/{wallet_id}/valuation": {
       "get": {
         "summary": "Current Valuation",
@@ -668,6 +819,85 @@
   },
   "components": {
     "schemas": {
+      "BuyEdit": {
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "quantity": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Quantity"
+          },
+          "price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Price"
+          },
+          "price_currency": {
+            "$ref": "#/components/schemas/Currency"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp"
+          },
+          "settled_amount": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Settled Amount"
+          },
+          "fees": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Fees",
+            "default": "0"
+          },
+          "type": {
+            "type": "string",
+            "const": "buy",
+            "title": "Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "symbol",
+          "quantity",
+          "price",
+          "price_currency",
+          "timestamp",
+          "type"
+        ],
+        "title": "BuyEdit"
+      },
       "CashMovementRequest": {
         "properties": {
           "amount": {
@@ -750,6 +980,44 @@
           "EUR"
         ],
         "title": "Currency"
+      },
+      "DepositEdit": {
+        "properties": {
+          "amount": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Amount"
+          },
+          "timestamp": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timestamp"
+          },
+          "type": {
+            "type": "string",
+            "const": "deposit",
+            "title": "Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "amount",
+          "type"
+        ],
+        "title": "DepositEdit"
       },
       "ErrorResponse": {
         "properties": {
@@ -1009,6 +1277,85 @@
         ],
         "title": "RenameWalletRequest"
       },
+      "SellEdit": {
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "quantity": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Quantity"
+          },
+          "price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Price"
+          },
+          "price_currency": {
+            "$ref": "#/components/schemas/Currency"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Timestamp"
+          },
+          "settled_amount": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Settled Amount"
+          },
+          "fees": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Fees",
+            "default": "0"
+          },
+          "type": {
+            "type": "string",
+            "const": "sell",
+            "title": "Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "symbol",
+          "quantity",
+          "price",
+          "price_currency",
+          "timestamp",
+          "type"
+        ],
+        "title": "SellEdit"
+      },
       "TradeRequest": {
         "properties": {
           "symbol": {
@@ -1147,6 +1494,44 @@
           "holdings"
         ],
         "title": "WalletResponse"
+      },
+      "WithdrawalEdit": {
+        "properties": {
+          "amount": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "title": "Amount"
+          },
+          "timestamp": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timestamp"
+          },
+          "type": {
+            "type": "string",
+            "const": "withdrawal",
+            "title": "Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "amount",
+          "type"
+        ],
+        "title": "WithdrawalEdit"
       }
     }
   }

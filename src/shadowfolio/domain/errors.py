@@ -13,6 +13,10 @@ class InvalidAmountError(DomainError):
     """An amount, quantity or price is out of range."""
 
 
+class OperationTypeChangeError(DomainError):
+    """An edit tries to turn an operation into another kind (e.g. a buy into a sell)."""
+
+
 class InsufficientCashError(DomainError):
     """The wallet would not have enough cash at some point of its timeline."""
 
@@ -35,3 +39,7 @@ class PriceUnavailableError(DomainError):
 
 class FxRateUnavailableError(DomainError):
     """There is no exchange rate for a currency pair that needs one."""
+
+
+class OperationNotFoundError(LookupError):
+    """The wallet has no operation with that id. Not a broken rule: the thing asked for does not exist."""

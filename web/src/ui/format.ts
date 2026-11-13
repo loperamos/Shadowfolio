@@ -60,3 +60,13 @@ export function toUtcTimestamp(date: string, time: string): string {
 export function isInFuture(date: string, time: string): boolean {
   return dayjs(`${date} ${time}`).isAfter(dayjs());
 }
+
+/** The local date of an API timestamp, as a date input value. */
+export function dateInputValueOf(isoTimestamp: string): string {
+  return dayjs(isoTimestamp).format(DATE_VALUE_FORMAT);
+}
+
+/** The local time of an API timestamp, as a time input value. */
+export function timeInputValueOf(isoTimestamp: string): string {
+  return dayjs(isoTimestamp).format(TIME_VALUE_FORMAT);
+}

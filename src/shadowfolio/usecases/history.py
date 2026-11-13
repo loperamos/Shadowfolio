@@ -1,6 +1,6 @@
-"""History use cases: recording what happened in a wallet (cash movements and past trades).
+"""History use cases: recording, correcting and removing what happened in a wallet (cash movements and past trades).
 
-Each returns the updated wallet, or None if the wallet does not exist.
+Each returns the updated wallet, or None if the wallet does not exist; an unknown operation raises OperationNotFoundError.
 """
 
 from datetime import datetime
@@ -19,43 +19,66 @@ class History:
         self._repo = repo
         self._clock = clock
 
-    def deposit(self, wallet_id: UUID, amount: Decimal, timestamp: datetime | None = None) -> Wallet | None:
+    # Every recording method can instead replace an existing operation (`replacing=<its id>`), keeping its id.
+
+    def deposit(self, wallet_id: UUID, amount: Decimal, timestamp: datetime | None = None, replacing: UUID | None = None) -> Wallet | None:
         """Add cash to a wallet, now or at a past timestamp."""
         wallet = self._repo.get(wallet_id)
         if wallet is None:
             return None
-        updated = wallet.deposit(uuid4(), amount, self._at(timestamp))
+        updated = wallet.deposit(replacing or uuid4(), amount, self._at(timestamp), replacing)
         self._repo.update(updated)
         return updated
 
-    def withdraw(self, wallet_id: UUID, amount: Decimal, timestamp: datetime | None = None) -> Wallet | None:
+    def withdraw(self, wallet_id: UUID, amount: Decimal, timestamp: datetime | None = None, replacing: UUID | None = None) -> Wallet | None:
         """Take cash out of a wallet, now or at a past timestamp."""
         wallet = self._repo.get(wallet_id)
         if wallet is None:
             return None
-        updated = wallet.withdraw(uuid4(), amount, self._at(timestamp))
+        updated = wallet.withdraw(replacing or uuid4(), amount, self._at(timestamp), replacing)
         self._repo.update(updated)
         return updated
 
     def record_buy(
-        self, wallet_id: UUID, trade: Trade, timestamp: datetime, settled_amount: Decimal | None = None, fees: Decimal = Decimal(0)
+        self,
+        wallet_id: UUID,
+        trade: Trade,
+        timestamp: datetime,
+        settled_amount: Decimal | None = None,
+        fees: Decimal = Decimal(0),
+        replacing: UUID | None = None,
     ) -> Wallet | None:
         """Record a buy that already happened, with the price the broker reported."""
         wallet = self._repo.get(wallet_id)
         if wallet is None:
             return None
-        updated = wallet.buy(uuid4(), trade, self._at(timestamp), settled_amount, fees)
+        updated = wallet.buy(replacing or uuid4(), trade, self._at(timestamp), settled_amount, fees, replacing)
         self._repo.update(updated)
         return updated
 
     def record_sell(
-        self, wallet_id: UUID, trade: Trade, timestamp: datetime, settled_amount: Decimal | None = None, fees: Decimal = Decimal(0)
+        self,
+        wallet_id: UUID,
+        trade: Trade,
+        timestamp: datetime,
+        settled_amount: Decimal | None = None,
+        fees: Decimal = Decimal(0),
+        replacing: UUID | None = None,
     ) -> Wallet | None:
         """Record a sell that already happened, with the price the broker reported."""
         wallet = self._repo.get(wallet_id)
         if wallet is None:
             return None
-        updated = wallet.sell(uuid4(), trade, self._at(timestamp), settled_amount, fees)
+        updated = wallet.sell(replacing or uuid4(), trade, self._at(timestamp), settled_amount, fees, replacing)
+        self._repo.update(updated)
+        return updated
+
+    def delete_operation(self, wallet_id: UUID, operation_id: UUID) -> Wallet | None:
+        """Remove an operation; the rest of the history must still hold together."""
+        wallet = self._repo.get(wallet_id)
+        if wallet is None:
+            return None
+        updated = wallet.remove_operation(operation_id)
         self._repo.update(updated)
         return updated
 

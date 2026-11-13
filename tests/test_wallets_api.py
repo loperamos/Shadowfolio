@@ -239,6 +239,82 @@ def test_invalid_buy_is_rejected(client: TestClient, change: dict[str, str]) -> 
     assert response.status_code == 422
 
 
+def operation_ids(client: TestClient, wallet_id: str) -> list[str]:
+    return [op["id"] for op in client.get(f"/api/wallets/{wallet_id}/operations").json()]
+
+
+def test_editing_an_operation_keeps_its_id_and_recomputes_the_wallet(client: TestClient) -> None:
+    wallet_id = create_wallet(client, "0")
+    fund_in_the_past(client, wallet_id, "1000")
+    client.post(f"/api/wallets/{wallet_id}/buys", json=NVDA_BUY)
+    deposit_id = operation_ids(client, wallet_id)[0]
+
+    response = client.put(
+        f"/api/wallets/{wallet_id}/operations/{deposit_id}", json={"type": "deposit", "amount": "2000", "timestamp": "2024-01-02T09:00:00Z"}
+    )
+    assert response.status_code == 200
+    assert response.json()["cash"] == "1090.32"  # 2000 - 907.68 - 2.00
+    assert operation_ids(client, wallet_id)[0] == deposit_id
+
+
+def test_editing_cannot_change_the_type(client: TestClient) -> None:
+    wallet_id = create_wallet(client, "100")
+    client.post(f"/api/wallets/{wallet_id}/withdrawals", json={"amount": "30"})
+    withdrawal_id = operation_ids(client, wallet_id)[1]
+
+    response = client.put(f"/api/wallets/{wallet_id}/operations/{withdrawal_id}", json={"type": "deposit", "amount": "30"})
+    assert response.status_code == 422
+    assert response.json()["detail"] == "the type of an operation cannot change; delete it and add a new one"
+    assert client.get(f"/api/wallets/{wallet_id}").json()["cash"] == "70"
+
+
+def test_an_edit_that_breaks_the_timeline_is_rejected_and_changes_nothing(client: TestClient) -> None:
+    wallet_id = create_wallet(client, "0")
+    fund_in_the_past(client, wallet_id, "1000")
+    client.post(f"/api/wallets/{wallet_id}/buys", json=NVDA_BUY)
+    deposit_id = operation_ids(client, wallet_id)[0]
+
+    # The buy needs 909.68 in June 2024; a 900 deposit is not enough.
+    response = client.put(
+        f"/api/wallets/{wallet_id}/operations/{deposit_id}", json={"type": "deposit", "amount": "900", "timestamp": "2024-01-02T09:00:00Z"}
+    )
+    assert response.status_code == 422
+    assert client.get(f"/api/wallets/{wallet_id}").json()["cash"] == "90.32"
+
+
+def test_deleting_an_operation_recomputes_the_wallet(client: TestClient) -> None:
+    wallet_id = create_wallet(client, "0")
+    fund_in_the_past(client, wallet_id, "1000")
+    client.post(f"/api/wallets/{wallet_id}/buys", json=NVDA_BUY)
+    buy_id = operation_ids(client, wallet_id)[1]
+
+    response = client.delete(f"/api/wallets/{wallet_id}/operations/{buy_id}")
+    assert response.status_code == 200
+    assert (response.json()["cash"], response.json()["holdings"]) == ("1000", {})
+    assert buy_id not in operation_ids(client, wallet_id)
+
+
+def test_deleting_an_operation_others_depend_on_is_rejected(client: TestClient) -> None:
+    wallet_id = create_wallet(client, "0")
+    fund_in_the_past(client, wallet_id, "1000")
+    client.post(f"/api/wallets/{wallet_id}/buys", json=NVDA_BUY)
+    deposit_id = operation_ids(client, wallet_id)[0]
+
+    assert client.delete(f"/api/wallets/{wallet_id}/operations/{deposit_id}").status_code == 422
+    assert len(operation_ids(client, wallet_id)) == 2
+
+
+@pytest.mark.parametrize("method", ["PUT", "DELETE"])
+def test_unknown_operation_or_wallet_returns_404(client: TestClient, method: str) -> None:
+    wallet_id = create_wallet(client, "100")
+    body = {"type": "deposit", "amount": "10"}
+
+    unknown_operation = client.request(method, f"/api/wallets/{wallet_id}/operations/{uuid4()}", json=body)
+    assert (unknown_operation.status_code, unknown_operation.json()["detail"]) == (404, "operation not found")
+    unknown_wallet = client.request(method, f"/api/wallets/{uuid4()}/operations/{uuid4()}", json=body)
+    assert (unknown_wallet.status_code, unknown_wallet.json()["detail"]) == (404, "wallet not found")
+
+
 def test_copy_has_the_same_history_under_a_new_id(client: TestClient) -> None:
     wallet_id = create_wallet(client, "0")
     fund_in_the_past(client, wallet_id, "1000")

@@ -13,6 +13,8 @@ from shadowfolio.domain.errors import (
     InvalidAmountError,
     InvalidNameError,
     MissingSettledAmountError,
+    OperationNotFoundError,
+    OperationTypeChangeError,
 )
 from shadowfolio.domain.money import Currency
 from shadowfolio.domain.operations import Buy, Deposit, Operation, Sell, Trade, Withdrawal
@@ -48,29 +50,57 @@ class Wallet:
     def rename(self, name: str) -> Self:
         return replace(self, name=name)
 
-    def deposit(self, operation_id: UUID, amount: Decimal, at: datetime) -> Self:
-        _require_positive(amount, "amount")
-        return self._with(Deposit(operation_id, at, amount))
+    # Every method that records an operation can instead replace an existing one of the same kind (`replacing=<its id>`):
+    # the new version takes its place in a single check of the timeline, so an edit never fails halfway.
 
-    def withdraw(self, operation_id: UUID, amount: Decimal, at: datetime) -> Self:
+    def deposit(self, operation_id: UUID, amount: Decimal, at: datetime, replacing: UUID | None = None) -> Self:
         _require_positive(amount, "amount")
-        return self._with(Withdrawal(operation_id, at, amount))
+        return self._with(Deposit(operation_id, at, amount), replacing)
+
+    def withdraw(self, operation_id: UUID, amount: Decimal, at: datetime, replacing: UUID | None = None) -> Self:
+        _require_positive(amount, "amount")
+        return self._with(Withdrawal(operation_id, at, amount), replacing)
 
     def buy(
-        self, operation_id: UUID, trade: Trade, at: datetime, settled_amount: Decimal | None = None, fees: Decimal = Decimal(0)
+        self,
+        operation_id: UUID,
+        trade: Trade,
+        at: datetime,
+        settled_amount: Decimal | None = None,
+        fees: Decimal = Decimal(0),
+        replacing: UUID | None = None,
     ) -> Self:
         """Record a buy. `settled_amount` is what left the wallet before fees, in its currency."""
-        return self._trade(Buy, operation_id, trade, at, settled_amount, fees)
+        return self._trade(Buy, operation_id, trade, at, settled_amount, fees, replacing)
 
     def sell(
-        self, operation_id: UUID, trade: Trade, at: datetime, settled_amount: Decimal | None = None, fees: Decimal = Decimal(0)
+        self,
+        operation_id: UUID,
+        trade: Trade,
+        at: datetime,
+        settled_amount: Decimal | None = None,
+        fees: Decimal = Decimal(0),
+        replacing: UUID | None = None,
     ) -> Self:
         """Record a sell. `settled_amount` is what entered the wallet before fees, in its
         currency."""
-        return self._trade(Sell, operation_id, trade, at, settled_amount, fees)
+        return self._trade(Sell, operation_id, trade, at, settled_amount, fees, replacing)
+
+    def remove_operation(self, operation_id: UUID) -> Self:
+        """Remove an operation; what is left must still be a valid timeline."""
+        remaining = self._without(operation_id)
+        _replay(remaining)
+        return replace(self, operations=remaining)
 
     def _trade(
-        self, kind: type[Buy] | type[Sell], operation_id: UUID, trade: Trade, at: datetime, settled_amount: Decimal | None, fees: Decimal
+        self,
+        kind: type[Buy] | type[Sell],
+        operation_id: UUID,
+        trade: Trade,
+        at: datetime,
+        settled_amount: Decimal | None,
+        fees: Decimal,
+        replacing: UUID | None,
     ) -> Self:
         """`settled_amount` is required when the price is in another currency than the
         wallet's, and defaults to quantity × price otherwise."""
@@ -83,16 +113,31 @@ class Wallet:
                 raise MissingSettledAmountError(f"price is in {trade.price_currency}; settled amount in {self.currency} needed")
             settled_amount = trade.quantity * trade.price
         _require_positive(settled_amount, "settled amount")
-        return self._with(kind(operation_id, at, trade, settled_amount, fees))
+        return self._with(kind(operation_id, at, trade, settled_amount, fees), replacing)
 
-    def _with(self, operation: Operation) -> Self:
-        """Insert the operation at its timestamp and check the whole timeline.
+    def _with(self, operation: Operation, replacing: UUID | None = None) -> Self:
+        """Insert the operation at its timestamp, in place of `replacing` if given, and check the whole timeline.
 
         Operations with equal timestamps keep the order in which they were added.
         """
-        timeline = tuple(sorted((*self.operations, operation), key=lambda op: op.timestamp))
+        if replacing is not None and self._get(replacing).type is not operation.type:
+            raise OperationTypeChangeError("the type of an operation cannot change; delete it and add a new one")
+        others = self.operations if replacing is None else self._without(replacing)
+        timeline = tuple(sorted((*others, operation), key=lambda op: op.timestamp))
         _replay(timeline)
         return replace(self, operations=timeline)
+
+    def _get(self, operation_id: UUID) -> Operation:
+        for op in self.operations:
+            if op.id == operation_id:
+                return op
+        raise OperationNotFoundError(f"no operation {operation_id}")
+
+    def _without(self, operation_id: UUID) -> tuple[Operation, ...]:
+        remaining = tuple(op for op in self.operations if op.id != operation_id)
+        if len(remaining) == len(self.operations):
+            raise OperationNotFoundError(f"no operation {operation_id}")
+        return remaining
 
 
 def _replay(timeline: tuple[Operation, ...]) -> dict[str, Decimal]:

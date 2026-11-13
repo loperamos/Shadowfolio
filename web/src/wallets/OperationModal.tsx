@@ -4,8 +4,27 @@ import { IconCalendar } from "@tabler/icons-react";
 import { type FormEvent, useState } from "react";
 
 import { apiErrorMessage } from "../api/errors";
-import { Currency, deposit, OperationType, recordBuy, recordSell, type WalletResponse, withdraw } from "../api/generated";
-import { DATE_INPUT_FORMAT, isInFuture, nowAsTimeValue, parseDateInput, todayAsInputValue, toUtcTimestamp } from "../ui/format";
+import {
+  Currency,
+  deposit,
+  editOperation,
+  type OperationResponse,
+  OperationType,
+  recordBuy,
+  recordSell,
+  type WalletResponse,
+  withdraw,
+} from "../api/generated";
+import {
+  DATE_INPUT_FORMAT,
+  dateInputValueOf,
+  isInFuture,
+  nowAsTimeValue,
+  parseDateInput,
+  timeInputValueOf,
+  todayAsInputValue,
+  toUtcTimestamp,
+} from "../ui/format";
 import { DATE_INPUT_WIDTH, ICON_SIZE, TIME_INPUT_WIDTH } from "../ui/theme";
 
 const OPERATION_LABELS: Record<OperationType, string> = {
@@ -22,33 +41,36 @@ const DEFAULT_PRICE_CURRENCY = Currency.USD;
 type Props = {
   wallet: WalletResponse;
   opened: boolean;
+  operation: OperationResponse | null; // the operation to edit; null to add a new one
   onClose: () => void;
-  onAdded: () => void;
+  onSaved: () => void;
 };
 
-/** Record something that already happened in the wallet: a trade or a cash movement, at its real date. */
-export function AddOperationModal({ wallet, opened, onClose, onAdded }: Props) {
+/** Record something that already happened in the wallet (a trade or a cash movement, at its real date), or correct one. */
+export function OperationModal({ wallet, opened, operation, onClose, onSaved }: Props) {
   return (
-    <Modal opened={opened} onClose={onClose} title="Add operation" size="lg">
-      {/* Rendered only while open, so the form starts empty each time. */}
-      {opened && <AddOperationForm wallet={wallet} onClose={onClose} onAdded={onAdded} />}
+    <Modal opened={opened} onClose={onClose} title={operation ? `Edit ${OPERATION_LABELS[operation.type].toLowerCase()}` : "Add operation"} size="lg">
+      {/* Rendered only while open, so the form starts fresh (empty, or from the operation) each time. */}
+      {opened && <OperationForm wallet={wallet} operation={operation} onClose={onClose} onSaved={onSaved} />}
     </Modal>
   );
 }
 
-function AddOperationForm({ wallet, onClose, onAdded }: Omit<Props, "opened">) {
-  const [type, setType] = useState<OperationType>(OperationType.BUY);
+function OperationForm({ wallet, operation, onClose, onSaved }: Omit<Props, "opened">) {
+  const isTradeOperation = operation?.symbol != null;
+  const [type, setType] = useState<OperationType>(operation?.type ?? OperationType.BUY);
   // Amounts are kept as text and sent as strings, so they stay exact (never through a float).
-  // Local date and time, entered separately as on broker statements; they start at now, the most common case.
-  const [date, setDate] = useState<string | null>(todayAsInputValue); // "2024-06-24"
-  const [time, setTime] = useState(nowAsTimeValue); // "16:26"
-  const [amount, setAmount] = useState("");
-  const [symbol, setSymbol] = useState("");
-  const [quantity, setQuantity] = useState("");
-  const [price, setPrice] = useState("");
-  const [priceCurrency, setPriceCurrency] = useState<Currency>(DEFAULT_PRICE_CURRENCY);
-  const [settledAmount, setSettledAmount] = useState("");
-  const [fees, setFees] = useState("");
+  // Local date and time, entered separately as on broker statements; a new operation starts at now, the most common case.
+  const [date, setDate] = useState<string | null>(() => (operation ? dateInputValueOf(operation.timestamp) : todayAsInputValue())); // "2024-06-24"
+  const [time, setTime] = useState(() => (operation ? timeInputValueOf(operation.timestamp) : nowAsTimeValue())); // "16:26"
+  const [amount, setAmount] = useState(operation && !isTradeOperation ? operation.amount : "");
+  const [symbol, setSymbol] = useState(operation?.symbol ?? "");
+  const [quantity, setQuantity] = useState(operation?.quantity ?? "");
+  const [price, setPrice] = useState(operation?.price ?? "");
+  const [priceCurrency, setPriceCurrency] = useState<Currency>(operation?.price_currency ?? DEFAULT_PRICE_CURRENCY);
+  // For a trade, the stored amount is what the broker settled; it is only asked for when the price is in another currency.
+  const [settledAmount, setSettledAmount] = useState(isTradeOperation && operation.price_currency !== wallet.currency ? operation.amount : "");
+  const [fees, setFees] = useState(operation && Number(operation.fees) !== 0 ? operation.fees : "");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -61,6 +83,10 @@ function AddOperationForm({ wallet, onClose, onAdded }: Omit<Props, "opened">) {
     const timestamp = toUtcTimestamp(date!, time);
     if (!isTrade) {
       const body = { amount, timestamp };
+      if (operation) {
+        const kind = type === OperationType.DEPOSIT ? OperationType.DEPOSIT : OperationType.WITHDRAWAL;
+        return editOperation({ path: { ...path, operation_id: operation.id }, body: { type: kind, ...body } });
+      }
       return type === OperationType.DEPOSIT ? deposit({ path, body }) : withdraw({ path, body });
     }
     const body = {
@@ -72,6 +98,10 @@ function AddOperationForm({ wallet, onClose, onAdded }: Omit<Props, "opened">) {
       settled_amount: needsSettledAmount ? settledAmount : null,
       ...(fees.trim() ? { fees } : {}),
     };
+    if (operation) {
+      const kind = type === OperationType.BUY ? OperationType.BUY : OperationType.SELL;
+      return editOperation({ path: { ...path, operation_id: operation.id }, body: { type: kind, ...body } });
+    }
     return type === OperationType.BUY ? recordBuy({ path, body }) : recordSell({ path, body });
   }
 
@@ -90,7 +120,7 @@ function AddOperationForm({ wallet, onClose, onAdded }: Omit<Props, "opened">) {
       const { data, error } = await send();
       if (data) {
         onClose();
-        onAdded();
+        onSaved();
       } else {
         setError(apiErrorMessage(error));
       }
@@ -143,7 +173,10 @@ function AddOperationForm({ wallet, onClose, onAdded }: Omit<Props, "opened">) {
   return (
     <form onSubmit={submit}>
       <Stack>
-        <SegmentedControl fullWidth data={OPERATION_OPTIONS} value={type} onChange={(value) => setType(value as OperationType)} />
+        {/* An operation keeps its type; to change it, delete it and add a new one. */}
+        {!operation && (
+          <SegmentedControl fullWidth data={OPERATION_OPTIONS} value={type} onChange={(value) => setType(value as OperationType)} />
+        )}
 
         {dateAndTime}
 
@@ -190,7 +223,7 @@ function AddOperationForm({ wallet, onClose, onAdded }: Omit<Props, "opened">) {
             Cancel
           </Button>
           <Button type="submit" loading={saving}>
-            Add {OPERATION_LABELS[type].toLowerCase()}
+            {operation ? "Save changes" : `Add ${OPERATION_LABELS[type].toLowerCase()}`}
           </Button>
         </Group>
       </Stack>

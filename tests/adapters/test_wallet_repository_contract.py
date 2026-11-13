@@ -83,5 +83,16 @@ def test_delete_removes_the_wallet_and_its_operations(make_repository: Repositor
     assert make_repository().get(deleted.id) == empty
 
 
+def test_update_stores_changed_and_removed_operations(make_repository: RepositoryFactory) -> None:
+    wallet = a_wallet().deposit(uuid4(), Decimal("10"), T2)
+    make_repository().add(wallet)
+    first, second = wallet.operations
+
+    changed = wallet.deposit(first.id, Decimal("2000"), T1, replacing=first.id).remove_operation(second.id)
+    make_repository().update(changed)
+
+    assert make_repository().get(wallet.id) == changed
+
+
 def test_unknown_wallet_is_none(make_repository: RepositoryFactory) -> None:
     assert make_repository().get(uuid4()) is None

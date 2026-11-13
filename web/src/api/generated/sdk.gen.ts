@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { CopyWalletData, CopyWalletErrors, CopyWalletResponses, CreateWalletData, CreateWalletErrors, CreateWalletResponses, CurrentValuationData, CurrentValuationErrors, CurrentValuationResponses, DeleteWalletData, DeleteWalletErrors, DeleteWalletResponses, DepositData, DepositErrors, DepositResponses, GetWalletData, GetWalletErrors, GetWalletResponses, LatestQuoteData, LatestQuoteErrors, LatestQuoteResponses, ListOperationsData, ListOperationsErrors, ListOperationsResponses, ListWalletsData, ListWalletsResponses, RecordBuyData, RecordBuyErrors, RecordBuyResponses, RecordSellData, RecordSellErrors, RecordSellResponses, RenameWalletData, RenameWalletErrors, RenameWalletResponses, WithdrawData, WithdrawErrors, WithdrawResponses } from './types.gen';
+import type { CopyWalletData, CopyWalletErrors, CopyWalletResponses, CreateWalletData, CreateWalletErrors, CreateWalletResponses, CurrentValuationData, CurrentValuationErrors, CurrentValuationResponses, DeleteOperationData, DeleteOperationErrors, DeleteOperationResponses, DeleteWalletData, DeleteWalletErrors, DeleteWalletResponses, DepositData, DepositErrors, DepositResponses, EditOperationData, EditOperationErrors, EditOperationResponses, GetWalletData, GetWalletErrors, GetWalletResponses, LatestQuoteData, LatestQuoteErrors, LatestQuoteResponses, ListOperationsData, ListOperationsErrors, ListOperationsResponses, ListWalletsData, ListWalletsResponses, RecordBuyData, RecordBuyErrors, RecordBuyResponses, RecordSellData, RecordSellErrors, RecordSellResponses, RenameWalletData, RenameWalletErrors, RenameWalletResponses, WithdrawData, WithdrawErrors, WithdrawResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -115,6 +115,23 @@ export const recordBuy = <ThrowOnError extends boolean = false>(options: Options
  */
 export const recordSell = <ThrowOnError extends boolean = false>(options: Options<RecordSellData, ThrowOnError>): RequestResult<RecordSellResponses, RecordSellErrors, ThrowOnError> => (options.client ?? client).post<RecordSellResponses, RecordSellErrors, ThrowOnError>({
     url: '/api/wallets/{wallet_id}/sells',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Delete Operation
+ */
+export const deleteOperation = <ThrowOnError extends boolean = false>(options: Options<DeleteOperationData, ThrowOnError>): RequestResult<DeleteOperationResponses, DeleteOperationErrors, ThrowOnError> => (options.client ?? client).delete<DeleteOperationResponses, DeleteOperationErrors, ThrowOnError>({ url: '/api/wallets/{wallet_id}/operations/{operation_id}', ...options });
+
+/**
+ * Edit Operation
+ */
+export const editOperation = <ThrowOnError extends boolean = false>(options: Options<EditOperationData, ThrowOnError>): RequestResult<EditOperationResponses, EditOperationErrors, ThrowOnError> => (options.client ?? client).put<EditOperationResponses, EditOperationErrors, ThrowOnError>({
+    url: '/api/wallets/{wallet_id}/operations/{operation_id}',
     ...options,
     headers: {
         'Content-Type': 'application/json',

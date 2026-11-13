@@ -12,5 +12,5 @@ export const theme = createTheme({
 export const ICON_SIZE = 16;
 
 // Widths of inputs whose content always has the same length, so they don't stretch across a form.
-export const DATE_INPUT_WIDTH = rem(150); // DD/MM/YYYY plus the calendar icon
-export const TIME_INPUT_WIDTH = rem(90); // HH:mm
+export const DATE_INPUT_WIDTH = rem(128); // the calendar icon, DD/MM/YYYY and the usual inner padding
+export const TIME_INPUT_WIDTH = rem(70); // HH:mm and the usual inner padding

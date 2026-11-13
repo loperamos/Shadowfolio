@@ -30,5 +30,9 @@ def wallet_not_found() -> HTTPException:
     return HTTPException(status_code=404, detail="wallet not found")
 
 
+def operation_not_found() -> HTTPException:
+    return HTTPException(status_code=404, detail="operation not found")
+
+
 def rule_violation(error: DomainError) -> HTTPException:
     return HTTPException(status_code=422, detail=str(error))

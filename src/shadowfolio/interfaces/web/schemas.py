@@ -2,9 +2,10 @@
 
 from datetime import date
 from decimal import Decimal
+from typing import Annotated, Literal
 from uuid import UUID
 
-from pydantic import AwareDatetime, BaseModel
+from pydantic import AwareDatetime, BaseModel, Field
 
 from shadowfolio.domain.money import Currency
 from shadowfolio.domain.operations import Buy, Deposit, Operation, OperationType, Sell, Trade, Withdrawal
@@ -47,6 +48,26 @@ class TradeRequest(BaseModel):
 
     def to_trade(self) -> Trade:
         return Trade(self.symbol, self.quantity, self.price, self.price_currency)
+
+
+# Replacing an operation: the same fields as recording one, plus its type, which may change.
+class DepositEdit(CashMovementRequest):
+    type: Literal[OperationType.DEPOSIT]
+
+
+class WithdrawalEdit(CashMovementRequest):
+    type: Literal[OperationType.WITHDRAWAL]
+
+
+class BuyEdit(TradeRequest):
+    type: Literal[OperationType.BUY]
+
+
+class SellEdit(TradeRequest):
+    type: Literal[OperationType.SELL]
+
+
+OperationEditRequest = Annotated[DepositEdit | WithdrawalEdit | BuyEdit | SellEdit, Field(discriminator="type")]
 
 
 class WalletResponse(BaseModel):
