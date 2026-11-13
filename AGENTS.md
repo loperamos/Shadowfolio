@@ -10,6 +10,7 @@ What to build is in [SPEC.md](SPEC.md). This file is about *how* to work here. K
 - **No silent scope changes.** If the task turns out bigger or different than described, say so before continuing.
 - Ask before adding a dependency, changing global or system settings, or spending money (paid APIs, subscriptions).
 - Commit or push only when asked.
+- Work is tracked in GitHub Issues (`gh`), grouped by milestones that follow the MVP plan in SPEC.md. Commits reference their issue (`Refs #12`, or `Fixes #12` when it completes it). New gaps or bugs found along the way become issues, not chat notes.
 
 ## Architecture rules
 
