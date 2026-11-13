@@ -64,7 +64,15 @@ def test_cash_only_wallet_is_worth_its_cash(client: TestClient) -> None:
 
     response = client.get(f"/api/wallets/{wallet_id}/valuation")
     assert response.status_code == 200
-    assert response.json() == {"currency": "EUR", "cash": "3000", "holdings": [], "total": "3000"}
+    assert response.json() == {
+        "currency": "EUR",
+        "cash": "3000",
+        "holdings": [],
+        "cost": "0.00",
+        "gain": "0.00",
+        "gain_percent": None,
+        "total": "3000",
+    }
 
 
 def test_holdings_are_valued_at_latest_prices_and_converted_into_the_wallet_currency(
@@ -86,6 +94,12 @@ def test_holdings_are_valued_at_latest_prices_and_converted_into_the_wallet_curr
     assert (tsla["symbol"], tsla["value"], tsla["fx_rate"], tsla["value_in_wallet_currency"]) == ("TSLA", "1550.00", None, "1550.00")
     assert nvda["as_of"] == "2026-03-02T14:59:00Z"
     assert (valuation["cash"], valuation["total"]) == ("611.17", "3139.48")  # 611.17 + 978.31 + 1550.00
+    # Gains against what was paid, fees included: NVDA 978.31 - 909.68, TSLA 1550.00 - 1479.15.
+    assert [(h["cost"], h["gain"], h["gain_percent"]) for h in valuation["holdings"]] == [
+        ("909.68", "68.63", "7.54"),
+        ("1479.15", "70.85", "4.79"),
+    ]
+    assert (valuation["cost"], valuation["gain"], valuation["gain_percent"]) == ("2388.83", "139.48", "5.84")
 
 
 def test_missing_price_fails_the_valuation(client: TestClient, prices: InMemoryPriceData) -> None:

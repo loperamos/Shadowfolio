@@ -182,6 +182,18 @@ export type HoldingValueResponse = {
      * Value In Wallet Currency
      */
     value_in_wallet_currency: string;
+    /**
+     * Cost
+     */
+    cost: string;
+    /**
+     * Gain
+     */
+    gain: string;
+    /**
+     * Gain Percent
+     */
+    gain_percent: string;
 };
 
 /**
@@ -344,6 +356,18 @@ export type ValuationResponse = {
      */
     holdings: Array<HoldingValueResponse>;
     /**
+     * Cost
+     */
+    cost: string;
+    /**
+     * Gain
+     */
+    gain: string;
+    /**
+     * Gain Percent
+     */
+    gain_percent: string | null;
+    /**
      * Total
      */
     total: string;
@@ -372,6 +396,16 @@ export type WalletResponse = {
     holdings: {
         [key: string]: string;
     };
+    /**
+     * Cost Basis
+     */
+    cost_basis: {
+        [key: string]: string;
+    };
+    /**
+     * Realized Gain
+     */
+    realized_gain: string;
 };
 
 /**

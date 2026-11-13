@@ -1134,6 +1134,18 @@
           "value_in_wallet_currency": {
             "type": "string",
             "title": "Value In Wallet Currency"
+          },
+          "cost": {
+            "type": "string",
+            "title": "Cost"
+          },
+          "gain": {
+            "type": "string",
+            "title": "Gain"
+          },
+          "gain_percent": {
+            "type": "string",
+            "title": "Gain Percent"
           }
         },
         "type": "object",
@@ -1145,7 +1157,10 @@
           "as_of",
           "value",
           "fx_rate",
-          "value_in_wallet_currency"
+          "value_in_wallet_currency",
+          "cost",
+          "gain",
+          "gain_percent"
         ],
         "title": "HoldingValueResponse"
       },
@@ -1445,6 +1460,25 @@
             "type": "array",
             "title": "Holdings"
           },
+          "cost": {
+            "type": "string",
+            "title": "Cost"
+          },
+          "gain": {
+            "type": "string",
+            "title": "Gain"
+          },
+          "gain_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gain Percent"
+          },
           "total": {
             "type": "string",
             "title": "Total"
@@ -1455,6 +1489,9 @@
           "currency",
           "cash",
           "holdings",
+          "cost",
+          "gain",
+          "gain_percent",
           "total"
         ],
         "title": "ValuationResponse"
@@ -1483,6 +1520,17 @@
             },
             "type": "object",
             "title": "Holdings"
+          },
+          "cost_basis": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Cost Basis"
+          },
+          "realized_gain": {
+            "type": "string",
+            "title": "Realized Gain"
           }
         },
         "type": "object",
@@ -1491,7 +1539,9 @@
           "name",
           "currency",
           "cash",
-          "holdings"
+          "holdings",
+          "cost_basis",
+          "realized_gain"
         ],
         "title": "WalletResponse"
       },

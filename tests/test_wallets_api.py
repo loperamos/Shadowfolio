@@ -27,7 +27,15 @@ def test_created_wallet_can_be_read_back(client: TestClient) -> None:
 
     fetched = client.get(f"/api/wallets/{wallet_id}")
     assert fetched.status_code == 200
-    assert fetched.json() == {"id": wallet_id, "name": "Long term", "currency": "EUR", "cash": "1000.50", "holdings": {}}
+    assert fetched.json() == {
+        "id": wallet_id,
+        "name": "Long term",
+        "currency": "EUR",
+        "cash": "1000.50",
+        "holdings": {},
+        "cost_basis": {},
+        "realized_gain": "0.00",
+    }
 
 
 def test_wallets_are_listed_in_creation_order(client: TestClient) -> None:
@@ -181,6 +189,16 @@ def test_past_sell_reduces_holdings_and_adds_settled_amount(client: TestClient) 
     assert response.status_code == 200
     assert response.json()["cash"] == "688.32"  # 90.32 + 600.00 - 2.00
     assert response.json()["holdings"] == {"NVDA": "3"}
+
+
+def test_wallet_shows_fifo_cost_and_realized_gain(client: TestClient) -> None:
+    wallet_id = create_wallet(client, "0")
+    fund_in_the_past(client, wallet_id, "1000")
+    client.post(f"/api/wallets/{wallet_id}/buys", json=NVDA_BUY)  # 8 NVDA for 907.68 + 2.00 fees
+
+    wallet = client.post(f"/api/wallets/{wallet_id}/sells", json=nvda_sell("5")).json()  # 600.00 - 2.00 fees
+    # 5 of 8 shares sold: they cost 5/8 of 909.68 = 568.55; 598.00 - 568.55 = 29.45 gained.
+    assert (wallet["cost_basis"], wallet["realized_gain"]) == ({"NVDA": "341.13"}, "29.45")
 
 
 def test_selling_everything_removes_the_holding(client: TestClient) -> None:

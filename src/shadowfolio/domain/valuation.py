@@ -24,6 +24,7 @@ class Quote:
 class HoldingValue:
     symbol: str
     quantity: Decimal
+    cost: Decimal  # what the shares held cost, in the wallet's currency (FIFO, fees included)
     quote: Quote
     fx_rate: FxRate | None  # from the quote's currency into the wallet's; None when they are the same
 
@@ -39,12 +40,27 @@ class HoldingValue:
             return self.value
         return (self.value * self.fx_rate.rate).quantize(CENT, rounding=ROUND_HALF_EVEN)
 
+    @property
+    def gain(self) -> Decimal:
+        """Unrealized gain (negative for a loss), in the wallet's currency."""
+        return self.value_in_wallet_currency - self.cost
+
 
 @dataclass(frozen=True)
 class WalletValuation:
     currency: Currency
     cash: Decimal
     holdings: tuple[HoldingValue, ...]  # sorted by symbol
+
+    @property
+    def cost(self) -> Decimal:
+        """What the holdings cost, in the wallet's currency."""
+        return sum((h.cost for h in self.holdings), Decimal(0))
+
+    @property
+    def gain(self) -> Decimal:
+        """Unrealized gain of all holdings, in the wallet's currency."""
+        return sum((h.gain for h in self.holdings), Decimal(0))
 
     @property
     def total(self) -> Decimal:
@@ -58,9 +74,14 @@ def value_wallet(wallet: Wallet, quotes: Mapping[str, Quote], rates: Mapping[Cur
     `quotes` must have a quote for every symbol held, and `rates` a rate from every quote currency
     other than the wallet's into the wallet's currency.
     """
+    positions = wallet.ledger.positions
     holdings = tuple(
         HoldingValue(
-            symbol, quantity, quotes[symbol], None if quotes[symbol].currency is wallet.currency else rates[quotes[symbol].currency]
+            symbol,
+            quantity,
+            positions[symbol].cost,
+            quotes[symbol],
+            None if quotes[symbol].currency is wallet.currency else rates[quotes[symbol].currency],
         )
         for symbol, quantity in sorted(wallet.holdings.items())
     )

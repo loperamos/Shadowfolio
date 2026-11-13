@@ -1,7 +1,7 @@
 """Request and response bodies of the HTTP API."""
 
 from datetime import date
-from decimal import Decimal
+from decimal import ROUND_HALF_EVEN, Decimal
 from typing import Annotated, Literal
 from uuid import UUID
 
@@ -70,16 +70,39 @@ class SellEdit(TradeRequest):
 OperationEditRequest = Annotated[DepositEdit | WithdrawalEdit | BuyEdit | SellEdit, Field(discriminator="type")]
 
 
+# Costs and gains are exact in the domain and rounded here, for display: money to cents, percentages to hundredths.
+CENT = Decimal("0.01")
+
+
+def _cents(amount: Decimal) -> Decimal:
+    return amount.quantize(CENT, rounding=ROUND_HALF_EVEN)
+
+
+def _percent(part: Decimal, whole: Decimal) -> Decimal:
+    return (part / whole * 100).quantize(CENT, rounding=ROUND_HALF_EVEN)
+
+
 class WalletResponse(BaseModel):
     id: UUID
     name: str
     currency: Currency
     cash: Decimal
     holdings: dict[str, Decimal]
+    cost_basis: dict[str, Decimal]  # what each holding cost, in the wallet's currency (FIFO, fees included)
+    realized_gain: Decimal  # from all sells so far, in the wallet's currency
 
     @classmethod
     def from_wallet(cls, wallet: Wallet) -> "WalletResponse":
-        return cls(id=wallet.id, name=wallet.name, currency=wallet.currency, cash=wallet.cash, holdings=wallet.holdings)
+        ledger = wallet.ledger
+        return cls(
+            id=wallet.id,
+            name=wallet.name,
+            currency=wallet.currency,
+            cash=wallet.cash,
+            holdings=wallet.holdings,
+            cost_basis={symbol: _cents(position.cost) for symbol, position in ledger.positions.items()},
+            realized_gain=_cents(ledger.realized_gain),
+        )
 
 
 class OperationResponse(BaseModel):
@@ -127,12 +150,18 @@ class HoldingValueResponse(BaseModel):
     value: Decimal  # in the price's currency
     fx_rate: FxRateResponse | None  # null when the price is already in the wallet's currency
     value_in_wallet_currency: Decimal
+    cost: Decimal  # in the wallet's currency
+    gain: Decimal  # unrealized, in the wallet's currency; negative for a loss
+    gain_percent: Decimal  # of the cost
 
 
 class ValuationResponse(BaseModel):
     currency: Currency
     cash: Decimal
     holdings: list[HoldingValueResponse]
+    cost: Decimal  # of all holdings, in the wallet's currency
+    gain: Decimal  # unrealized gain of all holdings
+    gain_percent: Decimal | None  # of the cost; null when nothing is held
     total: Decimal  # cash plus holdings, in the wallet's currency
 
     @classmethod
@@ -150,9 +179,15 @@ class ValuationResponse(BaseModel):
                     value=h.value,
                     fx_rate=FxRateResponse(rate=h.fx_rate.rate, as_of=h.fx_rate.as_of) if h.fx_rate else None,
                     value_in_wallet_currency=h.value_in_wallet_currency,
+                    cost=_cents(h.cost),
+                    gain=_cents(h.gain),
+                    gain_percent=_percent(h.gain, h.cost),
                 )
                 for h in valuation.holdings
             ],
+            cost=_cents(valuation.cost),
+            gain=_cents(valuation.gain),
+            gain_percent=_percent(valuation.gain, valuation.cost) if valuation.cost else None,
             total=valuation.total,
         )
 

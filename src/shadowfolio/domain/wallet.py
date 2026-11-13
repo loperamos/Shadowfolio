@@ -16,6 +16,7 @@ from shadowfolio.domain.errors import (
     OperationNotFoundError,
     OperationTypeChangeError,
 )
+from shadowfolio.domain.ledger import Ledger, build_ledger
 from shadowfolio.domain.money import Currency
 from shadowfolio.domain.operations import Buy, Deposit, Operation, Sell, Trade, Withdrawal
 
@@ -35,6 +36,11 @@ class Wallet:
     @property
     def cash(self) -> Decimal:
         return sum((op.cash_delta for op in self.operations), Decimal(0))
+
+    @property
+    def ledger(self) -> Ledger:
+        """What each holding cost and what selling has gained (FIFO)."""
+        return build_ledger(self.operations)
 
     @property
     def holdings(self) -> dict[str, Decimal]:

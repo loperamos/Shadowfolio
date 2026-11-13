@@ -5,7 +5,7 @@ import type { WalletResponse } from "../api/generated";
 import { walletPath } from "../routes";
 import { useWalletValuation } from "./useWalletValuation";
 import { WalletActionsMenu } from "./WalletActionsMenu";
-import { WalletValue } from "./WalletValue";
+import { WalletGain, WalletValue } from "./WalletValue";
 
 type Props = {
   wallets: WalletResponse[] | null;
@@ -56,6 +56,7 @@ export function WalletTable({ wallets, error, selectedIds, onSelectionChange, on
           <Table.Th>Name</Table.Th>
           <Table.Th ta="right">Cash</Table.Th>
           <Table.Th ta="right">Value</Table.Th>
+          <Table.Th ta="right">Gain</Table.Th>
           <Table.Th>Holdings</Table.Th>
           <Table.Th w={40} />
         </Table.Tr>
@@ -74,9 +75,7 @@ export function WalletTable({ wallets, error, selectedIds, onSelectionChange, on
             <Table.Td ta="right">
               {wallet.cash} {wallet.currency}
             </Table.Td>
-            <Table.Td ta="right">
-              <WalletValueCell walletId={wallet.id} />
-            </Table.Td>
+            <WalletValuationCells walletId={wallet.id} />
             <Table.Td>
               {Object.entries(wallet.holdings)
                 .map(([symbol, quantity]) => `${symbol} ${quantity}`)
@@ -92,6 +91,17 @@ export function WalletTable({ wallets, error, selectedIds, onSelectionChange, on
   );
 }
 
-function WalletValueCell({ walletId }: { walletId: string }) {
-  return <WalletValue state={useWalletValuation(walletId)} />;
+/** The Value and Gain cells of a row, from one valuation of the wallet. */
+function WalletValuationCells({ walletId }: { walletId: string }) {
+  const valuation = useWalletValuation(walletId);
+  return (
+    <>
+      <Table.Td ta="right">
+        <WalletValue state={valuation} />
+      </Table.Td>
+      <Table.Td ta="right">
+        <WalletGain state={valuation} />
+      </Table.Td>
+    </>
+  );
 }
