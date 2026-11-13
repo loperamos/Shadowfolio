@@ -1,6 +1,7 @@
 import { Loader, Text, type TextProps, Tooltip } from "@mantine/core";
 
 import { GainText } from "../ui/GainText";
+import { Money } from "../ui/Money";
 import type { ValuationState } from "./useWalletValuation";
 
 /** A wallet's total value in its own currency; "—" with the reason on hover when it cannot be valued. */
@@ -17,11 +18,7 @@ export function WalletValue({ state, ...textProps }: { state: ValuationState } &
         </Tooltip>
       );
     case "loaded":
-      return (
-        <Text {...textProps}>
-          {state.valuation.total} {state.valuation.currency}
-        </Text>
-      );
+      return <Money amount={state.valuation.total} currency={state.valuation.currency} {...textProps} />;
   }
 }
 

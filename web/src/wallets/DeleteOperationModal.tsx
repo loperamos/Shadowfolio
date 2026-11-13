@@ -3,7 +3,7 @@ import { useState } from "react";
 
 import { apiErrorMessage } from "../api/errors";
 import { deleteOperation, type OperationResponse, type WalletResponse } from "../api/generated";
-import { formatDateTime } from "../ui/format";
+import { formatAmount, formatDateTime } from "../ui/format";
 
 type Props = {
   wallet: WalletResponse;
@@ -69,5 +69,5 @@ export function DeleteOperationModal({ wallet, operation, onClose, onDeleted }: 
 function describe(operation: OperationResponse, walletCurrency: string): string {
   return operation.symbol != null
     ? `${operation.type} of ${operation.quantity} ${operation.symbol}`
-    : `${operation.type} of ${operation.amount} ${walletCurrency}`;
+    : `${operation.type} of ${formatAmount(operation.amount)} ${walletCurrency}`;
 }

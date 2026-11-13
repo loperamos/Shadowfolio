@@ -3,6 +3,8 @@ import { Link } from "react-router";
 
 import type { WalletResponse } from "../api/generated";
 import { walletPath } from "../routes";
+import { Money } from "../ui/Money";
+import { TABLE_MIN_WIDTH } from "../ui/theme";
 import { useWalletValuation } from "./useWalletValuation";
 import { WalletActionsMenu } from "./WalletActionsMenu";
 import { WalletDayChange, WalletGain, WalletValue } from "./WalletValue";
@@ -42,7 +44,8 @@ export function WalletTable({ wallets, error, selectedIds, onSelectionChange, on
   }
 
   return (
-    <Table striped highlightOnHover>
+    <Table.ScrollContainer minWidth={TABLE_MIN_WIDTH}>
+      <Table striped highlightOnHover>
       <Table.Thead>
         <Table.Tr>
           <Table.Th w={40}>
@@ -74,7 +77,7 @@ export function WalletTable({ wallets, error, selectedIds, onSelectionChange, on
               </Anchor>
             </Table.Td>
             <Table.Td ta="right">
-              {wallet.cash} {wallet.currency}
+              <Money amount={wallet.cash} currency={wallet.currency} />
             </Table.Td>
             <WalletValuationCells walletId={wallet.id} />
             <Table.Td>
@@ -88,7 +91,8 @@ export function WalletTable({ wallets, error, selectedIds, onSelectionChange, on
           </Table.Tr>
         ))}
       </Table.Tbody>
-    </Table>
+      </Table>
+    </Table.ScrollContainer>
   );
 }
 

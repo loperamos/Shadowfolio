@@ -7,7 +7,7 @@ import { WalletsPage } from "./wallets/WalletsPage";
 
 export function App() {
   return (
-    <Container py="xl">
+    <Container size="xl" py="xl">
       <Routes>
         <Route path="/" element={<Navigate to={WALLETS_PATH} replace />} />
         <Route path={WALLETS_PATH} element={<WalletsPage />} />

@@ -8,8 +8,9 @@ import { getWallet, listOperations, type OperationResponse, renameWallet, type W
 import { walletPath, WALLETS_PATH } from "../routes";
 import { EditableTitle } from "../ui/EditableTitle";
 import { GainText } from "../ui/GainText";
+import { Money } from "../ui/Money";
 import { formatDate, formatDateTime, shortDecimal } from "../ui/format";
-import { ICON_SIZE } from "../ui/theme";
+import { ICON_SIZE, TABLE_MIN_WIDTH } from "../ui/theme";
 import { DeleteOperationModal } from "./DeleteOperationModal";
 import { OperationActionsMenu } from "./OperationActionsMenu";
 import { OperationModal } from "./OperationModal";
@@ -152,9 +153,7 @@ function WalletDetails({ wallet, operations, version, onEditOperation, onDeleteO
           <Text c="dimmed" size="sm">
             Cash
           </Text>
-          <Text size="xl" fw={600}>
-            {wallet.cash} {wallet.currency}
-          </Text>
+          <Money amount={wallet.cash} currency={wallet.currency} size="xl" fw={600} />
         </div>
         <div>
           <Text c="dimmed" size="sm">
@@ -194,6 +193,7 @@ function WalletDetails({ wallet, operations, version, onEditOperation, onDeleteO
         {holdings.length === 0 ? (
           <Text c="dimmed">No holdings.</Text>
         ) : (
+          <Table.ScrollContainer minWidth={TABLE_MIN_WIDTH}>
           <Table striped>
             <Table.Thead>
               <Table.Tr>
@@ -212,13 +212,14 @@ function WalletDetails({ wallet, operations, version, onEditOperation, onDeleteO
                   <Table.Td>{symbol}</Table.Td>
                   <Table.Td ta="right">{quantity}</Table.Td>
                   <Table.Td ta="right">
-                    {wallet.cost_basis[symbol]} {wallet.currency}
+                    <Money amount={wallet.cost_basis[symbol]} currency={wallet.currency} />
                   </Table.Td>
                   <HoldingPriceAndValue symbol={symbol} valuation={valuation} />
                 </Table.Tr>
               ))}
             </Table.Tbody>
           </Table>
+          </Table.ScrollContainer>
         )}
       </div>
 
@@ -229,6 +230,7 @@ function WalletDetails({ wallet, operations, version, onEditOperation, onDeleteO
         {operations.length === 0 ? (
           <Text c="dimmed">No operations yet. Use “Add operation” to record deposits and trades at their real dates.</Text>
         ) : (
+          <Table.ScrollContainer minWidth={TABLE_MIN_WIDTH}>
           <Table striped>
             <Table.Thead>
               <Table.Tr>
@@ -250,11 +252,11 @@ function WalletDetails({ wallet, operations, version, onEditOperation, onDeleteO
                   <Table.Td tt="capitalize">{op.type}</Table.Td>
                   <Table.Td>{op.symbol ?? ""}</Table.Td>
                   <Table.Td ta="right">{op.quantity ?? ""}</Table.Td>
-                  <Table.Td ta="right">{op.price != null ? `${op.price} ${op.price_currency}` : ""}</Table.Td>
+                  <Table.Td ta="right">{op.price != null && op.price_currency && <Money amount={op.price} currency={op.price_currency} />}</Table.Td>
                   <Table.Td ta="right">
-                    {op.amount} {wallet.currency}
+                    <Money amount={op.amount} currency={wallet.currency} />
                   </Table.Td>
-                  <Table.Td ta="right">{op.fees !== "0" ? `${op.fees} ${wallet.currency}` : ""}</Table.Td>
+                  <Table.Td ta="right">{op.fees !== "0" && <Money amount={op.fees} currency={wallet.currency} />}</Table.Td>
                   <Table.Td>
                     <OperationActionsMenu operation={op} onEdit={onEditOperation} onDelete={onDeleteOperation} />
                   </Table.Td>
@@ -262,6 +264,7 @@ function WalletDetails({ wallet, operations, version, onEditOperation, onDeleteO
               ))}
             </Table.Tbody>
           </Table>
+          </Table.ScrollContainer>
         )}
       </div>
     </Stack>
@@ -290,13 +293,13 @@ function HoldingPriceAndValue({ symbol, valuation }: { symbol: string; valuation
     <>
       <Table.Td ta="right">
         <Tooltip label={priceNote}>
-          <Text span>
-            {holding.price} {holding.currency}
+          <Text span inherit>
+            <Money amount={holding.price} currency={holding.currency} />
           </Text>
         </Tooltip>
       </Table.Td>
       <Table.Td ta="right">
-        {holding.value_in_wallet_currency} {loaded.currency}
+        <Money amount={holding.value_in_wallet_currency} currency={loaded.currency} />
       </Table.Td>
       <Table.Td ta="right">
         {holding.day_change != null ? (

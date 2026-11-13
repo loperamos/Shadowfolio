@@ -1,5 +1,8 @@
 import { Text, type TextProps } from "@mantine/core";
 
+import { formatAmount } from "./format";
+import { NO_WRAP } from "./Money";
+
 type Props = {
   amount: string; // a decimal from the API; negative for a loss
   currency: string;
@@ -11,8 +14,9 @@ export function GainText({ amount, currency, percent, ...textProps }: Props) {
   const direction = signOf(amount);
   const color = direction > 0 ? "teal" : direction < 0 ? "red" : "dimmed";
   return (
-    <Text span c={color} {...textProps}>
-      {signed(amount)} {currency}
+    // Without a size, take the surrounding one (e.g. a table cell's), so gains match the text around them.
+    <Text span c={color} inherit={textProps.size === undefined} style={NO_WRAP} {...textProps}>
+      {signed(formatAmount(amount))} {currency}
       {percent != null && ` (${signed(percent)}%)`}
     </Text>
   );

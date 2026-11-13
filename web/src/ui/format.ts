@@ -70,3 +70,15 @@ export function dateInputValueOf(isoTimestamp: string): string {
 export function timeInputValueOf(isoTimestamp: string): string {
   return dayjs(isoTimestamp).format(TIME_VALUE_FORMAT);
 }
+
+// Amounts are shown with at least this many decimals (e.g. 167.1 → 167.10); longer ones (e.g. a 397.425 price) are kept.
+const MIN_AMOUNT_DECIMALS = 2;
+const THOUSANDS_SEPARATOR = ",";
+
+/** An amount from the API for display: thousands separators and at least two decimals, e.g. 51111 → "51,111.00". */
+export function formatAmount(value: string): string {
+  const negative = value.trim().startsWith("-");
+  const [whole, fraction = ""] = value.trim().replace(/^[-+]/, "").split(".");
+  const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, THOUSANDS_SEPARATOR);
+  return `${negative ? "-" : ""}${grouped}.${fraction.padEnd(MIN_AMOUNT_DECIMALS, "0")}`;
+}
