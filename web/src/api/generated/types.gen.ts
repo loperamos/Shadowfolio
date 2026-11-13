@@ -255,6 +255,10 @@ export type OperationResponse = {
      * Automatic
      */
     automatic?: boolean;
+    /**
+     * Had Effect
+     */
+    had_effect?: boolean;
 };
 
 /**

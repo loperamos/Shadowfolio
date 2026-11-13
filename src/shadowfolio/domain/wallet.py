@@ -126,7 +126,13 @@ class Wallet:
             raise AutomaticOperationError("operations added from market data (e.g. splits) cannot be deleted")
         remaining = self._without(operation_id)
         _replay(remaining)
-        return replace(self, operations=remaining)
+        return replace(self, operations=remaining)._without_untraded_symbols()
+
+    def had_effect(self, operation: Operation) -> bool:
+        """Whether the operation changed the wallet: a split only does when shares of its symbol were held then."""
+        if isinstance(operation, Split):
+            return self.holdings_at(operation.timestamp).get(operation.symbol, Decimal(0)) > 0
+        return True
 
     def _trade(
         self,
@@ -166,7 +172,20 @@ class Wallet:
         others = self.operations if replacing is None else self._without(replacing)
         timeline = tuple(sorted((*others, operation), key=lambda op: op.timestamp))
         _replay(timeline)
-        return replace(self, operations=timeline)
+        updated = replace(self, operations=timeline)
+        # An edit can move a trade to another symbol, leaving the old one without trades. (Not when adding: splits
+        # are fetched for a symbol just before its first trade is added.)
+        return updated._without_untraded_symbols() if replacing is not None else updated
+
+    def _without_untraded_symbols(self) -> Self:
+        """Drops the automatic operations and the checked period of every symbol that has no trades left, so the
+        wallet looks as if it never touched it. They are fetched again if the symbol is traded again."""
+        traded = {op.trade.symbol for op in self.operations if isinstance(op, Buy | Sell)}
+        operations = tuple(op for op in self.operations if not (isinstance(op, Split) and op.symbol not in traded))
+        checked = {symbol: period for symbol, period in self.checked.items() if symbol in traded}
+        if operations == self.operations and checked == self.checked:
+            return self
+        return replace(self, operations=operations, checked=checked)
 
     def _get(self, operation_id: UUID) -> Operation:
         for op in self.operations:

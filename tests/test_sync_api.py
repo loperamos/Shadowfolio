@@ -153,3 +153,45 @@ def test_the_daily_sync_also_checks_trades_recorded_before_periods_existed(actio
 
     assert client.post("/api/sync").json() == {"wallets": 1, "splits_added": 1}
     assert client.get(f"/api/wallets/{wallet_id}").json()["holdings"] == {"NVDA": "80"}
+
+
+def operations_of(client: TestClient, wallet_id: str) -> list[dict[str, Any]]:
+    operations: list[dict[str, Any]] = client.get(f"/api/wallets/{wallet_id}/operations").json()
+    return operations
+
+
+def test_removing_the_last_trade_of_a_symbol_removes_its_splits_and_checked_period(
+    client: TestClient, actions: CountingCorporateActions
+) -> None:
+    wallet_id = new_wallet(client)
+    trade(client, wallet_id, "buys", "8", "2024-05-01T15:00:00Z")
+    buy_id = next(op["id"] for op in operations_of(client, wallet_id) if op["type"] == "buy")
+
+    wallet = client.delete(f"/api/wallets/{wallet_id}/operations/{buy_id}").json()
+    assert [op["type"] for op in operations_of(client, wallet_id)] == ["deposit"]
+    assert (wallet["holdings"], wallet["splits_checked_through"]) == ({}, None)
+
+    # Trading it again checks its splits again.
+    calls_before = len(actions.calls)
+    assert trade(client, wallet_id, "buys", "8", "2024-05-01T15:00:00Z")["holdings"] == {"NVDA": "80"}
+    assert len(actions.calls) == calls_before + 1
+
+
+def test_editing_the_last_trade_into_another_symbol_cleans_up_the_old_one(client: TestClient) -> None:
+    wallet_id = new_wallet(client)
+    trade(client, wallet_id, "buys", "8", "2024-05-01T15:00:00Z")
+    buy_id = next(op["id"] for op in operations_of(client, wallet_id) if op["type"] == "buy")
+    body = {"type": "buy", "symbol": "AAPL", "quantity": "8", "price": "170", "price_currency": "USD", "timestamp": "2024-05-01T15:00:00Z"}
+
+    assert client.put(f"/api/wallets/{wallet_id}/operations/{buy_id}", json=body).json()["holdings"] == {"AAPL": "8"}
+    assert [(op["type"], op["symbol"]) for op in operations_of(client, wallet_id)] == [("deposit", None), ("buy", "AAPL")]
+
+
+def test_a_split_when_no_shares_were_held_is_marked_as_without_effect(client: TestClient) -> None:
+    wallet_id = new_wallet(client)
+    trade(client, wallet_id, "buys", "8", "2024-05-01T15:00:00Z")
+    trade(client, wallet_id, "sells", "8", "2024-05-20T15:00:00Z")  # sold before the split
+    trade(client, wallet_id, "buys", "5", "2024-08-01T15:00:00Z", price="120")
+
+    split = next(op for op in operations_of(client, wallet_id) if op["type"] == "split")
+    assert split["had_effect"] is False

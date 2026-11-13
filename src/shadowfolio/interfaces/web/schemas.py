@@ -140,9 +140,10 @@ class OperationResponse(BaseModel):
     split_old_rate: Decimal | None = None
     split_new_rate: Decimal | None = None
     automatic: bool = False  # added by the system from market data; cannot be edited or deleted
+    had_effect: bool = True  # false for a split when no shares of its symbol were held then
 
     @classmethod
-    def from_operation(cls, operation: Operation) -> "OperationResponse":
+    def from_operation(cls, operation: Operation, had_effect: bool = True) -> "OperationResponse":
         match operation:
             case Deposit() | Withdrawal():
                 return cls(id=operation.id, type=operation.type, timestamp=operation.timestamp, amount=operation.amount, fees=Decimal(0))
@@ -171,6 +172,7 @@ class OperationResponse(BaseModel):
                     split_old_rate=operation.old_rate,
                     split_new_rate=operation.new_rate,
                     automatic=True,
+                    had_effect=had_effect,
                 )
 
 

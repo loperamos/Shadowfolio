@@ -150,6 +150,8 @@ type DetailsProps = Loaded & {
 };
 
 function WalletDetails({ wallet, operations, version, onEditOperation, onDeleteOperation }: DetailsProps) {
+  // Splits that changed nothing (no shares held on their date) are left out: they only add noise.
+  const shownOperations = operations.filter((op) => op.had_effect !== false);
   const holdings = Object.entries(wallet.holdings);
   const valuation = useWalletValuation(wallet.id, version);
   return (
@@ -233,7 +235,7 @@ function WalletDetails({ wallet, operations, version, onEditOperation, onDeleteO
         <Title order={2} mb="sm">
           Operations
         </Title>
-        {operations.length === 0 ? (
+        {shownOperations.length === 0 ? (
           <Text c="dimmed">No operations yet. Use “Add operation” to record deposits and trades at their real dates.</Text>
         ) : (
           <Table.ScrollContainer minWidth={TABLE_MIN_WIDTH}>
@@ -252,7 +254,7 @@ function WalletDetails({ wallet, operations, version, onEditOperation, onDeleteO
             </Table.Thead>
             <Table.Tbody>
               {/* Newest first, as in a statement. */}
-              {[...operations].reverse().map((op) => (
+              {[...shownOperations].reverse().map((op) => (
                 <Table.Tr key={op.id}>
                   {/* A split is a date-only event (its ex-date), so it shows no time. */}
                   <Table.Td>{op.type === OperationType.SPLIT ? formatDate(op.timestamp.slice(0, 10)) : formatDateTime(op.timestamp)}</Table.Td>

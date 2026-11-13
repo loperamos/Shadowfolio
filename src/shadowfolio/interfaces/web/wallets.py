@@ -72,6 +72,6 @@ def wallets_router(wallets: Wallets) -> APIRouter:
         wallet = wallets.get(wallet_id)
         if wallet is None:
             raise wallet_not_found()
-        return [OperationResponse.from_operation(op) for op in wallet.operations]
+        return [OperationResponse.from_operation(op, had_effect=wallet.had_effect(op)) for op in wallet.operations]
 
     return router

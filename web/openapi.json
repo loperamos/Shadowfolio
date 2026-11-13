@@ -1338,6 +1338,11 @@
             "type": "boolean",
             "title": "Automatic",
             "default": false
+          },
+          "had_effect": {
+            "type": "boolean",
+            "title": "Had Effect",
+            "default": true
           }
         },
         "type": "object",
