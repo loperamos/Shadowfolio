@@ -5,8 +5,11 @@ import { currentValuation, type ValuationResponse } from "../api/generated";
 
 export type ValuationState = { status: "loading" } | { status: "error"; message: string } | { status: "loaded"; valuation: ValuationResponse };
 
-/** The wallet valued at the latest prices. Loads on its own, so a slow or failing valuation never blocks a page. */
-export function useWalletValuation(walletId: string): ValuationState {
+/**
+ * The wallet valued at the latest prices. Loads on its own, so a slow or failing valuation never blocks a page.
+ * Change `refreshKey` to load it again, e.g. after the wallet's history changed.
+ */
+export function useWalletValuation(walletId: string, refreshKey = 0): ValuationState {
   const [state, setState] = useState<ValuationState>({ status: "loading" });
 
   useEffect(() => {
@@ -22,7 +25,7 @@ export function useWalletValuation(walletId: string): ValuationState {
     return () => {
       current = false;
     };
-  }, [walletId]);
+  }, [walletId, refreshKey]);
 
   return state;
 }

@@ -26,11 +26,9 @@ class CopyWalletRequest(BaseModel):
     name: str
 
 
-class AmountRequest(BaseModel):
-    amount: Decimal
+class CashMovementRequest(BaseModel):
+    """A deposit or a withdrawal."""
 
-
-class DepositRequest(BaseModel):
     amount: Decimal
     timestamp: AwareDatetime | None = None  # defaults to now
 

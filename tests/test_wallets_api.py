@@ -73,6 +73,17 @@ def test_withdrawal_takes_cash_out_and_is_recorded(client: TestClient) -> None:
     assert [(op["type"], op["amount"]) for op in operations] == [("deposit", "100"), ("withdrawal", "30.50")]
 
 
+def test_past_withdrawal_must_fit_the_cash_at_that_time(client: TestClient) -> None:
+    wallet_id = create_wallet(client, "0")
+    fund_in_the_past(client, wallet_id, "1000")  # on 2024-01-02
+
+    before_funding = client.post(f"/api/wallets/{wallet_id}/withdrawals", json={"amount": "10", "timestamp": "2023-12-31T09:00:00Z"})
+    assert before_funding.status_code == 422
+    after_funding = client.post(f"/api/wallets/{wallet_id}/withdrawals", json={"amount": "10", "timestamp": "2024-02-01T09:00:00Z"})
+    assert after_funding.json()["cash"] == "990"
+    assert client.get(f"/api/wallets/{wallet_id}/operations").json()[-1]["timestamp"] == "2024-02-01T09:00:00Z"
+
+
 def test_withdrawing_more_than_cash_is_rejected(client: TestClient) -> None:
     wallet_id = create_wallet(client, "100")
 

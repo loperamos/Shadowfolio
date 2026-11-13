@@ -1,4 +1,5 @@
-import { Alert, Anchor, Breadcrumbs, Group, Loader, Stack, Table, Text, Title, Tooltip } from "@mantine/core";
+import { Alert, Anchor, Breadcrumbs, Button, Group, Loader, Stack, Table, Text, Title, Tooltip } from "@mantine/core";
+import { IconPlus } from "@tabler/icons-react";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 
@@ -7,6 +8,8 @@ import { getWallet, listOperations, type OperationResponse, renameWallet, type W
 import { walletPath, WALLETS_PATH } from "../routes";
 import { EditableTitle } from "../ui/EditableTitle";
 import { formatDate, formatDateTime, shortDecimal } from "../ui/format";
+import { ICON_SIZE } from "../ui/theme";
+import { AddOperationModal } from "./AddOperationModal";
 import { DeleteWalletsModal } from "./DeleteWalletsModal";
 import { DuplicateWalletModal } from "./DuplicateWalletModal";
 import { type ValuationState, useWalletValuation } from "./useWalletValuation";
@@ -26,11 +29,15 @@ export function WalletPage() {
   const navigate = useNavigate();
   const [state, setState] = useState<State>({ status: "loading" });
   const [editingName, setEditingName] = useState(false);
+  const [adding, setAdding] = useState(false);
+  // Bumped after the wallet's history changes, to load it (and its value) again.
+  const [version, setVersion] = useState(0);
   const [toDuplicate, setToDuplicate] = useState<WalletResponse | null>(null);
   const [toDelete, setToDelete] = useState<WalletResponse[]>([]);
 
   useEffect(() => {
-    setState({ status: "loading" });
+    // Keep showing the wallet while it reloads; show the loader only when opening another one.
+    setState((current) => (current.status === "loaded" && current.wallet.id === walletId ? current : { status: "loading" }));
     const path = { wallet_id: walletId };
     Promise.all([getWallet({ path }), listOperations({ path })])
       .then(([wallet, operations]) => {
@@ -43,7 +50,7 @@ export function WalletPage() {
         }
       })
       .catch(() => setState({ status: "error", message: "Could not reach the backend." }));
-  }, [walletId]);
+  }, [walletId, version]);
 
   const breadcrumbs = (current: string) => (
     <Breadcrumbs mb="md">
@@ -90,9 +97,15 @@ export function WalletPage() {
           {breadcrumbs(state.wallet.name)}
           <Group justify="space-between" mb="lg">
             <EditableTitle value={state.wallet.name} editing={editingName} onEditingChange={setEditingName} onSave={rename} label="Wallet name" />
-            <WalletActionsMenu wallet={state.wallet} onRename={() => setEditingName(true)} onDuplicate={setToDuplicate} onDelete={setToDelete} />
+            <Group gap="xs" wrap="nowrap">
+              <Button leftSection={<IconPlus size={ICON_SIZE} />} onClick={() => setAdding(true)}>
+                Add operation
+              </Button>
+              <WalletActionsMenu wallet={state.wallet} onRename={() => setEditingName(true)} onDuplicate={setToDuplicate} onDelete={setToDelete} />
+            </Group>
           </Group>
-          <WalletDetails wallet={state.wallet} operations={state.operations} />
+          <WalletDetails wallet={state.wallet} operations={state.operations} version={version} />
+          <AddOperationModal wallet={state.wallet} opened={adding} onClose={() => setAdding(false)} onAdded={() => setVersion((v) => v + 1)} />
           {/* Duplicating opens the copy; deleting goes back to the list. */}
           <DuplicateWalletModal wallet={toDuplicate} onClose={() => setToDuplicate(null)} onDuplicated={(copy) => navigate(walletPath(copy.id))} />
           <DeleteWalletsModal wallets={toDelete} onClose={() => setToDelete([])} onDeleted={(allDeleted) => allDeleted && navigate(WALLETS_PATH)} />
@@ -101,9 +114,9 @@ export function WalletPage() {
   }
 }
 
-function WalletDetails({ wallet, operations }: Loaded) {
+function WalletDetails({ wallet, operations, version }: Loaded & { version: number }) {
   const holdings = Object.entries(wallet.holdings);
-  const valuation = useWalletValuation(wallet.id);
+  const valuation = useWalletValuation(wallet.id, version);
   return (
     <Stack gap="xl">
       <Group gap="xl">
@@ -162,7 +175,7 @@ function WalletDetails({ wallet, operations }: Loaded) {
           Operations
         </Title>
         {operations.length === 0 ? (
-          <Text c="dimmed">No operations yet.</Text>
+          <Text c="dimmed">No operations yet. Use “Add operation” to record deposits and trades at their real dates.</Text>
         ) : (
           <Table striped>
             <Table.Thead>

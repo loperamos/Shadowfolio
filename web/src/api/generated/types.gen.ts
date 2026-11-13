@@ -5,13 +5,19 @@ export type ClientOptions = {
 };
 
 /**
- * AmountRequest
+ * CashMovementRequest
+ *
+ * A deposit or a withdrawal.
  */
-export type AmountRequest = {
+export type CashMovementRequest = {
     /**
      * Amount
      */
     amount: number | string;
+    /**
+     * Timestamp
+     */
+    timestamp?: string | null;
 };
 
 /**
@@ -48,20 +54,6 @@ export const Currency = { USD: 'USD', EUR: 'EUR' } as const;
  * Currency
  */
 export type Currency = typeof Currency[keyof typeof Currency];
-
-/**
- * DepositRequest
- */
-export type DepositRequest = {
-    /**
-     * Amount
-     */
-    amount: number | string;
-    /**
-     * Timestamp
-     */
-    timestamp?: string | null;
-};
 
 /**
  * ErrorResponse
@@ -510,7 +502,7 @@ export type ListOperationsResponses = {
 export type ListOperationsResponse = ListOperationsResponses[keyof ListOperationsResponses];
 
 export type DepositData = {
-    body: DepositRequest;
+    body: CashMovementRequest;
     path: {
         /**
          * Wallet Id
@@ -544,7 +536,7 @@ export type DepositResponses = {
 export type DepositResponse = DepositResponses[keyof DepositResponses];
 
 export type WithdrawData = {
-    body: AmountRequest;
+    body: CashMovementRequest;
     path: {
         /**
          * Wallet Id

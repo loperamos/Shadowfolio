@@ -28,12 +28,12 @@ class History:
         self._repo.update(updated)
         return updated
 
-    def withdraw(self, wallet_id: UUID, amount: Decimal) -> Wallet | None:
-        """Take cash out of a wallet now."""
+    def withdraw(self, wallet_id: UUID, amount: Decimal, timestamp: datetime | None = None) -> Wallet | None:
+        """Take cash out of a wallet, now or at a past timestamp."""
         wallet = self._repo.get(wallet_id)
         if wallet is None:
             return None
-        updated = wallet.withdraw(uuid4(), amount, self._clock.now())
+        updated = wallet.withdraw(uuid4(), amount, self._at(timestamp))
         self._repo.update(updated)
         return updated
 

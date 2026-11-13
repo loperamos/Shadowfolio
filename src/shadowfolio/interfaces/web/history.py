@@ -6,7 +6,7 @@ from fastapi import APIRouter
 
 from shadowfolio.domain.errors import DomainError
 from shadowfolio.interfaces.web.errors import INVALID, NOT_FOUND, rule_violation, wallet_not_found
-from shadowfolio.interfaces.web.schemas import AmountRequest, DepositRequest, TradeRequest, WalletResponse
+from shadowfolio.interfaces.web.schemas import CashMovementRequest, TradeRequest, WalletResponse
 from shadowfolio.usecases.history import History
 
 
@@ -14,7 +14,7 @@ def history_router(history: History) -> APIRouter:
     router = APIRouter()
 
     @router.post("/wallets/{wallet_id}/deposits", responses=NOT_FOUND | INVALID)
-    def deposit(wallet_id: UUID, request: DepositRequest) -> WalletResponse:
+    def deposit(wallet_id: UUID, request: CashMovementRequest) -> WalletResponse:
         try:
             wallet = history.deposit(wallet_id, request.amount, request.timestamp)
         except DomainError as error:
@@ -24,9 +24,9 @@ def history_router(history: History) -> APIRouter:
         return WalletResponse.from_wallet(wallet)
 
     @router.post("/wallets/{wallet_id}/withdrawals", responses=NOT_FOUND | INVALID)
-    def withdraw(wallet_id: UUID, request: AmountRequest) -> WalletResponse:
+    def withdraw(wallet_id: UUID, request: CashMovementRequest) -> WalletResponse:
         try:
-            wallet = history.withdraw(wallet_id, request.amount)
+            wallet = history.withdraw(wallet_id, request.amount, request.timestamp)
         except DomainError as error:
             raise rule_violation(error) from error
         if wallet is None:

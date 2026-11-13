@@ -347,7 +347,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/DepositRequest"
+                "$ref": "#/components/schemas/CashMovementRequest"
               }
             }
           }
@@ -407,7 +407,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/AmountRequest"
+                "$ref": "#/components/schemas/CashMovementRequest"
               }
             }
           }
@@ -668,7 +668,7 @@
   },
   "components": {
     "schemas": {
-      "AmountRequest": {
+      "CashMovementRequest": {
         "properties": {
           "amount": {
             "anyOf": [
@@ -680,13 +680,26 @@
               }
             ],
             "title": "Amount"
+          },
+          "timestamp": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timestamp"
           }
         },
         "type": "object",
         "required": [
           "amount"
         ],
-        "title": "AmountRequest"
+        "title": "CashMovementRequest",
+        "description": "A deposit or a withdrawal."
       },
       "CopyWalletRequest": {
         "properties": {
@@ -737,38 +750,6 @@
           "EUR"
         ],
         "title": "Currency"
-      },
-      "DepositRequest": {
-        "properties": {
-          "amount": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "string"
-              }
-            ],
-            "title": "Amount"
-          },
-          "timestamp": {
-            "anyOf": [
-              {
-                "type": "string",
-                "format": "date-time"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Timestamp"
-          }
-        },
-        "type": "object",
-        "required": [
-          "amount"
-        ],
-        "title": "DepositRequest"
       },
       "ErrorResponse": {
         "properties": {
