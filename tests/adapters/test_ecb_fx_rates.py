@@ -11,7 +11,7 @@ from decimal import Decimal
 import httpx2
 import pytest
 
-from shadowfolio.adapters.ecb_fx_rates import DAILY_RATES_URL, EcbFxRates
+from shadowfolio.adapters.ecb_fx_rates import DAILY_RATES_URL, HISTORY_URL, EcbFxRates
 from shadowfolio.domain.money import Currency, FxRate
 
 DAILY_FEED = """<?xml version="1.0" encoding="UTF-8"?>
@@ -47,6 +47,31 @@ def test_currency_missing_from_the_feed_has_no_rate() -> None:
     assert adapter_serving(feed).latest_rate(Currency.EUR, Currency.USD) is None
 
 
+# Trimmed from the ECB data API's CSV: weekdays only, so a Sunday request returns the days before it.
+HISTORY_CSV = """KEY,FREQ,CURRENCY,CURRENCY_DENOM,EXR_TYPE,EXR_SUFFIX,TIME_PERIOD,OBS_VALUE,OBS_STATUS
+EXR.D.USD.EUR.SP00.A,D,USD,EUR,SP00,A,2024-06-20,1.0719,A
+EXR.D.USD.EUR.SP00.A,D,USD,EUR,SP00,A,2024-06-21,1.0688,A
+"""
+
+
+def test_historical_rate_is_the_last_published_on_or_before_the_day() -> None:
+    seen: list[httpx2.Request] = []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        seen.append(request)
+        return httpx2.Response(200, text=HISTORY_CSV)
+
+    rate = EcbFxRates(transport=httpx2.MockTransport(handler)).rate_on(Currency.EUR, Currency.USD, date(2024, 6, 23))
+
+    assert rate == FxRate(Currency.EUR, Currency.USD, Decimal("1.0688"), date(2024, 6, 21))
+    assert seen[0].url.params["endPeriod"] == "2024-06-23"
+
+
+def test_no_published_rate_in_the_period_means_none() -> None:
+    adapter = EcbFxRates(transport=httpx2.MockTransport(lambda request: httpx2.Response(404, text="No results found.")))
+    assert adapter.rate_on(Currency.USD, Currency.EUR, date(1990, 1, 1)) is None
+
+
 @pytest.mark.live
 def test_real_feed_has_the_shape_the_fake_uses() -> None:
     response = httpx2.get(DAILY_RATES_URL)
@@ -57,3 +82,14 @@ def test_real_feed_has_the_shape_the_fake_uses() -> None:
     usd = [cube for cube in day if cube.attrib.get("currency") == "USD"]
     assert len(usd) == 1
     assert Decimal(usd[0].attrib["rate"]) > 0
+
+
+@pytest.mark.live
+def test_real_history_has_the_shape_the_fake_uses() -> None:
+    response = httpx2.get(
+        HISTORY_URL.format(currency="USD"), params={"startPeriod": "2024-06-16", "endPeriod": "2024-06-23", "format": "csvdata"}
+    )
+
+    assert response.status_code == 200
+    header = response.text.splitlines()[0].split(",")
+    assert {"TIME_PERIOD", "OBS_VALUE"} <= set(header)

@@ -6,7 +6,7 @@ adapter must never be wired into production.
 
 import json
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from http import HTTPStatus
 from urllib.parse import quote
@@ -21,6 +21,8 @@ BASE_URL = "https://data.alpaca.markets"
 # The free plan only includes the IEX exchange's feed.
 FEED = "iex"
 TIMEOUT_SECONDS = 10.0
+# How far after a requested time to look for the next traded price (covers nights, weekends and holidays).
+BAR_LOOKAHEAD = timedelta(days=7)
 # Alpaca answers these for symbols it does not know.
 _UNKNOWN_SYMBOL_STATUSES = {HTTPStatus.NOT_FOUND, HTTPStatus.UNPROCESSABLE_ENTITY}
 
@@ -59,3 +61,28 @@ class AlpacaPriceData(PriceData):
             as_of=datetime.fromisoformat(trade["t"]),
             previous_close=Decimal(previous_bar["c"]) if previous_bar else None,
         )
+
+    def price_at(self, symbol: str, at: datetime) -> Quote | None:
+        """The open of the first one-minute bar at or after `at`. Raw prices (not adjusted for later splits), as traded then."""
+        params: dict[str, str | int] = {
+            "timeframe": "1Min",
+            "start": _rfc3339(at),
+            "end": _rfc3339(at + BAR_LOOKAHEAD),
+            "limit": 1,
+            "sort": "asc",
+            "adjustment": "raw",
+            "feed": FEED,
+        }
+        response = self._client.get(f"/v2/stocks/{quote(symbol, safe='')}/bars", params=params)
+        if response.status_code in _UNKNOWN_SYMBOL_STATUSES:
+            return None
+        response.raise_for_status()
+        # Unknown symbols also come back as 200, with no bars.
+        bars = json.loads(response.text, parse_float=Decimal).get("bars") or []
+        if not bars:
+            return None
+        return Quote(price=Decimal(bars[0]["o"]), currency=Currency.USD, as_of=datetime.fromisoformat(bars[0]["t"]))
+
+
+def _rfc3339(moment: datetime) -> str:
+    return moment.astimezone(UTC).isoformat().replace("+00:00", "Z")

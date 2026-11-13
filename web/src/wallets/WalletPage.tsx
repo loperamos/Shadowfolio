@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 
 import { apiErrorMessage } from "../api/errors";
-import { getWallet, listOperations, type OperationResponse, renameWallet, type WalletResponse } from "../api/generated";
+import { getWallet, listOperations, type OperationResponse, PriceSource, renameWallet, type WalletResponse } from "../api/generated";
 import { walletPath, WALLETS_PATH } from "../routes";
 import { EditableTitle } from "../ui/EditableTitle";
 import { GainText } from "../ui/GainText";
@@ -17,6 +17,7 @@ import { OperationModal } from "./OperationModal";
 import { DeleteWalletsModal } from "./DeleteWalletsModal";
 import { DuplicateWalletModal } from "./DuplicateWalletModal";
 import { type ValuationState, useWalletValuation } from "./useWalletValuation";
+import { HindsightBadge, MarketPriceBadge } from "./HindsightBadges";
 import { WalletActionsMenu } from "./WalletActionsMenu";
 import { WalletDayChange, WalletGain, WalletValue } from "./WalletValue";
 
@@ -106,7 +107,10 @@ export function WalletPage() {
         <>
           {breadcrumbs(state.wallet.name)}
           <Group justify="space-between" mb="lg">
-            <EditableTitle value={state.wallet.name} editing={editingName} onEditingChange={setEditingName} onSave={rename} label="Wallet name" />
+            <Group gap="sm" wrap="nowrap">
+              <EditableTitle value={state.wallet.name} editing={editingName} onEditingChange={setEditingName} onSave={rename} label="Wallet name" />
+              {state.wallet.hindsight && <HindsightBadge />}
+            </Group>
             <Group gap="xs" wrap="nowrap">
               <Button leftSection={<IconPlus size={ICON_SIZE} />} onClick={() => setOperationDialog({ operation: null })}>
                 Add operation
@@ -252,7 +256,14 @@ function WalletDetails({ wallet, operations, version, onEditOperation, onDeleteO
                   <Table.Td tt="capitalize">{op.type}</Table.Td>
                   <Table.Td>{op.symbol ?? ""}</Table.Td>
                   <Table.Td ta="right">{op.quantity ?? ""}</Table.Td>
-                  <Table.Td ta="right">{op.price != null && op.price_currency && <Money amount={op.price} currency={op.price_currency} />}</Table.Td>
+                  <Table.Td ta="right">
+                    {op.price != null && op.price_currency && (
+                      <Group gap={6} justify="flex-end" wrap="nowrap">
+                        {op.price_source === PriceSource.MARKET && <MarketPriceBadge />}
+                        <Money amount={op.price} currency={op.price_currency} />
+                      </Group>
+                    )}
+                  </Table.Td>
                   <Table.Td ta="right">
                     <Money amount={op.amount} currency={wallet.currency} />
                   </Table.Td>

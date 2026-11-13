@@ -1,6 +1,8 @@
 """Contract every WalletRepository adapter must meet, run against each one."""
 
+import sqlite3
 from collections.abc import Callable
+from contextlib import closing
 from dataclasses import replace
 from datetime import UTC, datetime
 from decimal import Decimal
@@ -12,7 +14,7 @@ import pytest
 from shadowfolio.adapters.in_memory_wallet_repository import InMemoryWalletRepository
 from shadowfolio.adapters.sqlite_wallet_repository import SqliteWalletRepository
 from shadowfolio.domain.money import Currency
-from shadowfolio.domain.operations import Trade
+from shadowfolio.domain.operations import PriceSource, Trade
 from shadowfolio.domain.wallet import Wallet
 from shadowfolio.ports.wallet_repository import WalletRepository
 
@@ -92,6 +94,26 @@ def test_update_stores_changed_and_removed_operations(make_repository: Repositor
     make_repository().update(changed)
 
     assert make_repository().get(wallet.id) == changed
+
+
+def test_a_market_priced_trade_keeps_its_price_source(make_repository: RepositoryFactory) -> None:
+    market = Trade("NVDA", Decimal("1"), Decimal("122.005"), Currency.USD, PriceSource.MARKET)
+    wallet = a_wallet().buy(uuid4(), market, T2, settled_amount=Decimal("113.99"))
+    make_repository().add(wallet)
+
+    stored = make_repository().get(wallet.id)
+    assert stored == wallet
+    assert stored is not None and stored.hindsight
+
+
+def test_sqlite_upgrades_a_database_created_before_price_sources(tmp_path: Path) -> None:
+    path = tmp_path / "old.db"
+    wallet = a_wallet().buy(uuid4(), Trade("NVDA", Decimal("1"), Decimal("121.81"), Currency.USD), T2, settled_amount=Decimal("113.80"))
+    SqliteWalletRepository(path).add(wallet)
+    with closing(sqlite3.connect(path)) as conn, conn:  # back to the schema before the price_source column
+        conn.execute("ALTER TABLE operations DROP COLUMN price_source")
+
+    assert SqliteWalletRepository(path).get(wallet.id) == wallet
 
 
 def test_unknown_wallet_is_none(make_repository: RepositoryFactory) -> None:

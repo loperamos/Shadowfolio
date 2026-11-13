@@ -17,14 +17,14 @@ export type BuyEdit = {
      */
     quantity: number | string;
     /**
-     * Price
-     */
-    price: number | string;
-    price_currency: Currency;
-    /**
      * Timestamp
      */
     timestamp: string;
+    /**
+     * Price
+     */
+    price?: number | string | null;
+    price_currency?: Currency | null;
     /**
      * Settled Amount
      */
@@ -242,6 +242,7 @@ export type OperationResponse = {
      */
     price?: string | null;
     price_currency?: Currency | null;
+    price_source?: PriceSource | null;
 };
 
 /**
@@ -258,6 +259,16 @@ export const OperationType = {
  * OperationType
  */
 export type OperationType = typeof OperationType[keyof typeof OperationType];
+
+/**
+ * PriceSource
+ */
+export const PriceSource = { ENTERED: 'entered', MARKET: 'market' } as const;
+
+/**
+ * PriceSource
+ */
+export type PriceSource = typeof PriceSource[keyof typeof PriceSource];
 
 /**
  * QuoteResponse
@@ -305,14 +316,14 @@ export type SellEdit = {
      */
     quantity: number | string;
     /**
-     * Price
-     */
-    price: number | string;
-    price_currency: Currency;
-    /**
      * Timestamp
      */
     timestamp: string;
+    /**
+     * Price
+     */
+    price?: number | string | null;
+    price_currency?: Currency | null;
     /**
      * Settled Amount
      */
@@ -340,14 +351,14 @@ export type TradeRequest = {
      */
     quantity: number | string;
     /**
-     * Price
-     */
-    price: number | string;
-    price_currency: Currency;
-    /**
      * Timestamp
      */
     timestamp: string;
+    /**
+     * Price
+     */
+    price?: number | string | null;
+    price_currency?: Currency | null;
     /**
      * Settled Amount
      */
@@ -430,6 +441,10 @@ export type WalletResponse = {
      * Realized Gain
      */
     realized_gain: string;
+    /**
+     * Hindsight
+     */
+    hindsight: boolean;
 };
 
 /**

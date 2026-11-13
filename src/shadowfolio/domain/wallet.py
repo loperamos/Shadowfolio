@@ -18,7 +18,7 @@ from shadowfolio.domain.errors import (
 )
 from shadowfolio.domain.ledger import Ledger, build_ledger
 from shadowfolio.domain.money import Currency
-from shadowfolio.domain.operations import Buy, Deposit, Operation, Sell, Trade, Withdrawal
+from shadowfolio.domain.operations import Buy, Deposit, Operation, PriceSource, Sell, Trade, Withdrawal
 
 
 @dataclass(frozen=True)
@@ -36,6 +36,11 @@ class Wallet:
     @property
     def cash(self) -> Decimal:
         return sum((op.cash_delta for op in self.operations), Decimal(0))
+
+    @property
+    def hindsight(self) -> bool:
+        """Whether any trade was priced from market data after the fact, so results are not a forward test."""
+        return any(isinstance(op, Buy | Sell) and op.trade.price_source is PriceSource.MARKET for op in self.operations)
 
     @property
     def ledger(self) -> Ledger:

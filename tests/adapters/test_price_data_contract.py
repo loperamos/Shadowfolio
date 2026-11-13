@@ -23,10 +23,16 @@ KNOWN_SYMBOL = "NVDA"
 UNKNOWN_SYMBOL = "ZZZZZZZZ"
 
 
+# A minute the market was open.
+TRADING_MINUTE = datetime(2024, 6, 24, 14, 26, tzinfo=UTC)
+
+
 def _in_memory() -> PriceData:
-    return InMemoryPriceData(
+    prices = InMemoryPriceData(
         {KNOWN_SYMBOL: Quote(Decimal("135.50"), Currency.USD, datetime(2026, 3, 2, 21, 0, tzinfo=UTC), Decimal("133.04"))}
     )
+    prices.add_bar(KNOWN_SYMBOL, Quote(Decimal("122.005"), Currency.USD, TRADING_MINUTE))
+    return prices
 
 
 def _alpaca() -> PriceData:
@@ -59,3 +65,17 @@ def test_known_symbol_has_a_usable_quote(prices: PriceData) -> None:
 
 def test_unknown_symbol_has_no_price(prices: PriceData) -> None:
     assert prices.latest_price(UNKNOWN_SYMBOL) is None
+
+
+def test_historical_price_is_at_or_after_the_requested_time(prices: PriceData) -> None:
+    quote = prices.price_at(KNOWN_SYMBOL, TRADING_MINUTE)
+
+    assert quote is not None
+    assert quote.as_of >= TRADING_MINUTE
+    assert isinstance(quote.price, Decimal)
+    assert quote.price > 0
+    assert quote.currency is Currency.USD
+
+
+def test_unknown_symbol_has_no_historical_price(prices: PriceData) -> None:
+    assert prices.price_at(UNKNOWN_SYMBOL, TRADING_MINUTE) is None

@@ -22,14 +22,20 @@ class OperationType(StrEnum):
     SELL = "sell"
 
 
+class PriceSource(StrEnum):
+    ENTERED = "entered"  # the price the broker reported, typed in: a record of a real trade
+    MARKET = "market"  # filled from historical market data: a simulation, built with hindsight
+
+
 @dataclass(frozen=True)
 class Trade:
-    """What was traded, as the broker reports it. The price is in the listing's currency."""
+    """What was traded. The price is in the listing's currency."""
 
     symbol: str
     quantity: Decimal
     price: Decimal
     price_currency: Currency
+    price_source: PriceSource = PriceSource.ENTERED
 
 
 @dataclass(frozen=True)

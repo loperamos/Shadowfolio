@@ -1,10 +1,11 @@
-import { Alert, Anchor, Checkbox, Loader, Table, Text } from "@mantine/core";
+import { Alert, Anchor, Checkbox, Group, Loader, Table, Text } from "@mantine/core";
 import { Link } from "react-router";
 
 import type { WalletResponse } from "../api/generated";
 import { walletPath } from "../routes";
 import { Money } from "../ui/Money";
 import { TABLE_MIN_WIDTH } from "../ui/theme";
+import { HindsightBadge } from "./HindsightBadges";
 import { useWalletValuation } from "./useWalletValuation";
 import { WalletActionsMenu } from "./WalletActionsMenu";
 import { WalletDayChange, WalletGain, WalletValue } from "./WalletValue";
@@ -72,9 +73,12 @@ export function WalletTable({ wallets, error, selectedIds, onSelectionChange, on
               <Checkbox aria-label={`Select ${wallet.name}`} checked={selectedIds.has(wallet.id)} onChange={() => toggle(wallet.id)} />
             </Table.Td>
             <Table.Td>
-              <Anchor component={Link} to={walletPath(wallet.id)}>
-                {wallet.name}
-              </Anchor>
+              <Group gap="xs" wrap="nowrap">
+                <Anchor component={Link} to={walletPath(wallet.id)}>
+                  {wallet.name}
+                </Anchor>
+                {wallet.hindsight && <HindsightBadge />}
+              </Group>
             </Table.Td>
             <Table.Td ta="right">
               <Money amount={wallet.cash} currency={wallet.currency} />

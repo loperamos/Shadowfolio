@@ -10,6 +10,7 @@ import {
   editOperation,
   type OperationResponse,
   OperationType,
+  PriceSource,
   recordBuy,
   recordSell,
   type WalletResponse,
@@ -66,17 +67,23 @@ function OperationForm({ wallet, operation, onClose, onSaved }: Omit<Props, "ope
   const [amount, setAmount] = useState(operation && !isTradeOperation ? operation.amount : "");
   const [symbol, setSymbol] = useState(operation?.symbol ?? "");
   const [quantity, setQuantity] = useState(operation?.quantity ?? "");
-  const [price, setPrice] = useState(operation?.price ?? "");
+  // Empty means "price it from market data". A market-priced trade being edited starts empty again, so it stays one.
+  const [price, setPrice] = useState(operation?.price_source === PriceSource.MARKET ? "" : (operation?.price ?? ""));
   const [priceCurrency, setPriceCurrency] = useState<Currency>(operation?.price_currency ?? DEFAULT_PRICE_CURRENCY);
   // For a trade, the stored amount is what the broker settled; it is only asked for when the price is in another currency.
-  const [settledAmount, setSettledAmount] = useState(isTradeOperation && operation.price_currency !== wallet.currency ? operation.amount : "");
+  const [settledAmount, setSettledAmount] = useState(
+    isTradeOperation && operation.price_source !== PriceSource.MARKET && operation.price_currency !== wallet.currency ? operation.amount : "",
+  );
   const [fees, setFees] = useState(operation && Number(operation.fees) !== 0 ? operation.fees : "");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   const isTrade = type === OperationType.BUY || type === OperationType.SELL;
   // A trade priced in another currency needs the amount the broker settled in the wallet's currency.
-  const needsSettledAmount = isTrade && priceCurrency !== wallet.currency;
+  const usesMarketPrice = isTrade && price.trim() === "";
+  // A trade with the broker's price in another currency needs the amount settled in the wallet's currency;
+  // a market-priced one gets it computed from that day's exchange rate.
+  const needsSettledAmount = isTrade && !usesMarketPrice && priceCurrency !== wallet.currency;
 
   async function send() {
     const path = { wallet_id: wallet.id };
@@ -92,9 +99,9 @@ function OperationForm({ wallet, operation, onClose, onSaved }: Omit<Props, "ope
     const body = {
       symbol: symbol.trim().toUpperCase(),
       quantity,
-      price,
-      price_currency: priceCurrency,
       timestamp,
+      // Without a price, the backend fills it from market data at that time.
+      ...(usesMarketPrice ? {} : { price, price_currency: priceCurrency }),
       settled_amount: needsSettledAmount ? settledAmount : null,
       ...(fees.trim() ? { fees } : {}),
     };
@@ -184,11 +191,19 @@ function OperationForm({ wallet, operation, onClose, onSaved }: Omit<Props, "ope
           <SimpleGrid cols={2}>
             <TextInput label="Symbol" placeholder="NVDA" required value={symbol} onChange={(e) => setSymbol(e.currentTarget.value)} />
             <TextInput label="Quantity" inputMode="decimal" required value={quantity} onChange={(e) => setQuantity(e.currentTarget.value)} />
-            <TextInput label="Price per share" inputMode="decimal" required value={price} onChange={(e) => setPrice(e.currentTarget.value)} />
+            <TextInput
+              label="Price per share"
+              placeholder="Market price"
+              inputMode="decimal"
+              value={price}
+              onChange={(e) => setPrice(e.currentTarget.value)}
+            />
             <Select
               label="Price currency"
               data={CURRENCIES}
               allowDeselect={false}
+              // A market price comes with its own currency.
+              disabled={usesMarketPrice}
               value={priceCurrency}
               onChange={(value) => value && setPriceCurrency(value as Currency)}
             />
@@ -206,6 +221,12 @@ function OperationForm({ wallet, operation, onClose, onSaved }: Omit<Props, "ope
           </SimpleGrid>
         )}
 
+        {usesMarketPrice && (
+          <Alert color="yellow" variant="light">
+            Without a price, the trade is priced from market data: the first price traded at or after its time, converted at that
+            day&apos;s exchange rate. The wallet will be marked as built with hindsight.
+          </Alert>
+        )}
         {needsSettledAmount && (
           <TextInput
             label={`Amount in ${wallet.currency}, before fees`}

@@ -8,7 +8,7 @@ from uuid import UUID
 from pydantic import AwareDatetime, BaseModel, Field
 
 from shadowfolio.domain.money import Currency
-from shadowfolio.domain.operations import Buy, Deposit, Operation, OperationType, Sell, Trade, Withdrawal
+from shadowfolio.domain.operations import Buy, Deposit, Operation, OperationType, PriceSource, Sell, Withdrawal
 from shadowfolio.domain.valuation import WalletValuation
 from shadowfolio.domain.wallet import Wallet
 
@@ -37,17 +37,15 @@ class CashMovementRequest(BaseModel):
 class TradeRequest(BaseModel):
     symbol: str
     quantity: Decimal
-    price: Decimal
-    price_currency: Currency
     timestamp: AwareDatetime
-    # Cash that left (buy) or entered (sell) the wallet before fees, in the wallet's currency,
-    # as the broker reports it.
-    # Required when price_currency differs from the wallet's currency.
+    # The price the broker reported, with its currency. Leave both out to price the trade from market data
+    # at `timestamp`; the trade is then marked as priced with hindsight.
+    price: Decimal | None = None
+    price_currency: Currency | None = None
+    # Cash that left (buy) or entered (sell) the wallet before fees, in the wallet's currency, as the broker
+    # reports it. Required when price_currency differs from the wallet's currency; computed for market prices.
     settled_amount: Decimal | None = None
     fees: Decimal = Decimal(0)
-
-    def to_trade(self) -> Trade:
-        return Trade(self.symbol, self.quantity, self.price, self.price_currency)
 
 
 # Replacing an operation: the same fields as recording one, plus its type, which may change.
@@ -98,6 +96,7 @@ class WalletResponse(BaseModel):
     holdings: dict[str, Decimal]
     cost_basis: dict[str, Decimal]  # what each holding cost, in the wallet's currency (FIFO, fees included)
     realized_gain: Decimal  # from all sells so far, in the wallet's currency
+    hindsight: bool  # some trade was priced from market data after the fact, so results are not a forward test
 
     @classmethod
     def from_wallet(cls, wallet: Wallet) -> "WalletResponse":
@@ -110,6 +109,7 @@ class WalletResponse(BaseModel):
             holdings=wallet.holdings,
             cost_basis={symbol: _cents(position.cost) for symbol, position in ledger.positions.items()},
             realized_gain=_cents(ledger.realized_gain),
+            hindsight=wallet.hindsight,
         )
 
 
@@ -123,6 +123,7 @@ class OperationResponse(BaseModel):
     quantity: Decimal | None = None
     price: Decimal | None = None
     price_currency: Currency | None = None
+    price_source: PriceSource | None = None  # trades only: entered (from the broker) or market (filled from market data)
 
     @classmethod
     def from_operation(cls, operation: Operation) -> "OperationResponse":
@@ -141,6 +142,7 @@ class OperationResponse(BaseModel):
                     quantity=trade.quantity,
                     price=trade.price,
                     price_currency=trade.price_currency,
+                    price_source=trade.price_source,
                 )
 
 

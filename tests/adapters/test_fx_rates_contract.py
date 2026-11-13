@@ -14,11 +14,17 @@ from shadowfolio.adapters.in_memory_fx_rates import InMemoryFxRates
 from shadowfolio.domain.money import Currency, FxRate
 from shadowfolio.ports.fx_rates import FxRates
 
+# 23 June 2024 is a Sunday: no rate is published; the Friday before (21 June) applies.
+SUNDAY = date(2024, 6, 23)
+FRIDAY = date(2024, 6, 21)
+
 
 def _in_memory() -> FxRates:
     day = date(2026, 11, 12)
     return InMemoryFxRates(
-        FxRate(Currency.EUR, Currency.USD, Decimal("1.1081"), day), FxRate(Currency.USD, Currency.EUR, Decimal(1) / Decimal("1.1081"), day)
+        FxRate(Currency.EUR, Currency.USD, Decimal("1.1081"), day),
+        FxRate(Currency.USD, Currency.EUR, Decimal(1) / Decimal("1.1081"), day),
+        FxRate(Currency.EUR, Currency.USD, Decimal("1.0688"), FRIDAY),
     )
 
 
@@ -45,3 +51,12 @@ def test_opposite_rates_are_inverses(fx_rates: FxRates) -> None:
 
     assert there is not None and back is not None
     assert abs(there.rate * back.rate - 1) < Decimal("1e-12")
+
+
+def test_rate_on_a_day_without_one_is_the_last_published_before_it(fx_rates: FxRates) -> None:
+    rate = fx_rates.rate_on(Currency.EUR, Currency.USD, SUNDAY)
+
+    assert rate is not None
+    assert rate.as_of == FRIDAY
+    assert isinstance(rate.rate, Decimal)
+    assert rate.rate > 0

@@ -28,7 +28,7 @@ def build_test_app(clock: Clock | None = None, prices: PriceData | None = None, 
     wallet_repository = InMemoryWalletRepository()
     return create_app(
         wallets=Wallets(wallet_repository, clock),
-        history=History(wallet_repository, clock),
+        history=History(wallet_repository, clock, prices, fx_rates),
         valuation=Valuation(wallet_repository, prices, fx_rates),
         market=Market(prices),
     )

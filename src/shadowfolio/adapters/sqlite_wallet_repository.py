@@ -8,7 +8,7 @@ from pathlib import Path
 from uuid import UUID
 
 from shadowfolio.domain.money import Currency
-from shadowfolio.domain.operations import Buy, Deposit, Operation, OperationType, Sell, Trade, Withdrawal
+from shadowfolio.domain.operations import Buy, Deposit, Operation, OperationType, PriceSource, Sell, Trade, Withdrawal
 from shadowfolio.domain.wallet import Wallet
 from shadowfolio.ports.wallet_repository import WalletRepository
 
@@ -29,9 +29,14 @@ CREATE TABLE IF NOT EXISTS operations (
     symbol TEXT,
     quantity TEXT,
     price TEXT,
-    price_currency TEXT
+    price_currency TEXT,
+    price_source TEXT
 );
 """
+
+# Columns added after a database may already exist, with what existing rows get. Trades stored before
+# price_source existed were all typed in from a broker.
+_ADDED_COLUMNS = {"operations": {"price_source": "TEXT DEFAULT 'entered'"}}
 
 
 class SqliteWalletRepository(WalletRepository):
@@ -40,6 +45,7 @@ class SqliteWalletRepository(WalletRepository):
         path.parent.mkdir(parents=True, exist_ok=True)
         with closing(self._connect()) as conn, conn:
             conn.executescript(_SCHEMA)
+            _add_missing_columns(conn)
 
     def add(self, wallet: Wallet) -> None:
         with closing(self._connect()) as conn, conn:
@@ -65,7 +71,7 @@ class SqliteWalletRepository(WalletRepository):
             if row is None:
                 return None
             operation_rows = conn.execute(
-                "SELECT id, type, timestamp, amount, fees, symbol, quantity, price, price_currency "
+                "SELECT id, type, timestamp, amount, fees, symbol, quantity, price, price_currency, price_source "
                 "FROM operations WHERE wallet_id = ? ORDER BY timestamp, rowid",
                 (str(wallet_id),),
             ).fetchall()
@@ -96,7 +102,7 @@ def _insert_operations(conn: sqlite3.Connection, wallet: Wallet) -> None:
     # In timeline order, so equal timestamps read back in the same order (ORDER BY timestamp, rowid).
     conn.executemany(
         "INSERT INTO operations (id, wallet_id, type, timestamp, amount, fees, "
-        "symbol, quantity, price, price_currency) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "symbol, quantity, price, price_currency, price_source) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         [_operation_to_row(wallet.id, op) for op in wallet.operations],
     )
 
@@ -119,11 +125,12 @@ def _operation_to_row(wallet_id: UUID, op: Operation) -> tuple[str | None, ...]:
         str(trade.quantity) if trade else None,
         str(trade.price) if trade else None,
         trade.price_currency.value if trade else None,
+        trade.price_source.value if trade else None,
     )
 
 
 def _operation_from_row(row: tuple[str | None, ...]) -> Operation:
-    op_id, op_type, timestamp, amount, fees, symbol, quantity, price, price_currency = row
+    op_id, op_type, timestamp, amount, fees, symbol, quantity, price, price_currency, price_source = row
     assert op_id and op_type and timestamp and amount and fees
     id_, at, value = UUID(op_id), datetime.fromisoformat(timestamp), Decimal(amount)
     match OperationType(op_type):
@@ -133,6 +140,16 @@ def _operation_from_row(row: tuple[str | None, ...]) -> Operation:
             return Withdrawal(id_, at, value)
         case OperationType.BUY | OperationType.SELL as kind:
             assert symbol and quantity and price and price_currency
-            trade = Trade(symbol, Decimal(quantity), Decimal(price), Currency(price_currency))
+            source = PriceSource(price_source) if price_source else PriceSource.ENTERED
+            trade = Trade(symbol, Decimal(quantity), Decimal(price), Currency(price_currency), source)
             trade_class = Buy if kind is OperationType.BUY else Sell
             return trade_class(id_, at, trade, value, Decimal(fees))
+
+
+def _add_missing_columns(conn: sqlite3.Connection) -> None:
+    """Brings an existing database up to the current schema by adding columns introduced since it was created."""
+    for table, columns in _ADDED_COLUMNS.items():
+        existing = {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
+        for name, definition in columns.items():
+            if name not in existing:
+                conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {definition}")

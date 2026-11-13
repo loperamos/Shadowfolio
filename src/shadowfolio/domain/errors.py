@@ -29,12 +29,16 @@ class MissingSettledAmountError(DomainError):
     """A trade in a foreign currency needs the amount settled in the wallet's currency."""
 
 
+class MissingPriceCurrencyError(DomainError):
+    """A trade's price is given without saying which currency it is in."""
+
+
 class FutureTimestampError(DomainError):
     """An operation is dated after now."""
 
 
 class PriceUnavailableError(DomainError):
-    """There is no market price for a symbol that needs one."""
+    """There is no market price for a symbol (at a time) that needs one."""
 
 
 class FxRateUnavailableError(DomainError):

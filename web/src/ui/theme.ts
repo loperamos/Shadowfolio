@@ -13,7 +13,10 @@ export const ICON_SIZE = 16;
 
 // Widths of inputs whose content always has the same length, so they don't stretch across a form.
 export const DATE_INPUT_WIDTH = rem(128); // the calendar icon, DD/MM/YYYY and the usual inner padding
-export const TIME_INPUT_WIDTH = rem(70); // HH:mm and the usual inner padding
+export const TIME_INPUT_WIDTH = rem(78); // HH:mm and the usual inner padding
 
 // Below this width, tables scroll sideways instead of squeezing their columns.
 export const TABLE_MIN_WIDTH = rem(900);
+
+// Width of tooltips that hold a sentence, so they wrap into a readable block.
+export const TOOLTIP_WIDTH = rem(260);

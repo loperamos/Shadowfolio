@@ -57,6 +57,32 @@ def test_snapshot_without_a_previous_day_has_no_previous_close() -> None:
     assert quote is not None and quote.previous_close is None
 
 
+BARS_BODY = '{"bars": [{"t": "2024-06-24T14:26:00Z", "o": 122.005, "h": 122.04, "l": 121.78, "c": 121.815, "v": 5832}], "symbol": "NVDA"}'
+
+
+def test_historical_price_is_the_open_of_the_first_minute_bar_at_or_after_the_time() -> None:
+    seen: list[httpx2.Request] = []
+    at = datetime(2024, 6, 24, 14, 26, tzinfo=UTC)
+
+    quote = adapter_answering(200, BARS_BODY, seen).price_at("NVDA", at)
+
+    assert quote == Quote(Decimal("122.005"), Currency.USD, at)
+    params = seen[0].url.params
+    assert seen[0].url.path == "/v2/stocks/NVDA/bars"
+    assert (params["timeframe"], params["start"], params["limit"], params["sort"], params["adjustment"]) == (
+        "1Min",
+        "2024-06-24T14:26:00Z",
+        "1",
+        "asc",
+        "raw",
+    )
+
+
+def test_no_bars_means_no_historical_price() -> None:
+    # Alpaca answers unknown symbols with 200 and no bars.
+    assert adapter_answering(200, '{"bars": null, "symbol": "ZZZZ"}').price_at("ZZZZ", datetime(2024, 6, 24, tzinfo=UTC)) is None
+
+
 @pytest.mark.parametrize("status", UNKNOWN_SYMBOL_STATUSES)
 def test_unknown_symbol_is_none(status: int) -> None:
     assert adapter_answering(status, '{"message": "not found"}').latest_price("ZZZZ") is None
@@ -94,3 +120,16 @@ def test_real_unknown_symbol_answers_a_status_the_fake_uses() -> None:
     response = _real_client().get("/v2/stocks/ZZZZZZZZ/snapshot", params={"feed": "iex"})
 
     assert response.status_code in UNKNOWN_SYMBOL_STATUSES
+
+
+@pytest.mark.live
+def test_real_bars_have_the_shape_the_fake_uses() -> None:
+    response = _real_client().get(
+        "/v2/stocks/NVDA/bars", params={"timeframe": "1Min", "start": "2024-06-24T14:26:00Z", "limit": 1, "feed": "iex"}
+    )
+
+    assert response.status_code == 200
+    real, fake = json.loads(response.text), json.loads(BARS_BODY)
+    assert fake.keys() <= real.keys()
+    assert fake["bars"][0].keys() <= real["bars"][0].keys()
+    assert isinstance(real["bars"][0]["o"], int | float)
