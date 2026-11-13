@@ -23,7 +23,7 @@ A hosted, subscription service where people test investing strategies against re
 - **Wallet.** One kind only. A wallet is a cash balance plus a timeline of operations. It can be created empty, with starting cash, from an import, or as a copy of another wallet at a chosen time.
 - **Operation.** Something that happened in a wallet at a timestamp: buy, sell, deposit, withdrawal, fee, dividend, split.
 - **Order.** A request to buy or sell, placed now. The fill model turns it into an operation when market prices allow it.
-- **Past operation.** A buy or sell entered at a past timestamp, such as "I bought 10 AAPL on 3 March at 14:32", or the question "what if I had sold here?". It is priced by the same fill model, using the historical price at that time. Inserting it re-validates the whole timeline: no negative cash, and no selling shares that weren't held.
+- **Past operation.** A buy, sell, deposit or withdrawal entered at a past timestamp, such as "I bought 10 AAPL on 3 March at 14:32", or the question "what if I had sold here?". A real trade keeps what the broker reported: price, fees and, for a foreign-currency price, the amount settled in the wallet's currency. When no price is given, the fill model prices it from the historical data at that time. Inserting, editing or deleting one re-validates the whole timeline: no negative cash, and no selling shares that weren't held. An edit replaces the operation in a single check, so it never fails halfway, and an operation's type cannot change.
 - **Fill model.** The rules that turn an order into a price: which price is used, market hours, fees and slippage. It never uses a price from after the order time.
 - **Access tokens.** What a caller may do is decided by its token's scope, not by the type of wallet:
   - *owner* scope: everything the user can do in the UI, including past operations and imports. For example, the user's own agent can keep a wallet in sync with their real broker.
@@ -91,11 +91,13 @@ Lesson from the prototype: the provider **must** return dividend currency explic
 ## Architecture
 
 ```text
-interfaces/     web API · MCP server · scheduler jobs      ← thin; call use cases
-usecases/       use cases (import_statement, add_operation, place_order, compare, ...)
+interfaces/     web API (under /api) · MCP server · scheduler jobs      ← thin; call use cases
+usecases/       use cases, grouped by area (wallets, history, valuation, market, ...)
 domain/         wallets, operations, ledger (FIFO), fill model, valuation, metrics — pure, no I/O
 ports/          interfaces the core depends on
 adapters/       real implementations and fakes for every port
+wiring/         one composition root per environment (test, local, production): the only place that picks adapters
+web/            the React frontend; its API client is generated from the backend's OpenAPI schema
 ```
 
 | Port | Gives the core | Adapters |
@@ -114,7 +116,7 @@ Rules:
 - The whole app must run and be tested with fakes only. Each real adapter must pass the same contract tests as its fake.
 - The web API and MCP call the same use cases; no business logic in interfaces.
 
-Stack: Python with FastAPI and Pydantic, React, and Postgres (SQLite and in-memory repositories for tests). Docker images for deployment later.
+Stack: Python with FastAPI and Pydantic; React with TypeScript, Vite and Mantine; Postgres (SQLite and in-memory repositories for local runs and tests). Docker images for deployment later.
 
 ## Hard parts
 
@@ -123,7 +125,7 @@ These get the most careful tests:
 - **Splits and dividends** applied consistently to every past view of a wallet.
 - **Import checks** before anything is saved.
 
-## Data providers (to evaluate in MVP step 8)
+## Data providers (to evaluate in the licensed-provider slice of the MVP plan)
 
 The key requirement is the right to **display data to your own paying users**; personal plans almost never allow it. Prices are indicative as of 2026-11 and must be confirmed with each vendor in writing.
 
@@ -156,18 +158,29 @@ None found combines a user's real wallet, their own agents and fair comparison i
 
 ## MVP plan
 
-1. Repo skeleton: structure, AGENTS.md, tests and CI.
-2. Domain core with fakes: wallets, ledger, FIFO, valuation. Tests only.
-3. API and minimal UI: create wallets, add past operations, view holdings and value.
-4. Orders: market and limit orders, the fill model, `Clock`, and the order-filling job.
-5. Dividends and splits: automatic, paid once, applied to every wallet.
-6. Comparison: benchmarks with the same deposits, metrics, charts, hindsight label.
-7. MCP: tokens with owner and trading scopes, wallet grants, decision log.
-8. Real data provider: trial the shortlisted providers against the contract tests and pick one.
-9. LLM import: preview, checks, confirm.
-10. Accounts, auth and hosting, then a public beta.
+Built as thin vertical slices: each one works end to end (API, use case, domain, storage and web) before the next starts.
 
-No paid subscription is needed before step 8.
+Done:
+- Skeleton: structure, AGENTS.md, tests, and CI for backend and web.
+- Wallets: create, list, rename, duplicate and delete.
+- History: deposits, withdrawals and past buys and sells at their real dates, with the broker's price, fees and settled amount; edit and delete; every change checked against the whole timeline.
+- Valuation: latest prices (Alpaca, development only) and ECB rates, one total in the wallet's currency.
+- Web: wallet list and wallet page with value, holdings and operations.
+
+Next, in order:
+1. Cost basis and gains (FIFO lots).
+2. Past operations priced from market data when no price is given: minute bars and the first fill-model rule.
+3. Splits, then dividends (`CorporateActions`).
+4. Value over time: daily bars and historical FX.
+5. Copy a wallet at time T.
+6. Orders now: market and limit orders, the fill model and the order-filling job.
+7. Comparison: benchmarks with the same deposits, metrics, charts, hindsight label.
+8. MCP: tokens with owner and trading scopes, wallet grants, decision log.
+9. Licensed data provider: trial the shortlisted providers against the contract tests and pick one.
+10. LLM import: preview, checks, confirm.
+11. Accounts, auth and hosting, then a public beta.
+
+No paid subscription is needed before the licensed-provider slice.
 
 ## Open questions
 
