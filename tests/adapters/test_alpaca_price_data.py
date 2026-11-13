@@ -6,7 +6,7 @@ real API, so the offline tests cannot drift from what Alpaca actually sends.
 
 import json
 import os
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 
 import httpx2
@@ -79,6 +79,27 @@ def test_historical_price_is_the_open_of_the_first_minute_bar_at_or_after_the_ti
     )
 
 
+DAILY_BARS_BODY = (
+    '{"bars": [{"t": "2024-06-28T04:00:00Z", "o": 124.58, "h": 127.71, "l": 122.75, "c": 123.54, "v": 31005}], "symbol": "NVDA"}'
+)
+
+
+def test_close_on_a_day_is_the_close_of_the_last_daily_bar_up_to_its_end() -> None:
+    seen: list[httpx2.Request] = []
+
+    quote = adapter_answering(200, DAILY_BARS_BODY, seen).close_on("NVDA", date(2024, 6, 30))
+
+    assert quote == Quote(Decimal("123.54"), Currency.USD, datetime(2024, 6, 28, 4, 0, tzinfo=UTC))
+    params = seen[0].url.params
+    assert (params["timeframe"], params["end"], params["limit"], params["sort"], params["adjustment"]) == (
+        "1Day",
+        "2024-06-30T23:59:59.999999Z",
+        "1",
+        "desc",
+        "raw",
+    )
+
+
 def test_no_bars_means_no_historical_price() -> None:
     # Alpaca answers unknown symbols with 200 and no bars.
     assert adapter_answering(200, '{"bars": null, "symbol": "ZZZZ"}').price_at("ZZZZ", datetime(2024, 6, 24, tzinfo=UTC)) is None
@@ -89,14 +110,16 @@ def test_unknown_symbol_is_none(status: int) -> None:
     assert adapter_answering(status, '{"message": "not found"}').latest_price("ZZZZ") is None
 
 
-@pytest.mark.parametrize("fetch", ["latest", "historical"])
+@pytest.mark.parametrize("fetch", ["latest", "historical", "close"])
 def test_other_errors_mean_prices_are_unavailable(fetch: str) -> None:
     adapter = adapter_answering(500, "oops")
     with pytest.raises(PriceDataUnavailableError):
         if fetch == "latest":
             adapter.latest_price("NVDA")
-        else:
+        elif fetch == "historical":
             adapter.price_at("NVDA", datetime(2024, 6, 24, 14, 26, tzinfo=UTC))
+        else:
+            adapter.close_on("NVDA", date(2024, 6, 30))
 
 
 def _real_client() -> httpx2.Client:

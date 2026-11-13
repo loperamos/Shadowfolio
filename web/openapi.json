@@ -719,8 +719,9 @@
     },
     "/api/wallets/{wallet_id}/valuation": {
       "get": {
-        "summary": "Current Valuation",
-        "operationId": "current_valuation",
+        "summary": "Wallet Valuation",
+        "description": "What the wallet is worth now, or, given `on`, at the end of that day at its closing prices.",
+        "operationId": "wallet_valuation",
         "parameters": [
           {
             "name": "wallet_id",
@@ -730,6 +731,23 @@
               "type": "string",
               "format": "uuid",
               "title": "Wallet Id"
+            }
+          },
+          {
+            "name": "on",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "On"
             }
           }
         ],

@@ -1,5 +1,6 @@
 """Routes for what a wallet is worth."""
 
+from datetime import date
 from uuid import UUID
 
 from fastapi import APIRouter
@@ -14,9 +15,10 @@ def valuation_router(valuation: Valuation) -> APIRouter:
     router = APIRouter()
 
     @router.get("/wallets/{wallet_id}/valuation", responses=NOT_FOUND | INVALID)
-    def current_valuation(wallet_id: UUID) -> ValuationResponse:
+    def wallet_valuation(wallet_id: UUID, on: date | None = None) -> ValuationResponse:
+        """What the wallet is worth now, or, given `on`, at the end of that day at its closing prices."""
         try:
-            result = valuation.current(wallet_id)
+            result = valuation.current(wallet_id) if on is None else valuation.on(wallet_id, on)
         except DomainError as error:
             raise rule_violation(error) from error
         if result is None:

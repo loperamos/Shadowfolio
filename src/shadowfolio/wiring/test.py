@@ -41,7 +41,7 @@ def build_test_app(
     return create_app(
         wallets=Wallets(wallet_repository, clock),
         history=History(wallet_repository, clock, prices, fx_rates, sync),
-        valuation=Valuation(wallet_repository, prices, fx_rates),
+        valuation=Valuation(wallet_repository, clock, prices, fx_rates),
         market=Market(prices),
         sync=sync,
     )

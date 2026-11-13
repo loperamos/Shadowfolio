@@ -164,3 +164,53 @@ def test_a_valuation_is_refused_cleanly_when_prices_cannot_be_fetched() -> None:
 
     response = client.get(f"/api/wallets/{wallet_id}/valuation")
     assert (response.status_code, response.json()["detail"]) == (422, "could not fetch the price of NVDA right now; try again later")
+
+
+# NVDA's close on Friday 28 June 2024, and that day's ECB rate.
+NVDA_FRIDAY_CLOSE = Quote(Decimal("123.54"), Currency.USD, datetime(2024, 6, 28, 4, 0, tzinfo=UTC))
+FRIDAY_RATE = FxRate(Currency.USD, Currency.EUR, Decimal("0.9341"), date(2024, 6, 28))
+
+
+def test_a_past_day_is_valued_at_its_last_close_and_rate(client: TestClient, prices: InMemoryPriceData, fx_rates: InMemoryFxRates) -> None:
+    wallet_id = wallet_holding(client, NVDA_BUY, TSLA_BUY)  # TSLA was bought later, in November
+    prices.add_close("NVDA", NVDA_FRIDAY_CLOSE)
+    fx_rates.set(FRIDAY_RATE)
+    fx_rates.set(FxRate(Currency.USD, Currency.EUR, Decimal("0.9025"), date(2026, 3, 2)))  # today's, not used
+
+    response = client.get(f"/api/wallets/{wallet_id}/valuation", params={"on": "2024-06-30"})  # a Sunday
+
+    assert response.status_code == 200
+    valuation = response.json()
+    [nvda] = valuation["holdings"]
+    # 8 x 123.54 USD = 988.32 USD = 923.19 EUR at 0.9341; cash 3000 - 909.68.
+    assert (nvda["price"], nvda["fx_rate"], nvda["value_in_wallet_currency"]) == (
+        "123.54",
+        {"rate": "0.9341", "as_of": "2024-06-28"},
+        "923.19",
+    )
+    assert (valuation["cash"], valuation["total"], valuation["gain"]) == ("2090.32", "3013.51", "13.51")
+
+
+def test_a_day_before_any_trade_is_worth_the_cash_held_then(client: TestClient) -> None:
+    wallet_id = wallet_holding(client, NVDA_BUY)
+
+    valuation = client.get(f"/api/wallets/{wallet_id}/valuation", params={"on": "2024-01-05"}).json()
+
+    assert (valuation["cash"], valuation["holdings"], valuation["total"]) == ("3000", [], "3000")
+
+
+def test_a_past_day_without_a_close_fails_the_valuation(client: TestClient, fx_rates: InMemoryFxRates) -> None:
+    wallet_id = wallet_holding(client, NVDA_BUY)
+    fx_rates.set(FRIDAY_RATE)
+
+    response = client.get(f"/api/wallets/{wallet_id}/valuation", params={"on": "2024-06-25"})
+
+    assert (response.status_code, response.json()["detail"]) == (422, "no price for NVDA on or before 2024-06-25")
+
+
+def test_a_day_after_today_cannot_be_valued(client: TestClient) -> None:
+    wallet_id = wallet_holding(client)
+
+    response = client.get(f"/api/wallets/{wallet_id}/valuation", params={"on": "2026-03-03"})
+
+    assert (response.status_code, response.json()["detail"]) == (422, "cannot value a wallet on a day that has not happened yet")

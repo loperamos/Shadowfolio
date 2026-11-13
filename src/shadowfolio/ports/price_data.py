@@ -1,7 +1,7 @@
 """Market prices."""
 
 from abc import ABC, abstractmethod
-from datetime import datetime
+from datetime import date, datetime
 
 from shadowfolio.domain.valuation import Quote
 
@@ -24,4 +24,12 @@ class PriceData(ABC):
 
         Never a price from before `at`. Outside market hours this is the next open. None if there is no such price.
         Raises PriceDataUnavailableError when the provider cannot answer.
+        """
+
+    @abstractmethod
+    def close_on(self, symbol: str, day: date) -> Quote | None:
+        """The closing price of the last trading day on or before `day`, as traded then (not adjusted for later splits).
+
+        `as_of` is that trading day's start in the exchange's time zone. None if the symbol has no close in the days
+        before `day` (unknown, not yet listed, or delisted). Raises PriceDataUnavailableError when the provider cannot answer.
         """

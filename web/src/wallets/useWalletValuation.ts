@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { apiErrorMessage } from "../api/errors";
-import { currentValuation, type ValuationResponse } from "../api/generated";
+import { walletValuation, type ValuationResponse } from "../api/generated";
 
 export type ValuationState = { status: "loading" } | { status: "error"; message: string } | { status: "loaded"; valuation: ValuationResponse };
 
@@ -15,7 +15,7 @@ export function useWalletValuation(walletId: string, refreshKey = 0): ValuationS
   useEffect(() => {
     let current = true; // ignore answers for a wallet we have moved away from
     setState({ status: "loading" });
-    currentValuation({ path: { wallet_id: walletId } })
+    walletValuation({ path: { wallet_id: walletId } })
       .then(({ data, error }) => {
         if (current) {
           setState(data ? { status: "loaded", valuation: data } : { status: "error", message: apiErrorMessage(error) });

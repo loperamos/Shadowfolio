@@ -961,7 +961,7 @@ export type EditOperationResponses = {
 
 export type EditOperationResponse = EditOperationResponses[keyof EditOperationResponses];
 
-export type CurrentValuationData = {
+export type WalletValuationData = {
     body?: never;
     path: {
         /**
@@ -969,11 +969,16 @@ export type CurrentValuationData = {
          */
         wallet_id: string;
     };
-    query?: never;
+    query?: {
+        /**
+         * On
+         */
+        on?: string | null;
+    };
     url: '/api/wallets/{wallet_id}/valuation';
 };
 
-export type CurrentValuationErrors = {
+export type WalletValuationErrors = {
     /**
      * Not found
      */
@@ -984,16 +989,16 @@ export type CurrentValuationErrors = {
     422: ErrorResponse;
 };
 
-export type CurrentValuationError = CurrentValuationErrors[keyof CurrentValuationErrors];
+export type WalletValuationError = WalletValuationErrors[keyof WalletValuationErrors];
 
-export type CurrentValuationResponses = {
+export type WalletValuationResponses = {
     /**
      * Successful Response
      */
     200: ValuationResponse;
 };
 
-export type CurrentValuationResponse = CurrentValuationResponses[keyof CurrentValuationResponses];
+export type WalletValuationResponse = WalletValuationResponses[keyof WalletValuationResponses];
 
 export type LatestQuoteData = {
     body?: never;

@@ -135,6 +135,10 @@ class Wallet:
             return self
         return replace(self, dividend_events=self.dividend_events + new)._settled(self.operations)
 
+    def as_of(self, moment: datetime) -> Self:
+        """The wallet as it was just before `moment`: only its operations before then. For reading past states."""
+        return replace(self, operations=tuple(op for op in self.operations if op.timestamp < moment))
+
     def holdings_at(self, moment: datetime) -> dict[str, Decimal]:
         """Shares held per symbol just before `moment`."""
         return _holdings(op for op in self.operations if op.timestamp < moment)

@@ -6,7 +6,7 @@ adapter must never be wired into production.
 
 import json
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, time, timedelta
 from decimal import Decimal
 from http import HTTPStatus
 from urllib.parse import quote
@@ -23,6 +23,8 @@ FEED = "iex"
 TIMEOUT_SECONDS = 10.0
 # How far after a requested time to look for the next traded price (covers nights, weekends and holidays).
 BAR_LOOKAHEAD = timedelta(days=7)
+# How far before a requested day to look for the last close (covers weekends and holiday runs).
+CLOSE_LOOKBACK = timedelta(days=10)
 # Alpaca answers these for symbols it does not know.
 _UNKNOWN_SYMBOL_STATUSES = {HTTPStatus.NOT_FOUND, HTTPStatus.UNPROCESSABLE_ENTITY}
 
@@ -52,6 +54,12 @@ class AlpacaPriceData(PriceData):
     def price_at(self, symbol: str, at: datetime) -> Quote | None:
         try:
             return self._price_at(symbol, at)
+        except httpx2.HTTPError as error:
+            raise PriceDataUnavailableError(f"Alpaca: {error}") from error
+
+    def close_on(self, symbol: str, day: date) -> Quote | None:
+        try:
+            return self._close_on(symbol, day)
         except httpx2.HTTPError as error:
             raise PriceDataUnavailableError(f"Alpaca: {error}") from error
 
@@ -94,6 +102,27 @@ class AlpacaPriceData(PriceData):
         if not bars:
             return None
         return Quote(price=Decimal(bars[0]["o"]), currency=Currency.USD, as_of=datetime.fromisoformat(bars[0]["t"]))
+
+    def _close_on(self, symbol: str, day: date) -> Quote | None:
+        """The close of the last daily bar on or before `day`. Daily bars start at midnight New York time, so every bar of
+        `day` starts before the end of `day` in UTC. Raw prices, as traded then; the IEX feed's close, not the consolidated one."""
+        params: dict[str, str | int] = {
+            "timeframe": "1Day",
+            "start": _rfc3339(datetime.combine(day - CLOSE_LOOKBACK, time(), tzinfo=UTC)),
+            "end": _rfc3339(datetime.combine(day, time.max, tzinfo=UTC)),
+            "limit": 1,
+            "sort": "desc",
+            "adjustment": "raw",
+            "feed": FEED,
+        }
+        response = self._client.get(f"/v2/stocks/{quote(symbol, safe='')}/bars", params=params)
+        if response.status_code in _UNKNOWN_SYMBOL_STATUSES:
+            return None
+        response.raise_for_status()
+        bars = json.loads(response.text, parse_float=Decimal).get("bars") or []
+        if not bars:
+            return None
+        return Quote(price=Decimal(bars[0]["c"]), currency=Currency.USD, as_of=datetime.fromisoformat(bars[0]["t"]))
 
 
 def _rfc3339(moment: datetime) -> str:
