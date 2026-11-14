@@ -11,13 +11,15 @@ export type ChartSeries = {
   label: string;
   color: string; // a theme colour, e.g. "teal.6"
   dashed?: boolean; // for reference lines, e.g. money put in
-  hidden?: boolean; // hidden until shown from the legend, e.g. a line far from the others that would squash them
 };
 
 type Props = {
   // Oldest first; `day` as YYYY-MM-DD. A null value is a day without one: the line has a gap there.
   points: ({ day: string } & Record<string, number | string | null>)[];
   series: ChartSeries[];
+  // Names of the series drawn; the legend switches them with `onShownChange`.
+  shown: string[];
+  onShownChange: (shown: string[]) => void;
   currency: string;
   // Called with the first and last day (YYYY-MM-DD) of a drag across the chart; without it, the chart cannot be dragged.
   onSelect?: (first: string, last: string) => void;
@@ -33,9 +35,8 @@ const DASHED = "5 5";
  * shown or hidden from the legend, and the y axis fits the ones shown (as in Grafana and Highcharts). With `onSelect`,
  * dragging across it selects days, shaded while dragging (as zooming in Grafana and other time-series tools).
  */
-export function TimeSeriesChart({ points, series, currency, onSelect }: Props) {
+export function TimeSeriesChart({ points, series, shown, onShownChange, currency, onSelect }: Props) {
   const theme = useMantineTheme();
-  const [shown, setShown] = useState(() => series.filter((s) => !s.hidden).map((s) => s.name));
   // The chart shows its x values as they are, so each point carries its date already formatted.
   const data = points.map((point) => ({ ...point, date: formatDate(point.day) }));
   // Indexes of the points where a drag started and where it is now; null when not dragging.
@@ -64,7 +65,7 @@ export function TimeSeriesChart({ points, series, currency, onSelect }: Props) {
     <>
       {/* The legend: one switch per series. */}
       <Group gap="xs" justify="flex-end" mb="xs">
-        <Chip.Group multiple value={shown} onChange={setShown}>
+        <Chip.Group multiple value={shown} onChange={onShownChange}>
           {series.map(({ name, label, color }) => (
             <Chip key={name} value={name} size="xs" color={color} variant="outline">
               {label}
