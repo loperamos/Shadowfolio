@@ -14,6 +14,7 @@ from shadowfolio.domain.errors import DomainError
 from shadowfolio.domain.imports import ImportKind, ImportRecord, TradeDetails
 from shadowfolio.domain.money import Currency
 from shadowfolio.domain.wallet import Wallet
+from shadowfolio.ports.security_lookup import SecurityLookup, SecurityLookupUnavailableError
 from shadowfolio.ports.wallet_repository import WalletRepository
 from shadowfolio.usecases.wallet_changes import WalletChanges
 
@@ -35,6 +36,7 @@ class ImportReport:
 
 
 SUPPORTED_CURRENCIES = {currency.value for currency in Currency}
+LOOKUP_UNAVAILABLE = "could not look up tickers right now; try again later"
 # Records that are only cash; one of 0.00 records nothing.
 CASH_KINDS = {
     ImportKind.FEE,
@@ -59,20 +61,26 @@ SECURITY_KINDS = {
 
 
 class Imports:
-    def __init__(self, repo: WalletRepository, changes: WalletChanges) -> None:
+    def __init__(self, repo: WalletRepository, changes: WalletChanges, lookup: SecurityLookup) -> None:
         self._repo = repo
         self._changes = changes
+        self._lookup = lookup
 
-    def apply(self, wallet_id: UUID, records: list[ImportRecord], tickers: Mapping[str, str]) -> ImportReport | None:
+    def apply(self, wallet_id: UUID, records: list[ImportRecord]) -> ImportReport | None:
         """Record the records' operations in the wallet, in the order given, if every one goes in; report the records
         left out, and why. Returns None if the wallet does not exist.
 
-        `tickers` gives each security's ticker by ISIN, as statements often identify securities by ISIN only.
+        Statements often identify securities by ISIN only: their tickers are looked up, with the venue each traded on.
         """
         wallet = self._repo.get(wallet_id)
         if wallet is None:
             return None
         report = ImportReport()
+        try:
+            tickers = _with_exchanged_identifiers(records, self._lookup.tickers(_securities(records)))
+        except SecurityLookupUnavailableError:
+            problems = [NotImported(r, LOOKUP_UNAVAILABLE) for r in records if r.kind in SECURITY_KINDS]
+            return ImportReport(problems)
         unchanged = _same_ticker_isin_changes(records, tickers)
         for record in records:
             if record.kind is ImportKind.ISIN_CHANGE:
@@ -151,6 +159,31 @@ def _nothing_to_record(record: ImportRecord) -> bool:
     if record.kind is ImportKind.SPIN_OFF:
         return record.trade is not None and not record.trade.quantity
     return record.kind in CASH_KINDS and record.amount == 0
+
+
+def _securities(records: list[ImportRecord]) -> dict[str, str | None]:
+    """Each security the records name, by ISIN, with the venue it was traded on when a record says."""
+    securities: dict[str, str | None] = {}
+    for record in records:
+        if record.isin and (record.kind in SECURITY_KINDS or record.kind is ImportKind.ISIN_CHANGE):
+            venue = record.trade.venue if record.trade else None
+            securities[record.isin] = securities.get(record.isin) or venue
+    return securities
+
+
+def _with_exchanged_identifiers(records: list[ImportRecord], tickers: Mapping[str, str]) -> dict[str, str]:
+    """`tickers`, plus the ticker of identifiers the lookup does not know (e.g. a broker's temporary line for a
+    spin-off or an IPO subscription) taken from the one they are exchanged for in an ISIN change."""
+    known = dict(tickers)
+    sides: dict[tuple[datetime, Decimal | None], set[str]] = {}
+    for record in records:
+        if record.kind is ImportKind.ISIN_CHANGE and record.isin:
+            sides.setdefault(_isin_change_key(record), set()).add(record.isin)
+    for isins in sides.values():
+        found = {known[isin] for isin in isins if isin in known}
+        if len(found) == 1:
+            known |= {isin: next(iter(found)) for isin in isins if isin not in known}
+    return known
 
 
 def _same_ticker_isin_changes(records: list[ImportRecord], tickers: Mapping[str, str]) -> set[tuple[datetime, Decimal | None]]:

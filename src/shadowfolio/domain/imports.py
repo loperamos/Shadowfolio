@@ -39,6 +39,7 @@ class TradeDetails:
     price: Decimal  # per share, in `price_currency`
     price_currency: str
     fees: Decimal  # every fee of the trade, in the record's currency
+    venue: str | None = None  # the MIC of the venue it was executed on, when the statement gives it
 
 
 @dataclass(frozen=True)

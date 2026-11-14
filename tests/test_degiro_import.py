@@ -4,6 +4,7 @@ Each test writes the rows of one kind of operation in DEGIRO's exact format, the
 the wallet holds after importing them.
 """
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from decimal import Decimal
@@ -16,12 +17,14 @@ from shadowfolio.adapters.fixed_clock import FixedClock
 from shadowfolio.adapters.in_memory_corporate_actions import InMemoryCorporateActions
 from shadowfolio.adapters.in_memory_fx_rates import InMemoryFxRates
 from shadowfolio.adapters.in_memory_price_data import InMemoryPriceData
+from shadowfolio.adapters.in_memory_security_lookup import InMemorySecurityLookup
 from shadowfolio.adapters.in_memory_wallet_repository import InMemoryWalletRepository
 from shadowfolio.domain.corporate_actions import DividendEvent, SplitEvent
 from shadowfolio.domain.imports import DividendDetails, ImportKind, ImportRecord, TradeDetails
 from shadowfolio.domain.money import Currency, FxRate
 from shadowfolio.domain.operations import Dividend, Fee, ImportedDividend, Income, SharesReceived
 from shadowfolio.domain.wallet import Wallet
+from shadowfolio.ports.security_lookup import SecurityLookup, SecurityLookupUnavailableError
 from shadowfolio.usecases.imports import ImportReport, Imports
 from shadowfolio.usecases.sync import Sync
 from shadowfolio.usecases.wallet_changes import WalletChanges
@@ -51,11 +54,13 @@ def import_degiro(
     tickers: dict[str, str] | None = None,
     corporate_actions: tuple[SplitEvent | DividendEvent, ...] = (),
     fx_rates: tuple[FxRate, ...] = (),
+    lookup: SecurityLookup | None = None,
 ) -> Imported:
     """Read the exports with these rows (newest first, as DEGIRO lists them) and import them into a new EUR wallet.
 
-    `tickers` maps each security's ISIN to its ticker, which DEGIRO's exports do not give. `corporate_actions` and
-    `fx_rates` are what market data knows (the wallet applies splits and credits dividends from it automatically).
+    `tickers` is what the security lookup knows: each ISIN's ticker, which DEGIRO's exports do not give.
+    `corporate_actions` and `fx_rates` are what market data knows (the wallet applies splits and credits dividends from
+    it automatically).
     """
     repo, clock, rates = InMemoryWalletRepository(), FixedClock(NOW), InMemoryFxRates(*fx_rates)
     sync = Sync(repo, clock, InMemoryCorporateActions(*corporate_actions), rates)
@@ -64,7 +69,7 @@ def import_degiro(
     wallet = wallets.create("owner", "DEGIRO", Currency.EUR, Decimal(0))
 
     records = DegiroStatementReader().read("\n".join([TRANSACTIONS_HEADER, *transactions]), "\n".join([ACCOUNT_HEADER, *account]))
-    report = Imports(repo, changes).apply(wallet.id, records, tickers or {})
+    report = Imports(repo, changes, lookup or InMemorySecurityLookup(tickers or {})).apply(wallet.id, records)
     assert report is not None
 
     imported = wallets.get(wallet.id)
@@ -163,7 +168,9 @@ def test_a_buy_adds_the_shares_and_takes_its_cost_and_fees_from_the_cash() -> No
         Decimal("1100.00"),
         "EUR",
     )
-    assert buy.trade == TradeDetails(quantity=Decimal(10), price=Decimal("120.00"), price_currency="USD", fees=Decimal("4.75"))
+    assert buy.trade == TradeDetails(
+        quantity=Decimal(10), price=Decimal("120.00"), price_currency="USD", fees=Decimal("4.75"), venue="XNAS"
+    )
     assert [record.kind for record in imported.records].count(ImportKind.TRADE_SETTLEMENT) == len(NVIDIA_BUY_CASH)
     assert imported.wallet.holdings == {"NVDA": Decimal(10)}
     assert imported.wallet.cash == Decimal("95.25")  # 1200 - 1100.00 - 4.75
@@ -406,7 +413,7 @@ def test_an_isin_change_within_the_same_ticker_changes_nothing() -> None:
     imported = import_degiro(
         transactions=[*MEITUAN_ISIN_CHANGES, MEITUAN_SPIN_OFF, TENCENT_BUY],
         account=[*MEITUAN_ISIN_CHANGE_NOTICES, MEITUAN_SPIN_OFF_NOTICE, DEPOSIT_900],
-        tickers={**TENCENT_TICKERS, "RCC188527108": "3690.HK"},
+        tickers=TENCENT_TICKERS,  # the temporary line's identifier is not a real ISIN: not looked up
     )
 
     assert [record.kind for record in imported.records].count(ImportKind.ISIN_CHANGE) == 2
@@ -504,7 +511,8 @@ def test_shares_subscribed_in_an_ipo_are_bought_at_the_subscription_price() -> N
         '01-06-2026,10:00,01-06-2026,,,Dépôt flatex,,EUR,"500,00",EUR,"500,00",',
     ]
 
-    imported = import_degiro(transactions=transactions, account=account, tickers={"US0IPOSPACEX": "SPCX", "US84615Q1031": "SPCX"})
+    # The subscription line's identifier is not a real ISIN: it takes the ticker of the shares it becomes.
+    imported = import_degiro(transactions=transactions, account=account, tickers={"US84615Q1031": "SPCX"})
 
     kinds = [record.kind for record in imported.records]
     assert (kinds.count(ImportKind.IPO_SUBSCRIPTION), kinds.count(ImportKind.ISIN_CHANGE)) == (1, 2)
@@ -753,7 +761,7 @@ def test_importing_into_a_wallet_that_does_not_exist_imports_nothing() -> None:
     changes = WalletChanges(clock, InMemoryPriceData(), rates, Sync(repo, clock, InMemoryCorporateActions(), rates))
     records = DegiroStatementReader().read(TRANSACTIONS_HEADER, "\n".join([ACCOUNT_HEADER, DEPOSIT_500]))
 
-    assert Imports(repo, changes).apply(uuid4(), records, {}) is None
+    assert Imports(repo, changes, InMemorySecurityLookup({})).apply(uuid4(), records) is None
 
 
 def test_a_dividend_booked_just_after_midnight_still_replaces_the_automatic_one() -> None:
@@ -814,7 +822,7 @@ def test_two_isin_changes_in_the_same_minute_are_paired_by_their_shares() -> Non
     imported = import_degiro(
         transactions=[*other_change, *MEITUAN_ISIN_CHANGES, MEITUAN_SPIN_OFF, TENCENT_BUY],
         account=[*other_notices, *MEITUAN_ISIN_CHANGE_NOTICES, MEITUAN_SPIN_OFF_NOTICE, DEPOSIT_900],
-        tickers={**TENCENT_TICKERS, "RCC188527108": "3690.HK", "XX0000000001": "0700.HK"},
+        tickers=TENCENT_TICKERS,
     )
 
     assert imported.report.imported
@@ -854,3 +862,36 @@ def test_a_conversion_matching_no_waiting_cash_is_reported_not_guessed() -> None
 
     assert not imported.report.imported
     assert {problem.record.description for problem in imported.report.not_imported} >= {"Opération de change - Débit"}
+
+
+class UnavailableSecurityLookup(SecurityLookup):
+    def tickers(self, securities: Mapping[str, str | None]) -> dict[str, str]:
+        raise SecurityLookupUnavailableError("down")
+
+
+def test_without_the_security_lookup_nothing_is_saved_and_the_securities_are_reported() -> None:
+    imported = import_degiro(transactions=[NVIDIA_BUY], account=[DEPOSIT_1200], lookup=UnavailableSecurityLookup())
+
+    assert not imported.report.imported
+    assert [problem.reason for problem in imported.report.not_imported] == ["could not look up tickers right now; try again later"]
+    assert imported.wallet.operations == ()
+
+
+class RecordingSecurityLookup(InMemorySecurityLookup):
+    def __init__(self, tickers: dict[str, str]) -> None:
+        super().__init__(tickers)
+        self.asked: dict[str, str | None] = {}
+
+    def tickers(self, securities: Mapping[str, str | None]) -> dict[str, str]:
+        self.asked = dict(securities)
+        return super().tickers(securities)
+
+
+def test_the_lookup_is_asked_for_each_security_with_the_venue_it_traded_on() -> None:
+    lookup = RecordingSecurityLookup({"US88160R1014": "TSLA", "US67066G1040": "NVDA"})
+    tesla = '15-11-2024,14:39,TESLA INC,US88160R1014,TDG,XGAT,1,"300,0000",EUR,"-300,00",EUR,"-300,00","1,0000","0,00","-3,90","-303,90",o8'
+
+    import_degiro(transactions=[tesla], account=[*NVIDIA_DIVIDEND, DEPOSIT_1200], lookup=lookup)
+
+    # Tesla traded on Tradegate; NVIDIA only paid a dividend here, so its venue is unknown.
+    assert lookup.asked == {"US88160R1014": "XGAT", "US67066G1040": None}

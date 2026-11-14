@@ -133,6 +133,7 @@ class _Row:
     price: Decimal = Decimal(0)
     price_currency: str = ""
     fees: Decimal = Decimal(0)  # every fee of a trade, in the account's currency
+    venue: str = ""  # the MIC of the venue a trade was executed on ("Lieu d'exécution"); empty when not given
 
 
 class DegiroStatementReader:
@@ -159,7 +160,7 @@ def _cells(text: str) -> list[list[str]]:
 
 
 def _transactions_row(cells: list[str]) -> _Row:
-    date, time, product, isin, _exchange, _venue, quantity, price, price_currency = cells[:9]
+    date, time, product, isin, _exchange, venue, quantity, price, price_currency = cells[:9]
     amount, autofx_fee, brokerage_fee, order_id = cells[11], cells[13], cells[14], cells[16]
     return _Row(
         type=RowType.EXECUTION if order_id else RowType.CORPORATE_ACTION,
@@ -176,6 +177,7 @@ def _transactions_row(cells: list[str]) -> _Row:
         price=_number(price),
         price_currency=price_currency,
         fees=abs(_number(autofx_fee)) + abs(_number(brokerage_fee)),
+        venue=venue,
     )
 
 
@@ -212,7 +214,7 @@ def _trade_record(row: _Row, kind: ImportKind) -> ImportRecord:
         currency=ACCOUNT_CURRENCY,
         description=row.product,
         isin=row.isin,
-        trade=TradeDetails(abs(row.quantity), row.price, row.price_currency, row.fees),
+        trade=TradeDetails(abs(row.quantity), row.price, row.price_currency, row.fees, row.venue or None),
     )
 
 
