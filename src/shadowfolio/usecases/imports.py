@@ -1,4 +1,8 @@
-"""Import use cases: turning records read from a broker statement into a wallet's operations."""
+"""Import use cases: turning records read from a broker statement into a wallet's operations.
+
+An import is all or nothing: every record is tried, every problem reported, and the wallet is saved only if every
+record went in.
+"""
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
@@ -6,8 +10,10 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
+from shadowfolio.domain.errors import DomainError
 from shadowfolio.domain.imports import ImportKind, ImportRecord
 from shadowfolio.domain.money import Currency
+from shadowfolio.ports.wallet_repository import WalletRepository
 from shadowfolio.usecases.history import History
 
 
@@ -20,6 +26,11 @@ class NotImported:
 @dataclass
 class ImportReport:
     not_imported: list[NotImported] = field(default_factory=list)
+
+    @property
+    def imported(self) -> bool:
+        """Whether the records were saved: only when every one of them went in."""
+        return not self.not_imported
 
 
 # Records about a security, which need its ticker.
@@ -35,14 +46,17 @@ SECURITY_KINDS = {
 
 
 class Imports:
-    def __init__(self, history: History) -> None:
+    def __init__(self, history: History, repo: WalletRepository) -> None:
         self._history = history
+        self._repo = repo
 
     def apply(self, wallet_id: UUID, records: list[ImportRecord], tickers: Mapping[str, str]) -> ImportReport:
-        """Record the records' operations in the wallet, in the order given, and report the records left out.
+        """Record the records' operations in the wallet, in the order given, if every one goes in; report the records
+        left out, and why.
 
         `tickers` gives each security's ticker by ISIN, as statements often identify securities by ISIN only.
         """
+        before = self._repo.get(wallet_id)
         report = ImportReport()
         unchanged = _same_ticker_isin_changes(records, tickers)
         for record in records:
@@ -50,9 +64,14 @@ class Imports:
                 if record.timestamp not in unchanged:
                     report.not_imported.append(NotImported(record, "an ISIN change to another ticker is not imported yet"))
                 continue
-            problem = self._apply(wallet_id, record, tickers)
+            try:
+                problem = self._apply(wallet_id, record, tickers)
+            except DomainError as error:  # the wallet refuses it, or a provider it needs cannot answer
+                problem = str(error)
             if problem is not None:
                 report.not_imported.append(NotImported(record, problem))
+        if not report.imported and before is not None:
+            self._repo.update(before)  # each record was saved as it went in: put the wallet back as it was
         return report
 
     def _apply(self, wallet_id: UUID, record: ImportRecord, tickers: Mapping[str, str]) -> str | None:

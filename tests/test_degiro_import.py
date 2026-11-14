@@ -63,7 +63,7 @@ def import_degiro(
     wallet = wallets.create("owner", "DEGIRO", Currency.EUR, Decimal(0))
 
     records = DegiroStatementReader().read("\n".join([TRANSACTIONS_HEADER, *transactions]), "\n".join([ACCOUNT_HEADER, *account]))
-    report = Imports(history).apply(wallet.id, records, tickers or {})
+    report = Imports(history, repo).apply(wallet.id, records, tickers or {})
 
     imported = wallets.get(wallet.id)
     assert imported is not None
@@ -535,3 +535,27 @@ def test_a_dividend_tax_refunded_later_is_income_credited_with_its_conversion() 
     assert refund.amount == Decimal("0.01")
     assert refund.description in {"Dividend tax refunded on AAPL", "Dividend tax refunded on NVDA"}
     assert imported.wallet.cash == Decimal("500.01")
+
+
+def test_nothing_is_saved_unless_every_record_goes_in_and_every_problem_is_reported() -> None:
+    account = [
+        '01-03-2026,10:00,01-03-2026,,,Something new,,EUR,"1,00",EUR,"301,00",',  # not recognised
+        '01-02-2026,10:00,01-02-2026,,,Retrait flatex,,EUR,"-800,00",EUR,"-300,00",',  # more than the cash: refused
+        '01-01-2026,10:00,01-01-2026,,,Dépôt flatex,,EUR,"500,00",EUR,"500,00",',  # fine on its own
+    ]
+
+    imported = import_degiro(transactions=[], account=account)
+
+    assert not imported.report.imported
+    assert [(problem.record.description, problem.reason.split(" on ")[0]) for problem in imported.report.not_imported] == [
+        ("Retrait flatex", "cash would be -300.00"),
+        ("Something new", "unknown row"),
+    ]
+    assert imported.wallet.operations == ()  # not even the deposit
+
+
+def test_an_import_where_every_record_goes_in_is_saved() -> None:
+    imported = import_degiro(transactions=[], account=[DEPOSIT_500])
+
+    assert imported.report.imported
+    assert imported.wallet.cash == Decimal("500.00")
