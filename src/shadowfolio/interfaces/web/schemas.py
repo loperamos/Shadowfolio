@@ -380,6 +380,11 @@ class PerformanceResponse(BaseModel):
         )
 
 
+class DailyReturnResponse(BaseModel):
+    day: date
+    value: Decimal | None  # the return since the start of the period, in percent; null when the day could not be valued
+
+
 class PerformanceComparisonResponse(BaseModel):
     """How the wallet did over a period next to `benchmark_symbol` with the same deposits; null when nothing in the
     period could be valued."""
@@ -387,6 +392,9 @@ class PerformanceComparisonResponse(BaseModel):
     wallet: PerformanceResponse | None
     benchmark_symbol: str
     benchmark: PerformanceResponse | None
+    # The time-weighted return since the start of the period, day by day: comparable whatever money each had.
+    wallet_returns: list[DailyReturnResponse]
+    benchmark_returns: list[DailyReturnResponse]
 
     @classmethod
     def from_comparison(cls, comparison: PerformanceComparison) -> "PerformanceComparisonResponse":
@@ -394,7 +402,13 @@ class PerformanceComparisonResponse(BaseModel):
             wallet=None if comparison.wallet is None else PerformanceResponse.from_performance(comparison.wallet),
             benchmark_symbol=comparison.benchmark_symbol,
             benchmark=None if comparison.benchmark is None else PerformanceResponse.from_performance(comparison.benchmark),
+            wallet_returns=_daily_returns(comparison.wallet_returns),
+            benchmark_returns=_daily_returns(comparison.benchmark_returns),
         )
+
+
+def _daily_returns(returns: tuple[tuple[date, Decimal | None], ...]) -> list[DailyReturnResponse]:
+    return [DailyReturnResponse(day=day, value=_ratio_percent(value)) for day, value in returns]
 
 
 class DailyValueResponse(BaseModel):

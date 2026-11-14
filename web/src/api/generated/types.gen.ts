@@ -125,6 +125,20 @@ export const Currency = { USD: 'USD', EUR: 'EUR' } as const;
 export type Currency = typeof Currency[keyof typeof Currency];
 
 /**
+ * DailyReturnResponse
+ */
+export type DailyReturnResponse = {
+    /**
+     * Day
+     */
+    day: string;
+    /**
+     * Value
+     */
+    value: string | null;
+};
+
+/**
  * DailyValueResponse
  *
  * The wallet at the end of a day, valued at that day's closing prices, in its currency.
@@ -434,6 +448,14 @@ export type PerformanceComparisonResponse = {
      */
     benchmark_symbol: string;
     benchmark: PerformanceResponse | null;
+    /**
+     * Wallet Returns
+     */
+    wallet_returns: Array<DailyReturnResponse>;
+    /**
+     * Benchmark Returns
+     */
+    benchmark_returns: Array<DailyReturnResponse>;
 };
 
 /**

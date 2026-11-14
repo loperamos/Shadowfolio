@@ -20,13 +20,21 @@ type Props = {
   // Names of the series drawn; the legend switches them with `onShownChange`.
   shown: string[];
   onShownChange: (shown: string[]) => void;
-  currency: string;
+  // What the values are in: a currency (e.g. "EUR"), or PERCENT for returns.
+  unit: string;
+  // Shade the area under each line; off for several lines to compare, where the areas would overlap.
+  shaded?: boolean;
   // Called with the first and last day (YYYY-MM-DD) of a drag across the chart; without it, the chart cannot be dragged.
   onSelect?: (first: string, last: string) => void;
 };
 
+/** The unit of values that are percentages, e.g. returns. */
+export const PERCENT = "%";
+
 // Room for the y axis's labels, e.g. "-123,456", in px.
 const Y_AXIS_WIDTH = 72;
+// How strongly the area under a line is shaded (0 to 1).
+const AREA_OPACITY = 0.15;
 // Dash pattern of reference lines.
 const DASHED = "5 5";
 
@@ -35,7 +43,7 @@ const DASHED = "5 5";
  * shown or hidden from the legend, and the y axis fits the ones shown (as in Grafana and Highcharts). With `onSelect`,
  * dragging across it selects days, shaded while dragging (as zooming in Grafana and other time-series tools).
  */
-export function TimeSeriesChart({ points, series, shown, onShownChange, currency, onSelect }: Props) {
+export function TimeSeriesChart({ points, series, shown, onShownChange, unit, shaded = true, onSelect }: Props) {
   const theme = useMantineTheme();
   // The chart shows its x values as they are, so each point carries its date already formatted.
   const data = points.map((point) => ({ ...point, date: formatDate(point.day) }));
@@ -83,10 +91,10 @@ export function TimeSeriesChart({ points, series, shown, onShownChange, currency
         curveType="linear"
         connectNulls={false}
         withDots={false}
-        fillOpacity={0.15}
-        valueFormatter={(value) => `${formatAmount(value.toFixed(2))} ${currency}`}
+        fillOpacity={shaded ? AREA_OPACITY : 0}
+        valueFormatter={(value) => withUnit(formatAmount(value.toFixed(2)), unit)}
         // The axis shows whole amounts without the currency, so its labels stay on one line; the tooltip has both.
-        yAxisProps={{ domain: ["auto", "auto"], tickFormatter: formatWholeAmount, width: Y_AXIS_WIDTH }}
+        yAxisProps={{ domain: ["auto", "auto"], tickFormatter: (value: number) => (unit === PERCENT ? withUnit(formatWholeAmount(value), unit) : formatWholeAmount(value)), width: Y_AXIS_WIDTH }}
         xAxisProps={{ minTickGap: 40 }}
         areaChartProps={onSelect && { onMouseDown: start, onMouseMove: move, onMouseUp: end, onMouseLeave: () => setDrag(null) }}
       >
@@ -101,4 +109,9 @@ export function TimeSeriesChart({ points, series, shown, onShownChange, currency
       </AreaChart>
     </>
   );
+}
+
+/** "1,234.50 EUR", or "12.50%" for percentages. */
+function withUnit(value: string, unit: string): string {
+  return unit === PERCENT ? `${value}%` : `${value} ${unit}`;
 }

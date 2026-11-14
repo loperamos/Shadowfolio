@@ -1137,7 +1137,7 @@
     "/api/wallets/{wallet_id}/performance": {
       "get": {
         "summary": "Wallet Performance",
-        "description": "How the wallet did from `start` (default: its first operation) to `end` (default: today), next to `symbol`\n(default SPY) with the same deposits: gain, and returns that ignore (time-weighted) or include (money-weighted) when money moved.",
+        "description": "How the wallet did from `start` (default: its first operation) to `end` (default: today), next to `symbol`\n(default SPY) with the same deposits: gain, and returns that ignore (time-weighted) or include (money-weighted)\nwhen money moved; and both time-weighted returns day by day, from the start of the period.",
         "operationId": "wallet_performance",
         "parameters": [
           {
@@ -1461,6 +1461,32 @@
           "EUR"
         ],
         "title": "Currency"
+      },
+      "DailyReturnResponse": {
+        "properties": {
+          "day": {
+            "type": "string",
+            "format": "date",
+            "title": "Day"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "type": "object",
+        "required": [
+          "day",
+          "value"
+        ],
+        "title": "DailyReturnResponse"
       },
       "DailyValueResponse": {
         "properties": {
@@ -2022,13 +2048,29 @@
                 "type": "null"
               }
             ]
+          },
+          "wallet_returns": {
+            "items": {
+              "$ref": "#/components/schemas/DailyReturnResponse"
+            },
+            "type": "array",
+            "title": "Wallet Returns"
+          },
+          "benchmark_returns": {
+            "items": {
+              "$ref": "#/components/schemas/DailyReturnResponse"
+            },
+            "type": "array",
+            "title": "Benchmark Returns"
           }
         },
         "type": "object",
         "required": [
           "wallet",
           "benchmark_symbol",
-          "benchmark"
+          "benchmark",
+          "wallet_returns",
+          "benchmark_returns"
         ],
         "title": "PerformanceComparisonResponse",
         "description": "How the wallet did over a period next to `benchmark_symbol` with the same deposits; null when nothing in the\nperiod could be valued."

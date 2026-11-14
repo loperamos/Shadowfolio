@@ -205,6 +205,7 @@ export const benchmarkDaily = <ThrowOnError extends boolean = false>(options: Op
  * Wallet Performance
  *
  * How the wallet did from `start` (default: its first operation) to `end` (default: today), next to `symbol`
- * (default SPY) with the same deposits: gain, and returns that ignore (time-weighted) or include (money-weighted) when money moved.
+ * (default SPY) with the same deposits: gain, and returns that ignore (time-weighted) or include (money-weighted)
+ * when money moved; and both time-weighted returns day by day, from the start of the period.
  */
 export const walletPerformance = <ThrowOnError extends boolean = false>(options: Options<WalletPerformanceData, ThrowOnError>): RequestResult<WalletPerformanceResponses, WalletPerformanceErrors, ThrowOnError> => (options.client ?? client).get<WalletPerformanceResponses, WalletPerformanceErrors, ThrowOnError>({ url: '/api/wallets/{wallet_id}/performance', ...options });

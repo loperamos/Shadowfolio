@@ -33,7 +33,8 @@ def comparison_router(comparison: Comparison) -> APIRouter:
         wallet_id: UUID, start: date | None = None, end: date | None = None, symbol: str = DEFAULT_BENCHMARK
     ) -> PerformanceComparisonResponse:
         """How the wallet did from `start` (default: its first operation) to `end` (default: today), next to `symbol`
-        (default SPY) with the same deposits: gain, and returns that ignore (time-weighted) or include (money-weighted) when money moved."""
+        (default SPY) with the same deposits: gain, and returns that ignore (time-weighted) or include (money-weighted)
+        when money moved; and both time-weighted returns day by day, from the start of the period."""
         try:
             result = comparison.performance(wallet_id, start, end, symbol)
         except DomainError as error:
