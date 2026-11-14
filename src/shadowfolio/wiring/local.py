@@ -6,7 +6,9 @@ from pathlib import Path
 from fastapi import FastAPI
 
 from shadowfolio.adapters.alpaca_corporate_actions import AlpacaCorporateActions
-from shadowfolio.adapters.alpaca_price_data import AlpacaConfig, AlpacaPriceData
+from shadowfolio.adapters.alpaca_price_data import FEED, AlpacaConfig, AlpacaPriceData
+from shadowfolio.adapters.cached_fx_rates import CachedFxRates
+from shadowfolio.adapters.cached_price_data import CachedPriceData
 from shadowfolio.adapters.degiro_statements import DegiroStatementReader
 from shadowfolio.adapters.ecb_fx_rates import EcbFxRates
 from shadowfolio.adapters.openfigi_security_lookup import OpenFigiSecurityLookup
@@ -21,6 +23,13 @@ from shadowfolio.usecases.valuation import Valuation
 from shadowfolio.usecases.wallet_changes import WalletChanges
 from shadowfolio.usecases.wallets import Wallets
 
+# Past market data is kept in this file, next to the database (and, like it, out of version control). It only holds
+# copies of what the providers answered: deleting it loses nothing.
+MARKET_CACHE_FILE = "market-cache.db"
+# What each provider's data is kept under in that file, so data from one plan or feed never answers for another.
+PRICE_SOURCE = f"alpaca/{FEED}"
+FX_SOURCE = "ecb"
+
 
 @dataclass(frozen=True)
 class LocalConfig:
@@ -31,8 +40,9 @@ class LocalConfig:
 def build_local_app(config: LocalConfig) -> FastAPI:
     clock = SystemClock()
     wallet_repository = SqliteWalletRepository(config.db_path)
-    prices = AlpacaPriceData(config.alpaca)
-    fx_rates = EcbFxRates(clock)
+    market_cache = config.db_path.parent / MARKET_CACHE_FILE
+    prices = CachedPriceData(AlpacaPriceData(config.alpaca), PRICE_SOURCE, market_cache, clock)
+    fx_rates = CachedFxRates(EcbFxRates(clock), FX_SOURCE, market_cache, clock)
     sync = Sync(wallet_repository, clock, AlpacaCorporateActions(config.alpaca), fx_rates)
     return create_app(
         wallets=Wallets(wallet_repository, clock),
