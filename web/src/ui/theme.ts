@@ -24,3 +24,6 @@ export const PERCENT_INPUT_WIDTH = rem(110); // up to 99.99 and the % sign
 
 // Height of time-series charts, in px.
 export const CHART_HEIGHT = 280;
+
+// Tallest a list inside a dialog grows before it scrolls (e.g. an import's problems), in px.
+export const DIALOG_LIST_MAX_HEIGHT = 240;

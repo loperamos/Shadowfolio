@@ -30,6 +30,8 @@ CLOSE_LOOKBACK = timedelta(days=10)
 PAGE_LIMIT = 10_000
 # Alpaca answers these for symbols it does not know.
 _UNKNOWN_SYMBOL_STATUSES = {HTTPStatus.NOT_FOUND, HTTPStatus.UNPROCESSABLE_ENTITY}
+# ...and this for a symbol it cannot read (e.g. 9MD.XGAT), with this message.
+INVALID_SYMBOL_MESSAGE = "invalid symbol"
 
 
 @dataclass(frozen=True)
@@ -75,7 +77,7 @@ class AlpacaPriceData(PriceData):
     def _latest_price(self, symbol: str) -> Quote | None:
         """The last trade's price and the previous day's close. Alpaca only covers US listings, so prices are in USD."""
         response = self._client.get(f"/v2/stocks/{quote(symbol, safe='')}/snapshot", params={"feed": FEED})
-        if response.status_code in _UNKNOWN_SYMBOL_STATUSES:
+        if _unknown_symbol(response):
             return None
         response.raise_for_status()
         # Parse numbers as Decimal directly, never through float.
@@ -103,7 +105,7 @@ class AlpacaPriceData(PriceData):
             "feed": FEED,
         }
         response = self._client.get(f"/v2/stocks/{quote(symbol, safe='')}/bars", params=params)
-        if response.status_code in _UNKNOWN_SYMBOL_STATUSES:
+        if _unknown_symbol(response):
             return None
         response.raise_for_status()
         # Unknown symbols also come back as 200, with no bars.
@@ -125,7 +127,7 @@ class AlpacaPriceData(PriceData):
             "feed": FEED,
         }
         response = self._client.get(f"/v2/stocks/{quote(symbol, safe='')}/bars", params=params)
-        if response.status_code in _UNKNOWN_SYMBOL_STATUSES:
+        if _unknown_symbol(response):
             return None
         response.raise_for_status()
         bars = json.loads(response.text, parse_float=Decimal).get("bars") or []
@@ -147,7 +149,7 @@ class AlpacaPriceData(PriceData):
         closes: list[tuple[date, Quote]] = []
         while True:
             response = self._client.get(f"/v2/stocks/{quote(symbol, safe='')}/bars", params=params)
-            if response.status_code in _UNKNOWN_SYMBOL_STATUSES:
+            if _unknown_symbol(response):
                 return {}
             response.raise_for_status()
             page = json.loads(response.text, parse_float=Decimal)
@@ -158,6 +160,13 @@ class AlpacaPriceData(PriceData):
             if not token:
                 return last_on_or_before(closes, start, end, CLOSE_LOOKBACK)
             params["page_token"] = token
+
+
+def _unknown_symbol(response: httpx2.Response) -> bool:
+    """Whether Alpaca answered that it does not know, or cannot read, the symbol: no prices, rather than an error."""
+    if response.status_code in _UNKNOWN_SYMBOL_STATUSES:
+        return True
+    return response.status_code == HTTPStatus.BAD_REQUEST and INVALID_SYMBOL_MESSAGE in response.text
 
 
 def _rfc3339(moment: datetime) -> str:

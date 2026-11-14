@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { CopyWalletData, CopyWalletErrors, CopyWalletResponses, CreateWalletData, CreateWalletErrors, CreateWalletResponses, DailyValuationData, DailyValuationErrors, DailyValuationResponses, DeleteOperationData, DeleteOperationErrors, DeleteOperationResponses, DeleteWalletData, DeleteWalletErrors, DeleteWalletResponses, DepositData, DepositErrors, DepositResponses, EditOperationData, EditOperationErrors, EditOperationResponses, GetWalletData, GetWalletErrors, GetWalletResponses, LatestQuoteData, LatestQuoteErrors, LatestQuoteResponses, ListOperationsData, ListOperationsErrors, ListOperationsResponses, ListWalletsData, ListWalletsResponses, RecordBuyData, RecordBuyErrors, RecordBuyResponses, RecordSellData, RecordSellErrors, RecordSellResponses, SyncAllWalletsData, SyncAllWalletsErrors, SyncAllWalletsResponses, UpdateWalletData, UpdateWalletErrors, UpdateWalletResponses, WalletValuationData, WalletValuationErrors, WalletValuationResponses, WithdrawData, WithdrawErrors, WithdrawResponses } from './types.gen';
+import type { CopyWalletData, CopyWalletErrors, CopyWalletResponses, CreateWalletData, CreateWalletErrors, CreateWalletResponses, DailyValuationData, DailyValuationErrors, DailyValuationResponses, DeleteOperationData, DeleteOperationErrors, DeleteOperationResponses, DeleteWalletData, DeleteWalletErrors, DeleteWalletResponses, DepositData, DepositErrors, DepositResponses, EditOperationData, EditOperationErrors, EditOperationResponses, GetWalletData, GetWalletErrors, GetWalletResponses, ImportDegiroData, ImportDegiroErrors, ImportDegiroResponses, LatestQuoteData, LatestQuoteErrors, LatestQuoteResponses, ListOperationsData, ListOperationsErrors, ListOperationsResponses, ListWalletsData, ListWalletsResponses, PreviewDegiroImportData, PreviewDegiroImportErrors, PreviewDegiroImportResponses, RecordBuyData, RecordBuyErrors, RecordBuyResponses, RecordSellData, RecordSellErrors, RecordSellResponses, SyncAllWalletsData, SyncAllWalletsErrors, SyncAllWalletsResponses, UpdateWalletData, UpdateWalletErrors, UpdateWalletResponses, WalletValuationData, WalletValuationErrors, WalletValuationResponses, WithdrawData, WithdrawErrors, WithdrawResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -162,3 +162,31 @@ export const latestQuote = <ThrowOnError extends boolean = false>(options: Optio
  * Sync All Wallets
  */
 export const syncAllWallets = <ThrowOnError extends boolean = false>(options?: Options<SyncAllWalletsData, ThrowOnError>): RequestResult<SyncAllWalletsResponses, SyncAllWalletsErrors, ThrowOnError> => (options?.client ?? client).post<SyncAllWalletsResponses, SyncAllWalletsErrors, ThrowOnError>({ url: '/api/sync', ...options });
+
+/**
+ * Preview Degiro Import
+ *
+ * What importing DEGIRO's Transactions and Account exports would do to the wallet. Saves nothing.
+ */
+export const previewDegiroImport = <ThrowOnError extends boolean = false>(options: Options<PreviewDegiroImportData, ThrowOnError>): RequestResult<PreviewDegiroImportResponses, PreviewDegiroImportErrors, ThrowOnError> => (options.client ?? client).post<PreviewDegiroImportResponses, PreviewDegiroImportErrors, ThrowOnError>({
+    url: '/api/wallets/{wallet_id}/imports/degiro/preview',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Import Degiro
+ *
+ * Import DEGIRO's Transactions and Account exports into the wallet, if every record goes in.
+ */
+export const importDegiro = <ThrowOnError extends boolean = false>(options: Options<ImportDegiroData, ThrowOnError>): RequestResult<ImportDegiroResponses, ImportDegiroErrors, ThrowOnError> => (options.client ?? client).post<ImportDegiroResponses, ImportDegiroErrors, ThrowOnError>({
+    url: '/api/wallets/{wallet_id}/imports/degiro',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
