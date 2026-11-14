@@ -17,6 +17,10 @@ class InvalidPeriodError(DomainError):
     """A period ends before it starts."""
 
 
+class UnsupportedStatementFormatError(DomainError):
+    """A file given as a broker's statement is not in the format expected."""
+
+
 class InvalidAmountError(DomainError):
     """An amount, quantity or price is out of range."""
 

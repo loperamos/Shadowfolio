@@ -25,6 +25,7 @@ from shadowfolio.domain.operations import (
 )
 from shadowfolio.domain.valuation import DailyValue, WalletValuation
 from shadowfolio.domain.wallet import Wallet
+from shadowfolio.usecases.imports import ImportReport
 
 
 class CreateWalletRequest(BaseModel):
@@ -340,6 +341,47 @@ class DailyValueResponse(BaseModel):
         holdings_value = _cents(value.valuation.total - value.valuation.cash)
         cash = value.valuation.cash
         return cls(day=value.day, cash=cash, holdings_value=holdings_value, total=cash + holdings_value, net_deposits=value.net_deposits)
+
+
+class StatementRequest(BaseModel):
+    """A broker's two exports, as the files' text."""
+
+    transactions: str  # trades
+    account: str  # cash movements
+
+
+class ImportProblemResponse(BaseModel):
+    date: date
+    kind: str  # what the row was read as
+    description: str  # the statement's wording
+    reason: str  # why it was not imported
+
+
+class ImportResponse(BaseModel):
+    records: int  # read from the statement
+    can_import: bool  # every record goes in
+    imported: bool  # saved: only on an import (not a preview) that can import
+    problems: list[ImportProblemResponse]
+    cash: Decimal  # in the wallet after the import, in its currency
+    holdings: dict[str, Decimal]  # after the import
+
+    @classmethod
+    def from_report(cls, report: ImportReport) -> "ImportResponse":
+        assert report.wallet is not None
+        problems = [
+            ImportProblemResponse(
+                date=p.record.timestamp.date(), kind=p.record.kind.value, description=p.record.description, reason=p.reason
+            )
+            for p in report.not_imported
+        ]
+        return cls(
+            records=report.records,
+            can_import=report.imported,
+            imported=report.saved,
+            problems=problems,
+            cash=report.wallet.cash,
+            holdings=report.wallet.holdings,
+        )
 
 
 class QuoteResponse(BaseModel):

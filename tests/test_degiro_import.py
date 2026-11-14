@@ -69,7 +69,7 @@ def import_degiro(
     wallet = wallets.create("owner", "DEGIRO", Currency.EUR, Decimal(0))
 
     records = DegiroStatementReader().read("\n".join([TRANSACTIONS_HEADER, *transactions]), "\n".join([ACCOUNT_HEADER, *account]))
-    report = Imports(repo, changes, lookup or InMemorySecurityLookup(tickers or {})).apply(wallet.id, records)
+    report = Imports(repo, changes, lookup or InMemorySecurityLookup(tickers or {}), DegiroStatementReader()).apply(wallet.id, records)
     assert report is not None
 
     imported = wallets.get(wallet.id)
@@ -761,7 +761,7 @@ def test_importing_into_a_wallet_that_does_not_exist_imports_nothing() -> None:
     changes = WalletChanges(clock, InMemoryPriceData(), rates, Sync(repo, clock, InMemoryCorporateActions(), rates))
     records = DegiroStatementReader().read(TRANSACTIONS_HEADER, "\n".join([ACCOUNT_HEADER, DEPOSIT_500]))
 
-    assert Imports(repo, changes, InMemorySecurityLookup({})).apply(uuid4(), records) is None
+    assert Imports(repo, changes, InMemorySecurityLookup({}), DegiroStatementReader()).apply(uuid4(), records) is None
 
 
 def test_a_dividend_booked_just_after_midnight_still_replaces_the_automatic_one() -> None:

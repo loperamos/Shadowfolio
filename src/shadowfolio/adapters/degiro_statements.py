@@ -27,12 +27,16 @@ from zoneinfo import ZoneInfo
 
 from shadowfolio.domain.imports import DividendDetails, ImportKind, ImportRecord, TradeDetails
 from shadowfolio.domain.money import to_cents
+from shadowfolio.ports.statement_reader import StatementReader, UnsupportedStatementError
 
 TIMEZONE = ZoneInfo("Europe/Paris")
 DATE_FORMAT = "%d-%m-%Y"
 DATE_TIME_FORMAT = f"{DATE_FORMAT} %H:%M"
 # The account's own currency: the Transactions export gives each trade's value and fees in it.
 ACCOUNT_CURRENCY = "EUR"
+# How each export starts: the Transactions export's header (up to the price), and the Account export's.
+TRANSACTIONS_HEADER_START = "Date,Heure,Produit,Code ISIN,Place boursière sectionnée,Lieu d'exécution,Quantité,Cours,"
+ACCOUNT_HEADER = "Date,Heure,Date de,Produit,Code ISIN,Description,FX,Mouvements,,Solde,,ID Ordre"
 
 
 class RowType(Enum):
@@ -136,9 +140,13 @@ class _Row:
     venue: str = ""  # the MIC of the venue a trade was executed on ("Lieu d'exécution"); empty when not given
 
 
-class DegiroStatementReader:
+class DegiroStatementReader(StatementReader):
     def read(self, transactions: str, account: str) -> list[ImportRecord]:
         """The records in the two exports, each given as its full text (header first), oldest first."""
+        if not transactions.startswith(TRANSACTIONS_HEADER_START):
+            raise UnsupportedStatementError("the transactions file is not DEGIRO's Transactions export (CSV, in French)")
+        if not account.startswith(ACCOUNT_HEADER):
+            raise UnsupportedStatementError("the account file is not DEGIRO's Account export (CSV, in French)")
         trades = [_transactions_row(cells) for cells in _cells(transactions)]
         # Oldest first; rows of the same minute keep DEGIRO's order, which lists them newest first.
         cash = sorted(reversed([_account_row(cells) for cells in _cells(account)]), key=lambda row: row.timestamp)

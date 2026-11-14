@@ -10,11 +10,12 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
-from shadowfolio.domain.errors import DomainError
+from shadowfolio.domain.errors import DomainError, UnsupportedStatementFormatError
 from shadowfolio.domain.imports import ImportKind, ImportRecord, TradeDetails
 from shadowfolio.domain.money import Currency
 from shadowfolio.domain.wallet import Wallet
 from shadowfolio.ports.security_lookup import SecurityLookup, SecurityLookupUnavailableError
+from shadowfolio.ports.statement_reader import StatementReader, UnsupportedStatementError
 from shadowfolio.ports.wallet_repository import WalletRepository
 from shadowfolio.usecases.wallet_changes import WalletChanges
 
@@ -28,10 +29,13 @@ class NotImported:
 @dataclass
 class ImportReport:
     not_imported: list[NotImported] = field(default_factory=list)
+    records: int = 0  # read from the statement
+    wallet: Wallet | None = None  # the wallet as it is with every record that went in (saved only if all did)
+    saved: bool = False
 
     @property
     def imported(self) -> bool:
-        """Whether the records were saved: only when every one of them went in."""
+        """Whether every record went in: then they are saved, unless it is a preview."""
         return not self.not_imported
 
 
@@ -61,12 +65,22 @@ SECURITY_KINDS = {
 
 
 class Imports:
-    def __init__(self, repo: WalletRepository, changes: WalletChanges, lookup: SecurityLookup) -> None:
+    def __init__(self, repo: WalletRepository, changes: WalletChanges, lookup: SecurityLookup, reader: StatementReader) -> None:
         self._repo = repo
         self._changes = changes
         self._lookup = lookup
+        self._reader = reader
 
-    def apply(self, wallet_id: UUID, records: list[ImportRecord]) -> ImportReport | None:
+    def statement(self, wallet_id: UUID, transactions: str, account: str, save: bool) -> ImportReport | None:
+        """Read a broker's two exports and apply them to the wallet: saved if `save` and every record goes in, so a
+        preview (`save=False`) shows what an import would do. Returns None if the wallet does not exist."""
+        try:
+            records = self._reader.read(transactions, account)
+        except UnsupportedStatementError as error:
+            raise UnsupportedStatementFormatError(str(error)) from error
+        return self.apply(wallet_id, records, save)
+
+    def apply(self, wallet_id: UUID, records: list[ImportRecord], save: bool = True) -> ImportReport | None:
         """Record the records' operations in the wallet, in the order given, if every one goes in; report the records
         left out, and why. Returns None if the wallet does not exist.
 
@@ -75,12 +89,12 @@ class Imports:
         wallet = self._repo.get(wallet_id)
         if wallet is None:
             return None
-        report = ImportReport()
+        report = ImportReport(records=len(records))
         try:
             tickers = _with_exchanged_identifiers(records, self._lookup.tickers(_securities(records)))
         except SecurityLookupUnavailableError:
             problems = [NotImported(r, LOOKUP_UNAVAILABLE) for r in records if r.kind in SECURITY_KINDS]
-            return ImportReport(problems)
+            return ImportReport(problems, len(records), wallet)
         unchanged = _same_ticker_isin_changes(records, tickers)
         for record in records:
             if record.kind is ImportKind.ISIN_CHANGE:
@@ -93,8 +107,10 @@ class Imports:
                 problem = str(error)
             if problem is not None:
                 report.not_imported.append(NotImported(record, problem))
-        if report.imported:
+        report.wallet = wallet
+        if report.imported and save:
             self._repo.update(wallet)
+            report.saved = True
         return report
 
     def _apply(self, wallet: Wallet, record: ImportRecord, tickers: Mapping[str, str]) -> tuple[Wallet, str | None]:
