@@ -23,7 +23,14 @@ class ImportReport:
 
 
 # Records about a security, which need its ticker.
-SECURITY_KINDS = {ImportKind.BUY, ImportKind.SELL, ImportKind.DIVIDEND, ImportKind.SPIN_OFF, ImportKind.CASH_IN_LIEU}
+SECURITY_KINDS = {
+    ImportKind.BUY,
+    ImportKind.SELL,
+    ImportKind.IPO_SUBSCRIPTION,
+    ImportKind.DIVIDEND,
+    ImportKind.SPIN_OFF,
+    ImportKind.CASH_IN_LIEU,
+}
 
 
 class Imports:
@@ -57,7 +64,7 @@ class Imports:
                 self._history.deposit(wallet_id, record.amount, record.timestamp)
             case ImportKind.WITHDRAWAL:
                 self._history.withdraw(wallet_id, record.amount, record.timestamp)
-            case ImportKind.BUY | ImportKind.SELL if ticker:
+            case ImportKind.BUY | ImportKind.SELL | ImportKind.IPO_SUBSCRIPTION if ticker:
                 self._record_trade(wallet_id, record, ticker)
             case ImportKind.DIVIDEND if ticker:
                 self._record_dividend(wallet_id, record, ticker)
@@ -78,7 +85,7 @@ class Imports:
 
     def _record_trade(self, wallet_id: UUID, record: ImportRecord, ticker: str) -> None:
         assert record.quantity is not None and record.price is not None and record.price_currency is not None
-        record_trade = self._history.record_buy if record.kind is ImportKind.BUY else self._history.record_sell
+        record_trade = self._history.record_sell if record.kind is ImportKind.SELL else self._history.record_buy
         record_trade(
             wallet_id,
             ticker,

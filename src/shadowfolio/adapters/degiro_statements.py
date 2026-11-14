@@ -38,7 +38,7 @@ ACCOUNT_PATTERNS: list[tuple[re.Pattern[str], ImportKind]] = [
         (r"^(Variation Fonds Monétaires|Conversion Fonds Monétaires finalisée)", ImportKind.INTERNAL_TRANSFER),
         (r"^Frais de connexion aux places boursières", ImportKind.FEE),
         (r"^Ajustement fractionnement:", ImportKind.SPLIT),
-        (r"^(Spin-off|Changement ISIN):", ImportKind.CORPORATE_ACTION_NOTICE),
+        (r"^(Spin-off|Changement ISIN|Modification instrument|Introduction en bourse):", ImportKind.CORPORATE_ACTION_NOTICE),
         (r"^(Flatex Interest|Flatex Interest Income|Compensation Fonds Monétaires DEGIRO)$", ImportKind.INCOME),
     ]
 ]
@@ -47,8 +47,18 @@ ACCOUNT_PATTERNS: list[tuple[re.Pattern[str], ImportKind]] = [
 # Account rows announcing a corporate action, and what the Transactions rows of that security on that day are.
 ACTION_PATTERNS: list[tuple[re.Pattern[str], ImportKind]] = [
     (re.compile(r"^Spin-off:"), ImportKind.SPIN_OFF),
-    (re.compile(r"^Changement ISIN:"), ImportKind.ISIN_CHANGE),
+    (re.compile(r"^(Changement ISIN|Modification instrument):"), ImportKind.ISIN_CHANGE),
+    (re.compile(r"^Introduction en bourse:"), ImportKind.IPO_SUBSCRIPTION),
 ]
+
+
+@dataclass(frozen=True)
+class _Announcement:
+    """A corporate action as the Account export announces it: when, and the cash it moved (an IPO's price)."""
+
+    kind: ImportKind
+    timestamp: datetime
+    amount: Decimal
 
 
 class _Part(Enum):
@@ -115,18 +125,28 @@ def _rows(text: str) -> list[list[str]]:
     return [cells for cells in csv.reader(text.splitlines()[1:]) if cells]
 
 
-def _announced_actions(account_rows: list[list[str]]) -> dict[tuple[str, str], ImportKind]:
-    """The corporate actions the Account export announces, by day and ISIN."""
-    actions = {}
+def _announced_actions(account_rows: list[list[str]]) -> dict[tuple[str, str], list[_Announcement]]:
+    """The corporate actions the Account export announces, by day and ISIN (a day can have several, e.g. an IPO
+    subscription and then the change to the listed shares)."""
+    actions: dict[tuple[str, str], list[_Announcement]] = {}
     for cells in account_rows:
-        date, isin, description, order_id = cells[0], cells[4], cells[5], cells[11]
-        kind = next((kind for pattern, kind in ACTION_PATTERNS if pattern.search(description)), None)
-        if kind is not None and not order_id:
-            actions[(date, isin)] = kind
+        row = _account_row(cells)
+        kind = next((kind for pattern, kind in ACTION_PATTERNS if pattern.search(row.description)), None)
+        if kind is not None and not row.order_id:
+            actions.setdefault((cells[0], row.isin), []).append(_Announcement(kind, row.timestamp, abs(row.amount)))
     return actions
 
 
-def _transaction_records(rows: list[list[str]], actions: dict[tuple[str, str], ImportKind]) -> list[ImportRecord]:
+def _announcement(record: ImportRecord, announcements: list[_Announcement]) -> _Announcement | None:
+    """The announcement a Transactions row books: the one at the same minute, or else the day's other one (DEGIRO
+    books a spin-off's or a subscription's shares at midnight, but announces them later that day)."""
+    same_minute = [a for a in announcements if a.timestamp == record.timestamp]
+    others = [a for a in announcements if a.kind in (ImportKind.SPIN_OFF, ImportKind.IPO_SUBSCRIPTION)]
+    candidates = same_minute or others
+    return candidates[0] if candidates else None
+
+
+def _transaction_records(rows: list[list[str]], actions: dict[tuple[str, str], list[_Announcement]]) -> list[ImportRecord]:
     """Executions, identified by their order ID, and the rows corporate actions book without one: a split is
     recognised by its shape, other actions by what the Account export announces for that security that day."""
     records = [_transaction(cells) for cells in rows]
@@ -137,11 +157,29 @@ def _transaction_records(rows: list[list[str]], actions: dict[tuple[str, str], I
             groups.setdefault((records[index].timestamp, cells[3]), []).append(index)
     for indexes in groups.values():
         group = [rows[index] for index in indexes]
-        kind = ImportKind.SPLIT if _is_split(group) else actions.get((group[0][0], group[0][3]))
+        announcements = actions.get((group[0][0], group[0][3]), [])
         for index in indexes:
-            if kind is not None:
-                records[index] = replace(records[index], kind=kind)
+            if _is_split(group):
+                records[index] = replace(records[index], kind=ImportKind.SPLIT)
+            elif announcement := _announcement(records[index], announcements):
+                records[index] = _as_announced(records[index], announcement)
     return records
+
+
+def _as_announced(record: ImportRecord, announcement: _Announcement) -> ImportRecord:
+    """A corporate-action row of Transactions, as the Account export describes it. The Transactions row of an IPO
+    subscription has no price: what was paid, and when, is in the Account export."""
+    if announcement.kind is not ImportKind.IPO_SUBSCRIPTION or not record.quantity:
+        return replace(record, kind=announcement.kind)
+    return replace(
+        record,
+        kind=ImportKind.IPO_SUBSCRIPTION,
+        timestamp=announcement.timestamp,
+        amount=announcement.amount,
+        price=announcement.amount / record.quantity,
+        price_currency=ACCOUNT_CURRENCY,
+        fees=Decimal(0),
+    )
 
 
 def _is_split(rows: list[list[str]]) -> bool:

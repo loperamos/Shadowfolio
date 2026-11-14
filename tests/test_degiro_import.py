@@ -481,3 +481,35 @@ def test_a_tax_listed_before_its_dividend_in_the_same_minute_still_belongs_to_it
         Decimal("0.14"),
         Decimal("1.10"),
     )
+
+
+def test_shares_subscribed_in_an_ipo_are_bought_at_the_subscription_price() -> None:
+    # 2 SpaceX shares subscribed for 233.90 EUR on a temporary "non tradeable" line, which then became the listed
+    # shares (an instrument change, booked like an ISIN change).
+    subscription, listed = (
+        "SPACEX - IPO SUBSCRIPTION - NON TRADEABLE,US0IPOSPACEX",
+        "SPACE EXPLORATION TECHNOLOGIES CORP CLASS A,US84615Q1031",
+    )
+    transactions = [
+        f'12-06-2026,13:04,{listed},NDQ,,2,"135,0000",USD,"-270,00",USD,"-232,96","1,1590","0,00",,"-232,96",',
+        f'12-06-2026,13:04,{subscription},DEG,,-2,"116,6607",EUR,"233,32",EUR,"233,32","1,0000","0,00",,"233,32",',
+        f'12-06-2026,00:00,{subscription},DEG,,2,"0,0000",EUR,"0,00",EUR,"0,00","1,0000","0,00",,"0,00",',
+    ]
+    account = [
+        f'12-06-2026,13:04,12-06-2026,{listed},"Modification instrument: Achat 2 Space Exploration Technologies Corp Class A@135 USD '
+        '(US84615Q1031)",,USD,"0,00",USD,"0,00",',
+        f'12-06-2026,13:04,12-06-2026,{subscription},"Modification instrument: Vente 2 SpaceX - IPO Subscription - Non tradeable@116,6607 '
+        'EUR (US0IPOSPACEX)",,EUR,"0,00",EUR,"266,10",',
+        f"12-06-2026,12:50,12-06-2026,{subscription},Introduction en bourse: Achat 2 SpaceX - IPO Subscription - Non tradeable@0 EUR "
+        '(US0IPOSPACEX),,EUR,"-233,90",EUR,"266,10",',
+        '01-06-2026,10:00,01-06-2026,,,Dépôt flatex,,EUR,"500,00",EUR,"500,00",',
+    ]
+
+    imported = import_degiro(transactions=transactions, account=account, tickers={"US0IPOSPACEX": "SPCX", "US84615Q1031": "SPCX"})
+
+    kinds = [record.kind for record in imported.records]
+    assert (kinds.count(ImportKind.IPO_SUBSCRIPTION), kinds.count(ImportKind.ISIN_CHANGE)) == (1, 2)
+    assert imported.report.not_imported == []
+    assert imported.wallet.holdings == {"SPCX": Decimal(2)}
+    assert imported.wallet.ledger.positions["SPCX"].cost == Decimal("233.90")
+    assert imported.wallet.cash == Decimal("266.10")
