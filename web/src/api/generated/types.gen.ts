@@ -7,7 +7,7 @@ export type ClientOptions = {
 /**
  * BenchmarkResponse
  *
- * What the wallet's deposits and withdrawals would be worth in `symbol` instead, at the end of every day.
+ * What the wallet's money would be worth in `symbol` instead, at the end of every day (see the endpoint).
  */
 export type BenchmarkResponse = {
     /**

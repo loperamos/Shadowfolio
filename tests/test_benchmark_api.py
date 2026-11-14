@@ -1,5 +1,6 @@
-"""A benchmark with the same deposits: what the wallet's money would be worth had every deposit bought SPY that day
-(and every withdrawal sold it), with SPY's dividends reinvested after the wallet's withholding tax."""
+"""A benchmark with the same deposits: what the wallet's money would be worth had every deposit bought SPY that day,
+and every withdrawal sold the same share of it as it took from the wallet, with SPY's dividends reinvested after the
+wallet's withholding tax."""
 
 from datetime import UTC, date, datetime
 from decimal import Decimal
@@ -66,13 +67,26 @@ def test_deposits_buy_spy_on_their_day_and_follow_its_closes(client: TestClient,
 
     assert result["symbol"] == "SPY"
     # Monday: 1000 EUR buys 2.5 SPY at 500 USD x 0.80; Tuesday: 2.5 x 520 x 0.80 = 1040.00 EUR. Wednesday: the 208 EUR
-    # withdrawn sell 0.5 SPY, leaving 2 x 416 = 832.00 EUR. Later days keep Wednesday's close.
+    # withdrawn are 20.8% of the wallet's 1000, so 20.8% of the SPY is sold, leaving 1.98 x 416 = 823.68 EUR. Later days
+    # keep Wednesday's close.
     assert [(v["day"], v["value"]) for v in result["values"]][:4] == [
         ("2024-06-03", "1000.00"),
         ("2024-06-04", "1040.00"),
-        ("2024-06-05", "832.00"),
-        ("2024-06-06", "832.00"),
+        ("2024-06-05", "823.68"),
+        ("2024-06-06", "823.68"),
     ]
+
+
+def test_a_withdrawal_larger_than_what_spy_would_hold_never_leaves_it_negative(client: TestClient, prices: InMemoryPriceData) -> None:
+    wallet_id = wallet(client, "USD", MONDAY, "1000")
+    client.post(f"/api/wallets/{wallet_id}/withdrawals", json={"amount": "600", "timestamp": "2024-06-05T09:00:00Z"})
+    spy_close(prices, MONDAY, "500")
+    spy_close(prices, WEDNESDAY, "250")  # SPY halved: the same 600 would be more than all of it
+
+    values = benchmark(client, wallet_id)["values"]
+
+    # 600 of the wallet's 1000 is 60%: the 2 SPY bought on Monday become 0.8, worth 0.8 x 250 = 200.00.
+    assert [(v["day"], v["value"]) for v in values][2] == ("2024-06-05", "200.00")
 
 
 def test_dividends_are_reinvested_after_the_wallets_withholding_tax(

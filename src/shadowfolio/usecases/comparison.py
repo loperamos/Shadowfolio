@@ -12,6 +12,7 @@ from shadowfolio.ports.corporate_actions import CorporateActions, CorporateActio
 from shadowfolio.ports.fx_rates import FxRates, FxRatesUnavailableError
 from shadowfolio.ports.price_data import PriceData, PriceDataUnavailableError
 from shadowfolio.ports.wallet_repository import WalletRepository
+from shadowfolio.usecases.valuation import Valuation
 
 # The US market as a whole: the usual yardstick, with prices from the first day of market data.
 BENCHMARK_SYMBOL = "SPY"
@@ -26,6 +27,8 @@ class Comparison:
         self._prices = prices
         self._fx_rates = fx_rates
         self._corporate_actions = corporate_actions
+        # The wallet's own daily values: a withdrawal sells the share of the benchmark it took from the wallet.
+        self._valuation = Valuation(repo, clock, prices, fx_rates)
 
     def benchmark_daily(self, wallet_id: UUID) -> Benchmark | None:
         """The benchmark's value at the end of every day from the wallet's first operation to today, given the wallet's
@@ -63,4 +66,7 @@ class Comparison:
             raise CorporateActionsUnavailableNowError(
                 f"could not fetch {BENCHMARK_SYMBOL}'s dividends right now; try again later"
             ) from error
-        return Benchmark(BENCHMARK_SYMBOL, benchmark_values(days, flows, closes, rates, dividends, wallet.withholding_rate))
+        wallet_values = {
+            value.day: value.valuation.total for value in self._valuation.daily(wallet_id) or [] if value.valuation is not None
+        }
+        return Benchmark(BENCHMARK_SYMBOL, benchmark_values(days, flows, wallet_values, closes, rates, dividends, wallet.withholding_rate))

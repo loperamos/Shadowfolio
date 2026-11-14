@@ -15,8 +15,9 @@ def comparison_router(comparison: Comparison) -> APIRouter:
 
     @router.get("/wallets/{wallet_id}/benchmark/daily", responses=NOT_FOUND | INVALID)
     def benchmark_daily(wallet_id: UUID) -> BenchmarkResponse:
-        """What the wallet's deposits and withdrawals would be worth in SPY instead, at the end of every day from its
-        first operation to today, with SPY's dividends reinvested after the wallet's withholding tax."""
+        """What the wallet's money would be worth in SPY instead, at the end of every day from its first operation to
+        today: each deposit buys SPY that day, each withdrawal sells the same share of it as it took from the wallet,
+        and SPY's dividends are reinvested after the wallet's withholding tax."""
         try:
             benchmark = comparison.benchmark_daily(wallet_id)
         except DomainError as error:
