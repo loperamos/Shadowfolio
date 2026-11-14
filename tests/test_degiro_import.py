@@ -31,6 +31,8 @@ TRANSACTIONS_HEADER = (
     "Montant EUR,Taux de change,Frais conversion AutoFX,Frais de courtage et/ou de parties,Montant négocié EUR,ID Ordre"
 )
 ACCOUNT_HEADER = "Date,Heure,Date de,Produit,Code ISIN,Description,FX,Mouvements,,Solde,,ID Ordre"
+# The fund DEGIRO kept spare cash in before flatex: product and ISIN cells.
+FUND = "MORGAN STANLEY EUR LIQUIDITY FUND,LU1959429272"
 
 
 @dataclass(frozen=True)
@@ -94,3 +96,28 @@ def test_a_row_the_import_does_not_know_is_reported_and_changes_nothing() -> Non
 
     assert [(problem.record.description, problem.reason) for problem in imported.report.not_imported] == [("Something new", "unknown row")]
     assert imported.wallet.operations == ()
+
+
+@pytest.mark.parametrize(
+    "row",
+    [
+        # flatex books a processed withdrawal out and back in; the "Retrait flatex" row is the real one.
+        '07-10-2025,14:11,07-10-2025,,,Processed Flatex Withdrawal,,EUR,"200,00",EUR,"500,00",',
+        # Spare cash swept between DEGIRO and the flatex bank cash account, both yours.
+        '09-11-2026,18:12,09-11-2026,,,Degiro Cash Sweep Transfer,,EUR,"-26,76",EUR,"473,24",',
+        '09-11-2026,18:12,09-11-2026,,,"Virement vers votre Compte Espèces à la flatexDEGIRO Bank: 26,76 EUR",,,,EUR,"500,00",',
+        '30-09-2026,09:41,30-09-2026,,,"Virement depuis votre Compte Espèces à la flatexDEGIRO Bank: 3,18 EUR",,,,EUR,"500,00",',
+        # Before flatex (2020), DEGIRO kept spare cash in a money market fund: still cash.
+        f'26-10-2020,00:00,25-10-2020,{FUND},Variation Fonds Monétaires (EUR),,EUR,"0,00",EUR,"500,00",',
+        f'27-10-2020,17:50,23-10-2020,{FUND},"Conversion Fonds Monétaires finalisée: Achat 0,01 @ 0 EUR",,EUR,"99,16",EUR,"599,16",',
+        f'02-09-2020,16:09,02-09-2020,{FUND},"Conversion Fonds Monétaires finalisée: Vente 0,000001 @ 9 924,6649 EUR",,,,EUR,"500,00",',
+    ],
+)
+def test_money_moving_inside_the_broker_changes_nothing(row: str) -> None:
+    deposit = '01-06-2020,15:32,01-06-2020,,,Dépôt flatex,,EUR,"500,00",EUR,"500,00",'
+
+    imported = import_degiro(transactions=[], account=[row, deposit])
+
+    assert imported.records[-1].kind is ImportKind.INTERNAL_TRANSFER
+    assert imported.report.not_imported == []
+    assert imported.wallet.cash == Decimal("500.00")

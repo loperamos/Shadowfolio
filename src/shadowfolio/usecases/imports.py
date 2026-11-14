@@ -31,6 +31,8 @@ class Imports:
                     self._history.deposit(wallet_id, record.amount, record.timestamp)
                 case ImportKind.WITHDRAWAL:
                     self._history.withdraw(wallet_id, record.amount, record.timestamp)
+                case ImportKind.INTERNAL_TRANSFER:
+                    pass  # not money in or out of the wallet
                 case ImportKind.UNKNOWN:
                     report.not_imported.append(NotImported(record, "unknown row"))
         return report

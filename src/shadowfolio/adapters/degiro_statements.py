@@ -21,6 +21,10 @@ ACCOUNT_PATTERNS: list[tuple[re.Pattern[str], ImportKind]] = [
     for pattern, kind in [
         (r"^(Dépôt flatex|Versement de fonds)$", ImportKind.DEPOSIT),
         (r"^(Retrait flatex|Retrait instantané SEPA)$", ImportKind.WITHDRAWAL),
+        # flatex books a processed withdrawal out and back in; the "Retrait flatex" row is the real one.
+        (r"^Processed Flatex Withdrawal$", ImportKind.INTERNAL_TRANSFER),
+        (r"^(Degiro Cash Sweep Transfer|Virement (vers|depuis) votre Compte Espèces à la flatexDEGIRO Bank)", ImportKind.INTERNAL_TRANSFER),
+        (r"^(Variation Fonds Monétaires|Conversion Fonds Monétaires finalisée)", ImportKind.INTERNAL_TRANSFER),
     ]
 ]
 
@@ -47,5 +51,6 @@ def _timestamp(date: str, time: str) -> datetime:
 
 
 def _number(text: str) -> Decimal:
-    """A French-formatted number: decimal comma, spaces between thousands."""
-    return Decimal(re.sub(r"[\s ]", "", text).replace(",", "."))
+    """A French-formatted number: decimal comma, spaces (of any width) between thousands. An empty cell is zero."""
+    cleaned = re.sub(r"\s", "", text).replace(",", ".")
+    return Decimal(cleaned) if cleaned else Decimal(0)

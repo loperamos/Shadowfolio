@@ -9,6 +9,8 @@ from enum import StrEnum
 class ImportKind(StrEnum):
     DEPOSIT = "deposit"  # money moved into the account from outside
     WITHDRAWAL = "withdrawal"  # money moved out of the account
+    # Money moving between accounts that are all the investor's (a broker and its partner bank, a cash fund).
+    INTERNAL_TRANSFER = "internal_transfer"
     UNKNOWN = "unknown"  # a row the reader does not recognise
 
 
