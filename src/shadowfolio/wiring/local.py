@@ -15,6 +15,7 @@ from shadowfolio.adapters.openfigi_security_lookup import OpenFigiSecurityLookup
 from shadowfolio.adapters.sqlite_wallet_repository import SqliteWalletRepository
 from shadowfolio.adapters.system_clock import SystemClock
 from shadowfolio.interfaces.web.app import create_app
+from shadowfolio.usecases.comparison import Comparison
 from shadowfolio.usecases.history import History
 from shadowfolio.usecases.imports import Imports
 from shadowfolio.usecases.market import Market
@@ -43,11 +44,13 @@ def build_local_app(config: LocalConfig) -> FastAPI:
     market_cache = config.db_path.parent / MARKET_CACHE_FILE
     prices = CachedPriceData(AlpacaPriceData(config.alpaca), PRICE_SOURCE, market_cache, clock)
     fx_rates = CachedFxRates(EcbFxRates(clock), FX_SOURCE, market_cache, clock)
-    sync = Sync(wallet_repository, clock, AlpacaCorporateActions(config.alpaca), fx_rates)
+    corporate_actions = AlpacaCorporateActions(config.alpaca)
+    sync = Sync(wallet_repository, clock, corporate_actions, fx_rates)
     return create_app(
         wallets=Wallets(wallet_repository, clock),
         history=History(wallet_repository, clock, prices, fx_rates, sync),
         valuation=Valuation(wallet_repository, clock, prices, fx_rates),
+        comparison=Comparison(wallet_repository, clock, prices, fx_rates, corporate_actions),
         market=Market(prices),
         sync=sync,
         imports=Imports(wallet_repository, WalletChanges(clock, prices, fx_rates, sync), OpenFigiSecurityLookup(), DegiroStatementReader()),

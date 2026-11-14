@@ -7,6 +7,7 @@ from uuid import UUID
 
 from pydantic import AwareDatetime, BaseModel, Field
 
+from shadowfolio.domain.comparison import Benchmark
 from shadowfolio.domain.money import Currency
 from shadowfolio.domain.operations import (
     Buy,
@@ -327,6 +328,22 @@ class ValuationResponse(BaseModel):
             day_change_percent=_ratio_percent(valuation.day_change_ratio),
             total=valuation.total,
         )
+
+
+class BenchmarkValueResponse(BaseModel):
+    day: date
+    value: Decimal | None  # in the wallet's currency; null when the benchmark has no close or rate that day
+
+
+class BenchmarkResponse(BaseModel):
+    """What the wallet's money would be worth in `symbol` instead, at the end of every day (see the endpoint)."""
+
+    symbol: str
+    values: list[BenchmarkValueResponse]
+
+    @classmethod
+    def from_benchmark(cls, benchmark: Benchmark) -> "BenchmarkResponse":
+        return cls(symbol=benchmark.symbol, values=[BenchmarkValueResponse(day=v.day, value=v.value) for v in benchmark.values])
 
 
 class DailyValueResponse(BaseModel):

@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { CopyWalletData, CopyWalletErrors, CopyWalletResponses, CreateWalletData, CreateWalletErrors, CreateWalletResponses, DailyValuationData, DailyValuationErrors, DailyValuationResponses, DeleteOperationData, DeleteOperationErrors, DeleteOperationResponses, DeleteWalletData, DeleteWalletErrors, DeleteWalletResponses, DepositData, DepositErrors, DepositResponses, EditOperationData, EditOperationErrors, EditOperationResponses, GetWalletData, GetWalletErrors, GetWalletResponses, ImportDegiroData, ImportDegiroErrors, ImportDegiroResponses, LatestQuoteData, LatestQuoteErrors, LatestQuoteResponses, ListOperationsData, ListOperationsErrors, ListOperationsResponses, ListWalletsData, ListWalletsResponses, PreviewDegiroImportData, PreviewDegiroImportErrors, PreviewDegiroImportResponses, RecordBuyData, RecordBuyErrors, RecordBuyResponses, RecordSellData, RecordSellErrors, RecordSellResponses, SyncAllWalletsData, SyncAllWalletsErrors, SyncAllWalletsResponses, UpdateWalletData, UpdateWalletErrors, UpdateWalletResponses, WalletValuationData, WalletValuationErrors, WalletValuationResponses, WithdrawData, WithdrawErrors, WithdrawResponses } from './types.gen';
+import type { BenchmarkDailyData, BenchmarkDailyErrors, BenchmarkDailyResponses, CopyWalletData, CopyWalletErrors, CopyWalletResponses, CreateWalletData, CreateWalletErrors, CreateWalletResponses, DailyValuationData, DailyValuationErrors, DailyValuationResponses, DeleteOperationData, DeleteOperationErrors, DeleteOperationResponses, DeleteWalletData, DeleteWalletErrors, DeleteWalletResponses, DepositData, DepositErrors, DepositResponses, EditOperationData, EditOperationErrors, EditOperationResponses, GetWalletData, GetWalletErrors, GetWalletResponses, ImportDegiroData, ImportDegiroErrors, ImportDegiroResponses, LatestQuoteData, LatestQuoteErrors, LatestQuoteResponses, ListOperationsData, ListOperationsErrors, ListOperationsResponses, ListWalletsData, ListWalletsResponses, PreviewDegiroImportData, PreviewDegiroImportErrors, PreviewDegiroImportResponses, RecordBuyData, RecordBuyErrors, RecordBuyResponses, RecordSellData, RecordSellErrors, RecordSellResponses, SyncAllWalletsData, SyncAllWalletsErrors, SyncAllWalletsResponses, UpdateWalletData, UpdateWalletErrors, UpdateWalletResponses, WalletValuationData, WalletValuationErrors, WalletValuationResponses, WithdrawData, WithdrawErrors, WithdrawResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -190,3 +190,12 @@ export const importDegiro = <ThrowOnError extends boolean = false>(options: Opti
         ...options.headers
     }
 });
+
+/**
+ * Benchmark Daily
+ *
+ * What the wallet's money would be worth in SPY instead, at the end of every day from its first operation to
+ * today: each deposit buys SPY that day, each withdrawal sells the same share of it as it took from the wallet,
+ * and SPY's dividends are reinvested after the wallet's withholding tax.
+ */
+export const benchmarkDaily = <ThrowOnError extends boolean = false>(options: Options<BenchmarkDailyData, ThrowOnError>): RequestResult<BenchmarkDailyResponses, BenchmarkDailyErrors, ThrowOnError> => (options.client ?? client).get<BenchmarkDailyResponses, BenchmarkDailyErrors, ThrowOnError>({ url: '/api/wallets/{wallet_id}/benchmark/daily', ...options });
