@@ -1,6 +1,7 @@
 import { Alert, Group, SegmentedControl, Skeleton, Text, Title } from "@mantine/core";
 import { DateInput } from "@mantine/dates";
 import { IconCalendar } from "@tabler/icons-react";
+import { useSearchParams } from "react-router";
 
 import type { DailyValueResponse } from "../api/generated";
 import { TimeSeriesChart } from "../ui/TimeSeriesChart";
@@ -8,6 +9,43 @@ import { DATE_INPUT_FORMAT, parseDateInput } from "../ui/format";
 import { CHART_HEIGHT, DATE_INPUT_WIDTH, ICON_SIZE } from "../ui/theme";
 import { type DayRange, describeRange, inRange, isEverything, Period } from "./period";
 import { useDailyValues } from "./useDailyValues";
+
+// The chart's lines, by the key of their values in each point.
+enum Line {
+  VALUE = "total",
+  NET_DEPOSITS = "net_deposits",
+}
+
+// Net deposits is hidden at first: after taking out more than was put in, it is far below the value and squashes it.
+const DEFAULT_LINES: string[] = [Line.VALUE];
+// The lines shown, in the URL (?lines=total,net_deposits) when not the default ones, so a view can be shared.
+const LINES_PARAM = "lines";
+const LINES_SEPARATOR = ",";
+
+/** The lines shown, from the URL, and a way to change them. */
+function useLines(): [string[], (lines: string[]) => void] {
+  const [params, setParams] = useSearchParams();
+  const value = params.get(LINES_PARAM);
+  const known: string[] = Object.values(Line);
+  const lines = value === null ? DEFAULT_LINES : value.split(LINES_SEPARATOR).filter((line) => known.includes(line));
+  function setLines(next: string[]) {
+    // Replacing the history entry, as for the period.
+    setParams(
+      (current) => {
+        const updated = new URLSearchParams(current);
+        const isDefault = next.length === DEFAULT_LINES.length && next.every((line) => DEFAULT_LINES.includes(line));
+        if (isDefault) {
+          updated.delete(LINES_PARAM);
+        } else {
+          updated.set(LINES_PARAM, next.join(LINES_SEPARATOR));
+        }
+        return updated;
+      },
+      { replace: true },
+    );
+  }
+  return [lines, setLines];
+}
 
 type ChartProps = {
   walletId: string;
@@ -68,6 +106,7 @@ function DayInput({ label, placeholder, value, onChange, error }: DayInputProps)
 type BodyProps = { state: ReturnType<typeof useDailyValues>; range: DayRange; currency: string; onSelect: (start: string, end: string) => void };
 
 function ChartBody({ state, range, currency, onSelect }: BodyProps) {
+  const [lines, setLines] = useLines();
   switch (state.status) {
     case "loading":
       return <Skeleton h={CHART_HEIGHT} />;
@@ -94,10 +133,11 @@ function ChartBody({ state, range, currency, onSelect }: BodyProps) {
             currency={currency}
             onSelect={onSelect}
             series={[
-              { name: "total", label: "Value", color: "teal.6" },
-              // Hidden at first: after taking out more than was put in, it is far below the value and squashes it.
-              { name: "net_deposits", label: "Net deposits", color: "gray.6", dashed: true, hidden: true },
+              { name: Line.VALUE, label: "Value", color: "teal.6" },
+              { name: Line.NET_DEPOSITS, label: "Net deposits", color: "gray.6", dashed: true },
             ]}
+            shown={lines}
+            onShownChange={setLines}
           />
           {/* Unvalued days are gaps in the line, never guesses; say why. */}
           {unvalued.length > 0 && (
@@ -113,5 +153,5 @@ function ChartBody({ state, range, currency, onSelect }: BodyProps) {
 
 // For drawing only: the chart needs numbers. Amounts stay exact strings everywhere else.
 function toPoint(value: DailyValueResponse) {
-  return { day: value.day, total: value.total == null ? null : Number(value.total), net_deposits: Number(value.net_deposits) };
+  return { day: value.day, [Line.VALUE]: value.total == null ? null : Number(value.total), [Line.NET_DEPOSITS]: Number(value.net_deposits) };
 }
