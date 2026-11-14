@@ -1076,7 +1076,7 @@
     "/api/wallets/{wallet_id}/benchmark/daily": {
       "get": {
         "summary": "Benchmark Daily",
-        "description": "What the wallet's money would be worth in SPY instead, at the end of every day from its first operation to\ntoday: each deposit buys SPY that day, each withdrawal sells the same share of it as it took from the wallet,\nand SPY's dividends are reinvested after the wallet's withholding tax.",
+        "description": "What the wallet's money would be worth in `symbol` (default SPY) instead, at the end of every day from its first operation to\ntoday: each deposit buys SPY that day, each withdrawal sells the same share of it as it took from the wallet,\nand its dividends are reinvested after the wallet's withholding tax. Unvalued every day when market data has\nno prices for it.",
         "operationId": "benchmark_daily",
         "parameters": [
           {
@@ -1087,6 +1087,16 @@
               "type": "string",
               "format": "uuid",
               "title": "Wallet Id"
+            }
+          },
+          {
+            "name": "symbol",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "SPY",
+              "title": "Symbol"
             }
           }
         ],
@@ -1127,7 +1137,7 @@
     "/api/wallets/{wallet_id}/performance": {
       "get": {
         "summary": "Wallet Performance",
-        "description": "How the wallet did from `start` (default: its first operation) to `end` (default: today), next to SPY with the\nsame deposits: gain, and returns that ignore (time-weighted) or include (money-weighted) when money moved.",
+        "description": "How the wallet did from `start` (default: its first operation) to `end` (default: today), next to `symbol`\n(default SPY) with the same deposits: gain, and returns that ignore (time-weighted) or include (money-weighted) when money moved.",
         "operationId": "wallet_performance",
         "parameters": [
           {
@@ -1172,6 +1182,16 @@
                 }
               ],
               "title": "End"
+            }
+          },
+          {
+            "name": "symbol",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "SPY",
+              "title": "Symbol"
             }
           }
         ],

@@ -1413,7 +1413,12 @@ export type BenchmarkDailyData = {
          */
         wallet_id: string;
     };
-    query?: never;
+    query?: {
+        /**
+         * Symbol
+         */
+        symbol?: string;
+    };
     url: '/api/wallets/{wallet_id}/benchmark/daily';
 };
 
@@ -1456,6 +1461,10 @@ export type WalletPerformanceData = {
          * End
          */
         end?: string | null;
+        /**
+         * Symbol
+         */
+        symbol?: string;
     };
     url: '/api/wallets/{wallet_id}/performance';
 };

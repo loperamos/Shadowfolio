@@ -116,3 +116,24 @@ def test_days_before_spy_has_a_close_are_left_unvalued_and_deposits_wait_for_one
 
 def test_an_unknown_wallet_has_no_benchmark(client: TestClient) -> None:
     assert client.get("/api/wallets/00000000-0000-0000-0000-000000000000/benchmark/daily").status_code == 404
+
+
+def test_another_symbol_can_be_the_benchmark(client: TestClient, prices: InMemoryPriceData) -> None:
+    wallet_id = wallet(client, "USD", MONDAY, "1000")
+    prices.add_close("QQQ", Quote(Decimal("400"), Currency.USD, datetime(2024, 6, 3, 4, 0, tzinfo=UTC)))
+    prices.add_close("QQQ", Quote(Decimal("440"), Currency.USD, datetime(2024, 6, 4, 4, 0, tzinfo=UTC)))
+
+    response = client.get(f"/api/wallets/{wallet_id}/benchmark/daily", params={"symbol": "qqq"})
+
+    result = response.json()
+    assert result["symbol"] == "QQQ"
+    assert [(v["day"], v["value"]) for v in result["values"]][:2] == [("2024-06-03", "1000.00"), ("2024-06-04", "1100.00")]
+
+
+def test_a_symbol_without_prices_leaves_every_day_unvalued(client: TestClient) -> None:
+    wallet_id = wallet(client, "USD", MONDAY, "1000")
+
+    result = client.get(f"/api/wallets/{wallet_id}/benchmark/daily", params={"symbol": "ZZZZ"}).json()
+
+    assert result["symbol"] == "ZZZZ"
+    assert {v["value"] for v in result["values"]} == {None}

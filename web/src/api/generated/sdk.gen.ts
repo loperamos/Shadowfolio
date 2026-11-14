@@ -194,16 +194,17 @@ export const importDegiro = <ThrowOnError extends boolean = false>(options: Opti
 /**
  * Benchmark Daily
  *
- * What the wallet's money would be worth in SPY instead, at the end of every day from its first operation to
+ * What the wallet's money would be worth in `symbol` (default SPY) instead, at the end of every day from its first operation to
  * today: each deposit buys SPY that day, each withdrawal sells the same share of it as it took from the wallet,
- * and SPY's dividends are reinvested after the wallet's withholding tax.
+ * and its dividends are reinvested after the wallet's withholding tax. Unvalued every day when market data has
+ * no prices for it.
  */
 export const benchmarkDaily = <ThrowOnError extends boolean = false>(options: Options<BenchmarkDailyData, ThrowOnError>): RequestResult<BenchmarkDailyResponses, BenchmarkDailyErrors, ThrowOnError> => (options.client ?? client).get<BenchmarkDailyResponses, BenchmarkDailyErrors, ThrowOnError>({ url: '/api/wallets/{wallet_id}/benchmark/daily', ...options });
 
 /**
  * Wallet Performance
  *
- * How the wallet did from `start` (default: its first operation) to `end` (default: today), next to SPY with the
- * same deposits: gain, and returns that ignore (time-weighted) or include (money-weighted) when money moved.
+ * How the wallet did from `start` (default: its first operation) to `end` (default: today), next to `symbol`
+ * (default SPY) with the same deposits: gain, and returns that ignore (time-weighted) or include (money-weighted) when money moved.
  */
 export const walletPerformance = <ThrowOnError extends boolean = false>(options: Options<WalletPerformanceData, ThrowOnError>): RequestResult<WalletPerformanceResponses, WalletPerformanceErrors, ThrowOnError> => (options.client ?? client).get<WalletPerformanceResponses, WalletPerformanceErrors, ThrowOnError>({ url: '/api/wallets/{wallet_id}/performance', ...options });
