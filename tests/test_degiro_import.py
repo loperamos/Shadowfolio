@@ -7,6 +7,7 @@ the wallet holds after importing them.
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from decimal import Decimal
+from uuid import uuid4
 
 import pytest
 
@@ -21,9 +22,9 @@ from shadowfolio.domain.imports import ImportKind, ImportRecord
 from shadowfolio.domain.money import Currency, FxRate
 from shadowfolio.domain.operations import Dividend, Fee, ImportedDividend, Income, SharesReceived
 from shadowfolio.domain.wallet import Wallet
-from shadowfolio.usecases.history import History
 from shadowfolio.usecases.imports import ImportReport, Imports
 from shadowfolio.usecases.sync import Sync
+from shadowfolio.usecases.wallet_changes import WalletChanges
 from shadowfolio.usecases.wallets import Wallets
 
 NOW = datetime(2026, 11, 13, 12, 0, tzinfo=UTC)
@@ -58,12 +59,13 @@ def import_degiro(
     """
     repo, clock, rates = InMemoryWalletRepository(), FixedClock(NOW), InMemoryFxRates(*fx_rates)
     sync = Sync(repo, clock, InMemoryCorporateActions(*corporate_actions), rates)
-    history = History(repo, clock, InMemoryPriceData(), rates, sync)
+    changes = WalletChanges(clock, InMemoryPriceData(), rates, sync)
     wallets = Wallets(repo, clock)
     wallet = wallets.create("owner", "DEGIRO", Currency.EUR, Decimal(0))
 
     records = DegiroStatementReader().read("\n".join([TRANSACTIONS_HEADER, *transactions]), "\n".join([ACCOUNT_HEADER, *account]))
-    report = Imports(history, repo).apply(wallet.id, records, tickers or {})
+    report = Imports(repo, changes).apply(wallet.id, records, tickers or {})
+    assert report is not None
 
     imported = wallets.get(wallet.id)
     assert imported is not None
@@ -734,3 +736,23 @@ def test_value_changes_of_the_cash_fund_are_income() -> None:
         (Decimal("-0.03"), "Variation Fonds Monétaires (EUR)")
     ]
     assert imported.wallet.cash == Decimal("499.97")
+
+
+def test_a_trade_in_a_currency_wallets_do_not_use_is_reported_and_nothing_is_saved() -> None:
+    hkd_buy = (
+        f'31-01-2022,03:00,{TENCENT},HKS,XHKG,100,"450,0000",HKD,"-45000,00",HKD,"-5180,00","8,6870","-12,95","-3,00","-5195,95",order-6'
+    )
+    deposit = '01-01-2022,10:00,01-01-2022,,,Dépôt flatex,,EUR,"6000,00",EUR,"6000,00",'
+
+    imported = import_degiro(transactions=[hkd_buy], account=[deposit], tickers=TENCENT_TICKERS)
+
+    assert [problem.reason for problem in imported.report.not_imported] == ["prices in HKD are not supported"]
+    assert imported.wallet.operations == ()
+
+
+def test_importing_into_a_wallet_that_does_not_exist_imports_nothing() -> None:
+    repo, clock, rates = InMemoryWalletRepository(), FixedClock(NOW), InMemoryFxRates()
+    changes = WalletChanges(clock, InMemoryPriceData(), rates, Sync(repo, clock, InMemoryCorporateActions(), rates))
+    records = DegiroStatementReader().read(TRANSACTIONS_HEADER, "\n".join([ACCOUNT_HEADER, DEPOSIT_500]))
+
+    assert Imports(repo, changes).apply(uuid4(), records, {}) is None
