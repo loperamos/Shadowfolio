@@ -172,5 +172,12 @@ def test_fees_and_income_round_trip(make_repository: RepositoryFactory) -> None:
     assert make_repository().get(wallet.id) == wallet
 
 
+def test_shares_received_round_trip(make_repository: RepositoryFactory) -> None:
+    wallet = a_wallet().receive_shares(uuid4(), T2, "NVDA", Decimal(1), Decimal(0))
+    make_repository().add(wallet)
+
+    assert make_repository().get(wallet.id) == wallet
+
+
 def test_unknown_wallet_is_none(make_repository: RepositoryFactory) -> None:
     assert make_repository().get(uuid4()) is None

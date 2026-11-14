@@ -38,9 +38,14 @@ ACCOUNT_PATTERNS: list[tuple[re.Pattern[str], ImportKind]] = [
         (r"^(Variation Fonds Monétaires|Conversion Fonds Monétaires finalisée)", ImportKind.INTERNAL_TRANSFER),
         (r"^Frais de connexion aux places boursières", ImportKind.FEE),
         (r"^Ajustement fractionnement:", ImportKind.SPLIT),
+        (r"^Spin-off:", ImportKind.CORPORATE_ACTION_NOTICE),
         (r"^(Flatex Interest|Flatex Interest Income|Compensation Fonds Monétaires DEGIRO)$", ImportKind.INCOME),
     ]
 ]
+
+
+# Account rows announcing a corporate action, and what the Transactions rows of that security on that day are.
+ACTION_PATTERNS: list[tuple[re.Pattern[str], ImportKind]] = [(re.compile(r"^Spin-off:"), ImportKind.SPIN_OFF)]
 
 
 class _Part(Enum):
@@ -90,7 +95,9 @@ class _OpenDividend:
 class DegiroStatementReader:
     def read(self, transactions: str, account: str) -> list[ImportRecord]:
         """The records in the two exports, each given as its full text (header first), oldest first."""
-        records = [*_transaction_records(_rows(transactions)), *_account_records(_rows(account))]
+        account_rows = _rows(account)
+        actions = _announced_actions(account_rows)
+        records = [*_transaction_records(_rows(transactions), actions), *_account_records(account_rows)]
         return sorted(records, key=lambda record: record.timestamp)
 
 
@@ -99,8 +106,20 @@ def _rows(text: str) -> list[list[str]]:
     return [cells for cells in csv.reader(text.splitlines()[1:]) if cells]
 
 
-def _transaction_records(rows: list[list[str]]) -> list[ImportRecord]:
-    """Executions, identified by their order ID, and the rows corporate actions book without one."""
+def _announced_actions(account_rows: list[list[str]]) -> dict[tuple[str, str], ImportKind]:
+    """The corporate actions the Account export announces, by day and ISIN."""
+    actions = {}
+    for cells in account_rows:
+        date, isin, description, order_id = cells[0], cells[4], cells[5], cells[11]
+        kind = next((kind for pattern, kind in ACTION_PATTERNS if pattern.search(description)), None)
+        if kind is not None and not order_id:
+            actions[(date, isin)] = kind
+    return actions
+
+
+def _transaction_records(rows: list[list[str]], actions: dict[tuple[str, str], ImportKind]) -> list[ImportRecord]:
+    """Executions, identified by their order ID, and the rows corporate actions book without one: a split is
+    recognised by its shape, other actions by what the Account export announces for that security that day."""
     records = [_transaction(cells) for cells in rows]
     # Corporate-action rows (no order ID), grouped by moment and security.
     groups: dict[tuple[datetime, str], list[int]] = {}
@@ -108,9 +127,11 @@ def _transaction_records(rows: list[list[str]]) -> list[ImportRecord]:
         if not cells[16]:
             groups.setdefault((records[index].timestamp, cells[3]), []).append(index)
     for indexes in groups.values():
-        if _is_split([rows[index] for index in indexes]):
-            for index in indexes:
-                records[index] = replace(records[index], kind=ImportKind.SPLIT)
+        group = [rows[index] for index in indexes]
+        kind = ImportKind.SPLIT if _is_split(group) else actions.get((group[0][0], group[0][3]))
+        for index in indexes:
+            if kind is not None:
+                records[index] = replace(records[index], kind=kind)
     return records
 
 

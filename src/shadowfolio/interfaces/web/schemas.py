@@ -19,6 +19,7 @@ from shadowfolio.domain.operations import (
     OperationType,
     PriceSource,
     Sell,
+    SharesReceived,
     Split,
     Withdrawal,
 )
@@ -209,6 +210,17 @@ class OperationResponse(BaseModel):
                     split_new_rate=operation.new_rate,
                     automatic=True,
                     had_effect=had_effect,
+                )
+            case SharesReceived():
+                # amount: what the shares count as having cost.
+                return cls(
+                    id=operation.id,
+                    type=operation.type,
+                    timestamp=operation.timestamp,
+                    amount=operation.cost,
+                    fees=Decimal(0),
+                    symbol=operation.symbol,
+                    quantity=operation.quantity,
                 )
             case Fee() | Income():
                 return cls(

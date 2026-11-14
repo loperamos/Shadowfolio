@@ -20,6 +20,7 @@ from shadowfolio.domain.operations import (
     OperationType,
     PriceSource,
     Sell,
+    SharesReceived,
     Split,
     Trade,
     Withdrawal,
@@ -253,6 +254,8 @@ def _operation_to_row(wallet_id: UUID, op: Operation) -> tuple[str | None, ...]:
             symbol, price_currency = op.symbol, op.currency
         case Fee() | Income():
             amount, fees, description = op.amount, Decimal(0), op.description
+        case SharesReceived():
+            amount, fees, symbol, quantity = op.cost, Decimal(0), op.symbol, str(op.quantity)
     return (
         str(op.id),
         str(wallet_id),
@@ -314,6 +317,9 @@ def _operation_from_row(row: tuple[str | None, ...]) -> Operation:
         case OperationType.FEE:
             assert description is not None
             return Fee(id_, at, value, description)
+        case OperationType.SHARES_RECEIVED:
+            assert symbol and quantity
+            return SharesReceived(id_, at, symbol, Decimal(quantity), value)
         case OperationType.INCOME:
             assert description is not None
             return Income(id_, at, value, description)

@@ -55,6 +55,17 @@ class History:
         self._repo.update(updated)
         return updated
 
+    def record_shares_received(self, wallet_id: UUID, timestamp: datetime, symbol: str, quantity: Decimal) -> Wallet | None:
+        """Record shares received without buying them (e.g. in a spin-off), at no cost."""
+        wallet = self._repo.get(wallet_id)
+        if wallet is None:
+            return None
+        at = self._at(timestamp)
+        wallet = self._sync.ensure_checked(wallet, symbol, at.date())  # splits first, as for a trade
+        updated = wallet.receive_shares(uuid4(), at, symbol, quantity, Decimal(0))
+        self._repo.update(updated)
+        return updated
+
     def record_dividend(
         self, wallet_id: UUID, timestamp: datetime, symbol: str, currency: str, gross: Decimal, tax: Decimal, fee: Decimal, amount: Decimal
     ) -> Wallet | None:

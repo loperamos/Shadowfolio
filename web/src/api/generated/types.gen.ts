@@ -316,7 +316,8 @@ export const OperationType = {
     SPLIT: 'split',
     DIVIDEND: 'dividend',
     FEE: 'fee',
-    INCOME: 'income'
+    INCOME: 'income',
+    SHARES_RECEIVED: 'shares_received'
 } as const;
 
 /**

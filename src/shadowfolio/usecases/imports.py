@@ -21,6 +21,10 @@ class ImportReport:
     not_imported: list[NotImported] = field(default_factory=list)
 
 
+# Records about a security, which need its ticker.
+SECURITY_KINDS = {ImportKind.BUY, ImportKind.SELL, ImportKind.DIVIDEND, ImportKind.SPIN_OFF}
+
+
 class Imports:
     def __init__(self, history: History) -> None:
         self._history = history
@@ -32,34 +36,36 @@ class Imports:
         """
         report = ImportReport()
         for record in records:
-            match record.kind:
-                case ImportKind.DEPOSIT:
-                    self._history.deposit(wallet_id, record.amount, record.timestamp)
-                case ImportKind.WITHDRAWAL:
-                    self._history.withdraw(wallet_id, record.amount, record.timestamp)
-                case ImportKind.BUY | ImportKind.SELL:
-                    ticker = tickers.get(record.isin or "")
-                    if ticker is None:
-                        report.not_imported.append(NotImported(record, f"no ticker for {record.isin}"))
-                        continue
-                    self._record_trade(wallet_id, record, ticker)
-                case ImportKind.FEE:
-                    self._history.record_fee(wallet_id, record.timestamp, record.amount, record.description)
-                case ImportKind.INCOME if record.amount != 0:
-                    self._history.record_income(wallet_id, record.timestamp, record.amount, record.description)
-                case ImportKind.INCOME:
-                    pass  # e.g. a quarter's interest of 0.00: nothing to record
-                case ImportKind.DIVIDEND:
-                    ticker = tickers.get(record.isin or "")
-                    if ticker is None:
-                        report.not_imported.append(NotImported(record, f"no ticker for {record.isin}"))
-                        continue
-                    self._record_dividend(wallet_id, record, ticker)
-                case ImportKind.INTERNAL_TRANSFER | ImportKind.TRADE_SETTLEMENT | ImportKind.SPLIT:
-                    pass  # not money in or out of the wallet, already counted with its trade, or applied from market data
-                case ImportKind.UNKNOWN:
-                    report.not_imported.append(NotImported(record, "unknown row"))
+            problem = self._apply(wallet_id, record, tickers)
+            if problem is not None:
+                report.not_imported.append(NotImported(record, problem))
         return report
+
+    def _apply(self, wallet_id: UUID, record: ImportRecord, tickers: Mapping[str, str]) -> str | None:
+        """Record one record's operation, if it has one; the reason it is left out, if it is."""
+        ticker = tickers.get(record.isin) if record.isin else None
+        if record.kind in SECURITY_KINDS and ticker is None:
+            return f"no ticker for {record.isin}"
+        match record.kind:
+            case ImportKind.DEPOSIT:
+                self._history.deposit(wallet_id, record.amount, record.timestamp)
+            case ImportKind.WITHDRAWAL:
+                self._history.withdraw(wallet_id, record.amount, record.timestamp)
+            case ImportKind.BUY | ImportKind.SELL if ticker:
+                self._record_trade(wallet_id, record, ticker)
+            case ImportKind.DIVIDEND if ticker:
+                self._record_dividend(wallet_id, record, ticker)
+            case ImportKind.SPIN_OFF if ticker and record.quantity:
+                self._history.record_shares_received(wallet_id, record.timestamp, ticker, record.quantity)
+            case ImportKind.FEE:
+                self._history.record_fee(wallet_id, record.timestamp, record.amount, record.description)
+            case ImportKind.INCOME if record.amount != 0:
+                self._history.record_income(wallet_id, record.timestamp, record.amount, record.description)
+            case ImportKind.UNKNOWN:
+                return "unknown row"
+            # Nothing to record: interest of 0.00, a spin-off giving no whole share, money moving inside the broker,
+            # the cash lines of a trade, an action's notice, or a split (the wallet applies splits from market data).
+        return None
 
     def _record_trade(self, wallet_id: UUID, record: ImportRecord, ticker: str) -> None:
         assert record.quantity is not None and record.price is not None and record.price_currency is not None

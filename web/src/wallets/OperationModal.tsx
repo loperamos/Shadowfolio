@@ -28,10 +28,14 @@ import {
 } from "../ui/format";
 import { DATE_INPUT_WIDTH, ICON_SIZE, TIME_INPUT_WIDTH } from "../ui/theme";
 
-// The kinds a person records and edits here; others come from market data (splits, dividends) or imports (fees, income).
+// The kinds a person records and edits here; others come from market data (splits, dividends) or imports.
 type ManualOperationType = Exclude<
   OperationType,
-  typeof OperationType.SPLIT | typeof OperationType.DIVIDEND | typeof OperationType.FEE | typeof OperationType.INCOME
+  | typeof OperationType.SPLIT
+  | typeof OperationType.DIVIDEND
+  | typeof OperationType.FEE
+  | typeof OperationType.INCOME
+  | typeof OperationType.SHARES_RECEIVED
 >;
 
 const OPERATION_LABELS: Record<ManualOperationType, string> = {

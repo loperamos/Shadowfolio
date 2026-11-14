@@ -19,7 +19,7 @@ from shadowfolio.adapters.in_memory_wallet_repository import InMemoryWalletRepos
 from shadowfolio.domain.corporate_actions import DividendEvent, SplitEvent
 from shadowfolio.domain.imports import ImportKind, ImportRecord
 from shadowfolio.domain.money import Currency, FxRate
-from shadowfolio.domain.operations import Dividend, Fee, ImportedDividend, Income
+from shadowfolio.domain.operations import Dividend, Fee, ImportedDividend, Income, SharesReceived
 from shadowfolio.domain.wallet import Wallet
 from shadowfolio.usecases.history import History
 from shadowfolio.usecases.imports import ImportReport, Imports
@@ -347,3 +347,43 @@ def test_a_split_comes_from_market_data_and_its_statement_rows_are_skipped() -> 
     assert imported.report.not_imported == []
     assert imported.wallet.holdings == {"NVDA": Decimal(20)}
     assert imported.wallet.cash == Decimal("313.80")  # 2000 - 1680.00 - 6.20
+
+
+TENCENT = "TENCENT HOLDINGS LIMITED,KYG875721634"
+TENCENT_BUY = f'31-01-2022,08:01,{TENCENT},TDG,XGAT,12,"45,0000",EUR,"-540,00",EUR,"-540,00","1,0000","0,00","-3,90","-543,90",order-5'
+DEPOSIT_600 = '20-01-2022,10:00,20-01-2022,,,Dépôt flatex,,EUR,"600,00",EUR,"600,00",'
+# Tencent handed its shareholders Meituan shares: 1 for the 12 Tencent held, first as a temporary "non tradeable" line.
+MEITUAN_SPIN_OFF = '05-01-2023,00:00,MEITUAN - NON TRADEABLE,KYG596691041,DEG,,1,"0,0000",EUR,"0,00",EUR,"0,00","1,0000","0,00",,"0,00",'
+MEITUAN_SPIN_OFF_NOTICE = (
+    "05-01-2023,07:52,05-01-2023,MEITUAN - NON TRADEABLE,KYG596691041,Spin-off: Achat 1 Meituan - Non tradeable@0 EUR (KYG596691041),,"
+    'EUR,"0,00",EUR,"56,10",'
+)
+TENCENT_TICKERS = {"KYG875721634": "0700.HK", "KYG596691041": "3690.HK"}
+
+
+def test_shares_received_in_a_spin_off_are_added_at_no_cost() -> None:
+    imported = import_degiro(
+        transactions=[MEITUAN_SPIN_OFF, TENCENT_BUY], account=[MEITUAN_SPIN_OFF_NOTICE, DEPOSIT_600], tickers=TENCENT_TICKERS
+    )
+
+    assert ImportKind.SPIN_OFF in [record.kind for record in imported.records]
+    assert imported.report.not_imported == []
+    [received] = [op for op in imported.wallet.operations if isinstance(op, SharesReceived)]
+    assert (received.symbol, received.quantity) == ("3690.HK", Decimal(1))
+    assert imported.wallet.holdings == {"0700.HK": Decimal(12), "3690.HK": Decimal(1)}
+    assert imported.wallet.ledger.positions["3690.HK"].cost == Decimal(0)  # DEGIRO gives it no cost
+    assert imported.wallet.cash == Decimal("56.10")
+
+
+def test_a_spin_off_that_gives_no_whole_share_records_nothing() -> None:
+    # 1 IBM share entitled to 0.2 Kyndryl shares: DEGIRO delivers none (the fraction is paid in cash, later).
+    kyndryl = '"KYNDRYL HOLDINGS, INC.",US50155Q1004'
+    spin_off = f'04-11-2021,00:00,{kyndryl},NSY,,0,"0,0000",USD,"0,00",USD,"0,00","1,1738","0,00",,"0,00",'
+    notice = (
+        f'04-11-2021,13:55,04-11-2021,{kyndryl},"Spin-off: Achat 0 Kyndryl Holdings, Inc.@0 USD (US50155Q1004)",,USD,"0,00",USD,"0,00",'
+    )
+
+    imported = import_degiro(transactions=[spin_off], account=[notice], tickers={"US50155Q1004": "KD"})
+
+    assert imported.report.not_imported == []
+    assert imported.wallet.operations == ()

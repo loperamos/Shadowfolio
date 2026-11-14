@@ -32,6 +32,7 @@ from shadowfolio.domain.operations import (
     Operation,
     PriceSource,
     Sell,
+    SharesReceived,
     Split,
     Trade,
     Withdrawal,
@@ -118,6 +119,16 @@ class Wallet:
         if amount == 0:
             raise InvalidAmountError("amount must not be zero")
         return self._with(Income(operation_id, at, amount, description))
+
+    def receive_shares(self, operation_id: UUID, at: datetime, symbol: str, quantity: Decimal, cost: Decimal) -> Self:
+        """Shares received without buying them, e.g. in a spin-off. Like a trade, needs the symbol's splits checked."""
+        _require_positive(quantity, "quantity")
+        if cost < 0:
+            raise InvalidAmountError("cost must not be negative")
+        period = self.checked.get(symbol)
+        if period is None or not period.covers(at.date()):
+            raise CorporateActionsNotCheckedError(f"splits of {symbol} have not been checked for {at.date().isoformat()}")
+        return self._with(SharesReceived(operation_id, at, symbol, quantity, cost))
 
     def record_dividend(
         self, operation_id: UUID, at: datetime, symbol: str, currency: str, gross: Decimal, tax: Decimal, fee: Decimal, amount: Decimal
@@ -238,7 +249,9 @@ class Wallet:
         """The wallet with `operations`, minus the automatic operations, checked period and dividend events of every
         symbol that has no trades left, so it looks as if it never touched it. They are fetched again if the symbol
         is traded again."""
-        traded = {op.trade.symbol for op in operations if isinstance(op, Buy | Sell)}
+        traded = {op.symbol for op in operations if isinstance(op, SharesReceived)} | {
+            op.trade.symbol for op in operations if isinstance(op, Buy | Sell)
+        }
         kept = tuple(op for op in operations if not (isinstance(op, Split) and op.symbol not in traded))
         pruned = replace(
             self,

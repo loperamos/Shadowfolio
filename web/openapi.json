@@ -1551,7 +1551,8 @@
           "split",
           "dividend",
           "fee",
-          "income"
+          "income",
+          "shares_received"
         ],
         "title": "OperationType"
       },

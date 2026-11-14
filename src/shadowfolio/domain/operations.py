@@ -24,6 +24,7 @@ class OperationType(StrEnum):
     DIVIDEND = "dividend"
     FEE = "fee"
     INCOME = "income"
+    SHARES_RECEIVED = "shares_received"
 
 
 class PriceSource(StrEnum):
@@ -275,6 +276,29 @@ class Income(BaseOperation):
         return False
 
 
+@dataclass(frozen=True)
+class SharesReceived(BaseOperation):
+    """Shares received without buying them, e.g. in a spin-off; `cost` is what they count as having cost (often 0)."""
+
+    type: ClassVar[OperationType] = OperationType.SHARES_RECEIVED
+
+    symbol: str
+    quantity: Decimal
+    cost: Decimal
+
+    @property
+    def cash_delta(self) -> Decimal:
+        return Decimal(0)
+
+    @property
+    def holding_change(self) -> tuple[str, Decimal] | None:
+        return self.symbol, self.quantity
+
+    @property
+    def automatic(self) -> bool:
+        return False
+
+
 # Every concrete kind. Code that handles each kind matches on this, so mypy reports a kind
 # that is not handled.
-Operation = Deposit | Withdrawal | Buy | Sell | Split | Dividend | ImportedDividend | Fee | Income
+Operation = Deposit | Withdrawal | Buy | Sell | Split | Dividend | ImportedDividend | Fee | Income | SharesReceived

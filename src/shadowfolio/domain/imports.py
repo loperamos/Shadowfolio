@@ -16,6 +16,9 @@ class ImportKind(StrEnum):
     DIVIDEND = "dividend"
     FEE = "fee"  # a charge not tied to one trade
     SPLIT = "split"  # a stock split's rows; the wallet applies splits from market data
+    SPIN_OFF = "spin_off"  # shares received from a company splitting off part of its business
+    # A cash-statement row announcing a corporate action whose shares the trades statement books.
+    CORPORATE_ACTION_NOTICE = "corporate_action_notice"
     INCOME = "income"  # interest, compensations; its amount is signed (negative for interest charged)
     # Money moving between accounts that are all the investor's (a broker and its partner bank, a cash fund).
     INTERNAL_TRANSFER = "internal_transfer"
