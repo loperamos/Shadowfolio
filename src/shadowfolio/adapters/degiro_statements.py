@@ -37,7 +37,9 @@ ACCOUNT_PATTERNS: list[tuple[re.Pattern[str], ImportKind]] = [
         # flatex books a processed withdrawal out and back in; the "Retrait flatex" row is the real one.
         (r"^Processed Flatex Withdrawal$", ImportKind.INTERNAL_TRANSFER),
         (r"^(Degiro Cash Sweep Transfer|Virement (vers|depuis) votre Compte Espèces à la flatexDEGIRO Bank)", ImportKind.INTERNAL_TRANSFER),
-        (r"^(Variation Fonds Monétaires|Conversion Fonds Monétaires finalisée)", ImportKind.INTERNAL_TRANSFER),
+        # The 2020 cash fund: moving cash into or out of it is internal; its daily value changes are income.
+        (r"^Conversion Fonds Monétaires finalisée", ImportKind.INTERNAL_TRANSFER),
+        (r"^Variation Fonds Monétaires", ImportKind.INCOME),
         (r"^Frais de connexion aux places boursières", ImportKind.FEE),
         (r"^Ajustement fractionnement:", ImportKind.SPLIT),
         (r"^(Spin-off|Changement ISIN|Modification instrument|Introduction en bourse):", ImportKind.CORPORATE_ACTION_NOTICE),

@@ -120,8 +120,7 @@ def test_a_row_the_import_does_not_know_is_reported_and_changes_nothing() -> Non
         '09-11-2026,18:12,09-11-2026,,,Degiro Cash Sweep Transfer,,EUR,"-26,76",EUR,"473,24",',
         '09-11-2026,18:12,09-11-2026,,,"Virement vers votre Compte Espèces à la flatexDEGIRO Bank: 26,76 EUR",,,,EUR,"500,00",',
         '30-09-2026,09:41,30-09-2026,,,"Virement depuis votre Compte Espèces à la flatexDEGIRO Bank: 3,18 EUR",,,,EUR,"500,00",',
-        # Before flatex (2020), DEGIRO kept spare cash in a money market fund: still cash.
-        f'26-10-2020,00:00,25-10-2020,{FUND},Variation Fonds Monétaires (EUR),,EUR,"0,00",EUR,"500,00",',
+        # Before flatex (2020), DEGIRO kept spare cash in a money market fund: moving cash in or out is still cash.
         f'27-10-2020,17:50,23-10-2020,{FUND},"Conversion Fonds Monétaires finalisée: Achat 0,01 @ 0 EUR",,EUR,"99,16",EUR,"599,16",',
         f'02-09-2020,16:09,02-09-2020,{FUND},"Conversion Fonds Monétaires finalisée: Vente 0,000001 @ 9 924,6649 EUR",,,,EUR,"500,00",',
     ],
@@ -715,3 +714,23 @@ def test_a_dividend_reversed_and_booked_again_counts_once() -> None:
     ]
     assert [op.amount for op in imported.wallet.operations if isinstance(op, ImportedDividend)] == [Decimal("0.61")]
     assert imported.wallet.cash == Decimal("500.00")
+
+
+def test_value_changes_of_the_cash_fund_are_income() -> None:
+    # In 2020 DEGIRO parked spare cash in a money market fund whose value fell by a few cents most days (negative
+    # rates). Moving cash into or out of it changes nothing; its value changes are income, here negative.
+    account = [
+        f'27-10-2020,17:50,23-10-2020,{FUND},"Conversion Fonds Monétaires finalisée: Achat 0,01 @ 0 EUR",,EUR,"99,16",EUR,"599,13",',
+        f'27-10-2020,17:50,23-10-2020,{FUND},"Conversion Fonds Monétaires finalisée: Vente 0,01 @ 0 EUR",,EUR,"-99,16",EUR,"499,97",',
+        f'26-10-2020,00:00,25-10-2020,{FUND},Variation Fonds Monétaires (EUR),,EUR,"0,00",EUR,"499,97",',
+        f'02-06-2020,00:00,01-06-2020,{FUND},Variation Fonds Monétaires (EUR),,EUR,"-0,03",EUR,"499,97",',
+        '01-06-2020,10:00,01-06-2020,,,Dépôt flatex,,EUR,"500,00",EUR,"500,00",',
+    ]
+
+    imported = import_degiro(transactions=[], account=account)
+
+    assert imported.report.imported
+    assert [(op.amount, op.description) for op in imported.wallet.operations if isinstance(op, Income)] == [
+        (Decimal("-0.03"), "Variation Fonds Monétaires (EUR)")
+    ]
+    assert imported.wallet.cash == Decimal("499.97")
