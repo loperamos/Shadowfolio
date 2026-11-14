@@ -5,6 +5,7 @@ saves them together. Recording a trade or received shares first applies the symb
 without a price is priced from market data.
 """
 
+from dataclasses import replace
 from datetime import date, datetime
 from decimal import Decimal
 from uuid import UUID, uuid4
@@ -12,6 +13,7 @@ from uuid import UUID, uuid4
 from shadowfolio.domain.errors import FutureTimestampError, FxRateUnavailableError, MissingPriceCurrencyError, PriceUnavailableError
 from shadowfolio.domain.money import Currency, to_cents
 from shadowfolio.domain.operations import PriceSource, Trade
+from shadowfolio.domain.orders import OrderSide
 from shadowfolio.domain.wallet import Wallet
 from shadowfolio.ports.clock import Clock
 from shadowfolio.ports.fx_rates import FxRates, FxRatesUnavailableError
@@ -98,6 +100,15 @@ class WalletChanges:
         wallet = self._sync.ensure_checked(wallet, symbol, at.date())
         trade, settled_amount = self._priced(wallet, symbol, quantity, at, price, price_currency, settled_amount)
         return wallet.sell(replacing or uuid4(), trade, at, settled_amount, fees, replacing)
+
+    def fill(self, wallet: Wallet, operation_id: UUID, side: OrderSide, symbol: str, quantity: Decimal, at: datetime) -> Wallet:
+        """An order filled at `at`, the time of the first price after it was placed: a trade at that price, with that
+        day's exchange rate, marked as filled from an order (no hindsight). Splits first, as for any trade."""
+        wallet = self._sync.ensure_checked(wallet, symbol, at.date())
+        trade, settled_amount = self._priced(wallet, symbol, quantity, at, None, None, None)
+        trade = replace(trade, price_source=PriceSource.ORDER)
+        trading = wallet.buy if side is OrderSide.BUY else wallet.sell
+        return trading(operation_id, trade, at, settled_amount)
 
     def _priced(
         self,

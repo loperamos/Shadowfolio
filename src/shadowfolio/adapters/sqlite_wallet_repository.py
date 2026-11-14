@@ -25,6 +25,7 @@ from shadowfolio.domain.operations import (
     Trade,
     Withdrawal,
 )
+from shadowfolio.domain.orders import Order, OrderSide, OrderStatus
 from shadowfolio.domain.wallet import Wallet
 from shadowfolio.ports.wallet_repository import WalletRepository
 
@@ -63,6 +64,18 @@ CREATE TABLE IF NOT EXISTS checked_periods (
     start TEXT NOT NULL,
     end TEXT NOT NULL,
     PRIMARY KEY (wallet_id, symbol)
+);
+CREATE TABLE IF NOT EXISTS orders (
+    id TEXT PRIMARY KEY,
+    wallet_id TEXT NOT NULL REFERENCES wallets (id),
+    side TEXT NOT NULL,
+    symbol TEXT NOT NULL,
+    quantity TEXT NOT NULL,
+    placed_at TEXT NOT NULL,
+    reason TEXT NOT NULL,
+    status TEXT NOT NULL,
+    closed_at TEXT,
+    rejection TEXT
 );
 CREATE TABLE IF NOT EXISTS dividend_events (
     wallet_id TEXT NOT NULL REFERENCES wallets (id),
@@ -113,6 +126,7 @@ class SqliteWalletRepository(WalletRepository):
             _insert_operations(conn, wallet)
             _insert_checked_periods(conn, wallet)
             _insert_dividend_events(conn, wallet)
+            _insert_orders(conn, wallet)
 
     def update(self, wallet: Wallet) -> None:
         with closing(self._connect()) as conn, conn:
@@ -127,6 +141,8 @@ class SqliteWalletRepository(WalletRepository):
             _insert_checked_periods(conn, wallet)
             conn.execute("DELETE FROM dividend_events WHERE wallet_id = ?", (str(wallet.id),))
             _insert_dividend_events(conn, wallet)
+            conn.execute("DELETE FROM orders WHERE wallet_id = ?", (str(wallet.id),))
+            _insert_orders(conn, wallet)
 
     def get(self, wallet_id: UUID) -> Wallet | None:
         with closing(self._connect()) as conn:
@@ -147,6 +163,11 @@ class SqliteWalletRepository(WalletRepository):
                 "WHERE wallet_id = ? ORDER BY rowid",
                 (str(wallet_id),),
             ).fetchall()
+            order_rows = conn.execute(
+                "SELECT id, side, symbol, quantity, placed_at, reason, status, closed_at, rejection FROM orders "
+                "WHERE wallet_id = ? ORDER BY rowid",
+                (str(wallet_id),),
+            ).fetchall()
         return Wallet(
             id=UUID(row[0]),
             owner_id=row[1],
@@ -156,6 +177,7 @@ class SqliteWalletRepository(WalletRepository):
             checked={symbol: CheckedPeriod(date.fromisoformat(start), date.fromisoformat(end)) for symbol, start, end in period_rows},
             dividend_events=tuple(_dividend_from_row(row) for row in dividend_rows),
             withholding_rate=Decimal(row[4]),
+            orders=tuple(_order_from_row(order) for order in order_rows),
         )
 
     def delete(self, wallet_id: UUID) -> None:
@@ -163,6 +185,7 @@ class SqliteWalletRepository(WalletRepository):
             conn.execute("DELETE FROM operations WHERE wallet_id = ?", (str(wallet_id),))
             conn.execute("DELETE FROM checked_periods WHERE wallet_id = ?", (str(wallet_id),))
             conn.execute("DELETE FROM dividend_events WHERE wallet_id = ?", (str(wallet_id),))
+            conn.execute("DELETE FROM orders WHERE wallet_id = ?", (str(wallet_id),))
             conn.execute("DELETE FROM wallets WHERE id = ?", (str(wallet_id),))
 
     def all_ids(self) -> list[UUID]:
@@ -194,6 +217,44 @@ def _insert_checked_periods(conn: sqlite3.Connection, wallet: Wallet) -> None:
     conn.executemany(
         "INSERT INTO checked_periods (wallet_id, symbol, start, end) VALUES (?, ?, ?, ?)",
         [(str(wallet.id), symbol, period.start.isoformat(), period.end.isoformat()) for symbol, period in wallet.checked.items()],
+    )
+
+
+def _insert_orders(conn: sqlite3.Connection, wallet: Wallet) -> None:
+    # In the order they were placed, so they read back in it (ORDER BY rowid).
+    conn.executemany(
+        "INSERT INTO orders (id, wallet_id, side, symbol, quantity, placed_at, reason, status, closed_at, rejection) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        [
+            (
+                str(order.id),
+                str(wallet.id),
+                order.side.value,
+                order.symbol,
+                str(order.quantity),
+                order.placed_at.isoformat(),
+                order.reason,
+                order.status.value,
+                None if order.closed_at is None else order.closed_at.isoformat(),
+                order.rejection,
+            )
+            for order in wallet.orders
+        ],
+    )
+
+
+def _order_from_row(row: tuple[str, ...]) -> Order:
+    order_id, side, symbol, quantity, placed_at, reason, status, closed_at, rejection = row
+    return Order(
+        id=UUID(order_id),
+        side=OrderSide(side),
+        symbol=symbol,
+        quantity=Decimal(quantity),
+        placed_at=datetime.fromisoformat(placed_at),
+        reason=reason,
+        status=OrderStatus(status),
+        closed_at=None if closed_at is None else datetime.fromisoformat(closed_at),
+        rejection=rejection,
     )
 
 

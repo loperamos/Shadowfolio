@@ -24,6 +24,7 @@ from shadowfolio.domain.operations import (
     Split,
     Withdrawal,
 )
+from shadowfolio.domain.orders import Order, OrderSide, OrderStatus
 from shadowfolio.domain.performance import Performance
 from shadowfolio.domain.valuation import DailyValue, WalletValuation
 from shadowfolio.domain.wallet import Wallet
@@ -378,6 +379,51 @@ class PerformanceResponse(BaseModel):
             money_weighted_return=_ratio_percent(result.money_weighted),
             money_weighted_return_per_year=_ratio_percent(result.money_weighted_per_year),
         )
+
+
+class PlaceOrderRequest(BaseModel):
+    """A market order, placed now: it fills at the first price after it (see domain.orders)."""
+
+    side: OrderSide
+    symbol: str = Field(min_length=1)
+    quantity: Decimal
+    reason: str = ""  # why it is placed, kept as a decision log
+
+
+class OrderResponse(BaseModel):
+    id: UUID
+    side: OrderSide
+    symbol: str
+    quantity: Decimal
+    reason: str
+    placed_at: AwareDatetime
+    status: OrderStatus
+    closed_at: AwareDatetime | None  # when it filled (the price's time), was cancelled or rejected
+    price: Decimal | None  # what it filled at, in `price_currency`; null until filled
+    price_currency: Currency | None
+    rejection: str | None  # why it was rejected
+
+    @classmethod
+    def from_order(cls, order: Order, wallet: Wallet) -> "OrderResponse":
+        trade = next((op.trade for op in wallet.operations if op.id == order.id and isinstance(op, Buy | Sell)), None)
+        return cls(
+            id=order.id,
+            side=order.side,
+            symbol=order.symbol,
+            quantity=order.quantity,
+            reason=order.reason,
+            placed_at=order.placed_at,
+            status=order.status,
+            closed_at=order.closed_at,
+            price=None if trade is None else trade.price,
+            price_currency=None if trade is None else trade.price_currency,
+            rejection=order.rejection,
+        )
+
+
+class FillSummaryResponse(BaseModel):
+    wallets: int  # wallets looked at
+    filled: int  # orders filled
 
 
 class DailyReturnResponse(BaseModel):

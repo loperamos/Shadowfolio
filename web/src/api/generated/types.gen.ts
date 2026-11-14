@@ -223,6 +223,20 @@ export type FieldError = {
 };
 
 /**
+ * FillSummaryResponse
+ */
+export type FillSummaryResponse = {
+    /**
+     * Wallets
+     */
+    wallets: number;
+    /**
+     * Filled
+     */
+    filled: number;
+};
+
+/**
  * FxRateResponse
  */
 export type FxRateResponse = {
@@ -234,6 +248,16 @@ export type FxRateResponse = {
      * As Of
      */
     as_of: string;
+};
+
+/**
+ * HTTPValidationError
+ */
+export type HttpValidationError = {
+    /**
+     * Detail
+     */
+    detail?: Array<ValidationError>;
 };
 
 /**
@@ -436,6 +460,72 @@ export const OperationType = {
 export type OperationType = typeof OperationType[keyof typeof OperationType];
 
 /**
+ * OrderResponse
+ */
+export type OrderResponse = {
+    /**
+     * Id
+     */
+    id: string;
+    side: OrderSide;
+    /**
+     * Symbol
+     */
+    symbol: string;
+    /**
+     * Quantity
+     */
+    quantity: string;
+    /**
+     * Reason
+     */
+    reason: string;
+    /**
+     * Placed At
+     */
+    placed_at: string;
+    status: OrderStatus;
+    /**
+     * Closed At
+     */
+    closed_at: string | null;
+    /**
+     * Price
+     */
+    price: string | null;
+    price_currency: Currency | null;
+    /**
+     * Rejection
+     */
+    rejection: string | null;
+};
+
+/**
+ * OrderSide
+ */
+export const OrderSide = { BUY: 'buy', SELL: 'sell' } as const;
+
+/**
+ * OrderSide
+ */
+export type OrderSide = typeof OrderSide[keyof typeof OrderSide];
+
+/**
+ * OrderStatus
+ */
+export const OrderStatus = {
+    OPEN: 'open',
+    FILLED: 'filled',
+    CANCELLED: 'cancelled',
+    REJECTED: 'rejected'
+} as const;
+
+/**
+ * OrderStatus
+ */
+export type OrderStatus = typeof OrderStatus[keyof typeof OrderStatus];
+
+/**
  * PerformanceComparisonResponse
  *
  * How the wallet did over a period next to `benchmark_symbol` with the same deposits; null when nothing in the
@@ -507,9 +597,34 @@ export type PerformanceResponse = {
 };
 
 /**
+ * PlaceOrderRequest
+ *
+ * A market order, placed now: it fills at the first price after it (see domain.orders).
+ */
+export type PlaceOrderRequest = {
+    side: OrderSide;
+    /**
+     * Symbol
+     */
+    symbol: string;
+    /**
+     * Quantity
+     */
+    quantity: number | string;
+    /**
+     * Reason
+     */
+    reason?: string;
+};
+
+/**
  * PriceSource
  */
-export const PriceSource = { ENTERED: 'entered', MARKET: 'market' } as const;
+export const PriceSource = {
+    ENTERED: 'entered',
+    MARKET: 'market',
+    ORDER: 'order'
+} as const;
 
 /**
  * PriceSource
@@ -668,6 +783,34 @@ export type UpdateWalletRequest = {
      * Withholding Rate
      */
     withholding_rate?: number | string | null;
+};
+
+/**
+ * ValidationError
+ */
+export type ValidationError = {
+    /**
+     * Location
+     */
+    loc: Array<string | number>;
+    /**
+     * Message
+     */
+    msg: string;
+    /**
+     * Error Type
+     */
+    type: string;
+    /**
+     * Input
+     */
+    input?: unknown;
+    /**
+     * Context
+     */
+    ctx?: {
+        [key: string]: unknown;
+    };
 };
 
 /**
@@ -1512,3 +1655,127 @@ export type WalletPerformanceResponses = {
 };
 
 export type WalletPerformanceResponse = WalletPerformanceResponses[keyof WalletPerformanceResponses];
+
+export type ListOrdersData = {
+    body?: never;
+    path: {
+        /**
+         * Wallet Id
+         */
+        wallet_id: string;
+    };
+    query?: never;
+    url: '/api/wallets/{wallet_id}/orders';
+};
+
+export type ListOrdersErrors = {
+    /**
+     * Not found
+     */
+    404: ErrorResponse;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type ListOrdersError = ListOrdersErrors[keyof ListOrdersErrors];
+
+export type ListOrdersResponses = {
+    /**
+     * Response List Orders
+     *
+     * Successful Response
+     */
+    200: Array<OrderResponse>;
+};
+
+export type ListOrdersResponse = ListOrdersResponses[keyof ListOrdersResponses];
+
+export type PlaceOrderData = {
+    body: PlaceOrderRequest;
+    path: {
+        /**
+         * Wallet Id
+         */
+        wallet_id: string;
+    };
+    query?: never;
+    url: '/api/wallets/{wallet_id}/orders';
+};
+
+export type PlaceOrderErrors = {
+    /**
+     * Not found
+     */
+    404: ErrorResponse;
+    /**
+     * Malformed request or broken business rule
+     */
+    422: ErrorResponse;
+};
+
+export type PlaceOrderError = PlaceOrderErrors[keyof PlaceOrderErrors];
+
+export type PlaceOrderResponses = {
+    /**
+     * Successful Response
+     */
+    201: OrderResponse;
+};
+
+export type PlaceOrderResponse = PlaceOrderResponses[keyof PlaceOrderResponses];
+
+export type CancelOrderData = {
+    body?: never;
+    path: {
+        /**
+         * Wallet Id
+         */
+        wallet_id: string;
+        /**
+         * Order Id
+         */
+        order_id: string;
+    };
+    query?: never;
+    url: '/api/wallets/{wallet_id}/orders/{order_id}/cancel';
+};
+
+export type CancelOrderErrors = {
+    /**
+     * Not found
+     */
+    404: ErrorResponse;
+    /**
+     * Malformed request or broken business rule
+     */
+    422: ErrorResponse;
+};
+
+export type CancelOrderError = CancelOrderErrors[keyof CancelOrderErrors];
+
+export type CancelOrderResponses = {
+    /**
+     * Successful Response
+     */
+    200: OrderResponse;
+};
+
+export type CancelOrderResponse = CancelOrderResponses[keyof CancelOrderResponses];
+
+export type FillAllOrdersData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/orders/fill';
+};
+
+export type FillAllOrdersResponses = {
+    /**
+     * Successful Response
+     */
+    200: FillSummaryResponse;
+};
+
+export type FillAllOrdersResponse = FillAllOrdersResponses[keyof FillAllOrdersResponses];

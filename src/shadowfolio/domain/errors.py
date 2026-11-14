@@ -69,5 +69,13 @@ class FxRateUnavailableError(DomainError):
     """There is no exchange rate for a currency pair that needs one."""
 
 
+class OrderNotOpenError(DomainError):
+    """The order is no longer open (filled, cancelled or rejected), so it cannot change."""
+
+
 class OperationNotFoundError(LookupError):
     """The wallet has no operation with that id. Not a broken rule: the thing asked for does not exist."""
+
+
+class OrderNotFoundError(LookupError):
+    """The wallet has no order with that id."""
