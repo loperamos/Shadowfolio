@@ -1,43 +1,71 @@
 import { Alert, Group, SegmentedControl, Skeleton, Text, Title } from "@mantine/core";
+import { DateInput } from "@mantine/dates";
+import { IconCalendar } from "@tabler/icons-react";
 
 import type { DailyValueResponse } from "../api/generated";
 import { TimeSeriesChart } from "../ui/TimeSeriesChart";
-import { CHART_HEIGHT } from "../ui/theme";
-import { formatDate } from "../ui/format";
-import { Period, periodStart } from "./period";
+import { DATE_INPUT_FORMAT, parseDateInput } from "../ui/format";
+import { CHART_HEIGHT, DATE_INPUT_WIDTH, ICON_SIZE } from "../ui/theme";
+import { type DayRange, describeRange, inRange, isEverything, Period } from "./period";
 import { useDailyValues } from "./useDailyValues";
 
 type ChartProps = {
   walletId: string;
   currency: string;
   refreshKey: number;
-  period: Period;
-  // The first day of the period (YYYY-MM-DD); null for everything.
-  start: string | null;
-  onPeriodChange: (period: Period) => void;
+  // The preset shown, or null for chosen dates; `range` is the days either covers.
+  period: Period | null;
+  range: DayRange;
+  onChoose: (choice: Period | DayRange) => void;
 };
 
 /** The wallet's value over time against the money put in, over a period chosen here (which the page also follows). */
-export function WalletValueChart({ walletId, currency, refreshKey, period, start, onPeriodChange }: ChartProps) {
+export function WalletValueChart({ walletId, currency, refreshKey, period, range, onChoose }: ChartProps) {
   const state = useDailyValues(walletId, refreshKey);
+  const backwards = range.start !== null && range.end !== null && range.start > range.end;
   return (
     <div>
-      <Group justify="space-between" mb="sm">
+      <Group justify="space-between" align="flex-start" mb="sm">
         <Title order={2}>Value over time</Title>
-        <SegmentedControl
-          size="xs"
-          aria-label="Period"
-          data={Object.values(Period)}
-          value={period}
-          onChange={(value) => onPeriodChange(value as Period)}
-        />
+        <Group gap="xs" align="flex-start">
+          {/* A preset, or dates typed or picked: as in Grafana's and Google Analytics' period pickers. */}
+          <SegmentedControl size="xs" aria-label="Period" data={Object.values(Period)} value={period ?? ""} onChange={(value) => onChoose(value as Period)} />
+          <DayInput label="From" placeholder="First day" value={range.start} onChange={(start) => onChoose({ ...range, start })} />
+          <DayInput
+            label="To"
+            placeholder="Today"
+            value={range.end}
+            onChange={(end) => onChoose({ ...range, end })}
+            error={backwards ? "Before “From”" : undefined}
+          />
+        </Group>
       </Group>
-      <ChartBody state={state} start={start} currency={currency} />
+      <ChartBody state={state} range={range} currency={currency} />
     </div>
   );
 }
 
-function ChartBody({ state, start, currency }: { state: ReturnType<typeof useDailyValues>; start: string | null; currency: string }) {
+type DayInputProps = { label: string; placeholder: string; value: string | null; onChange: (value: string | null) => void; error?: string };
+
+function DayInput({ label, placeholder, value, onChange, error }: DayInputProps) {
+  return (
+    <DateInput
+      size="xs"
+      aria-label={label}
+      w={DATE_INPUT_WIDTH}
+      placeholder={placeholder}
+      valueFormat={DATE_INPUT_FORMAT}
+      dateParser={parseDateInput}
+      leftSection={<IconCalendar size={ICON_SIZE} />}
+      clearable
+      value={value}
+      onChange={onChange}
+      error={error}
+    />
+  );
+}
+
+function ChartBody({ state, range, currency }: { state: ReturnType<typeof useDailyValues>; range: DayRange; currency: string }) {
   switch (state.status) {
     case "loading":
       return <Skeleton h={CHART_HEIGHT} />;
@@ -51,9 +79,9 @@ function ChartBody({ state, start, currency }: { state: ReturnType<typeof useDai
       if (state.values.length === 0) {
         return <Text c="dimmed">No history yet. Add an operation to see the wallet’s value over time.</Text>;
       }
-      const shown = start === null ? state.values : state.values.filter((value) => value.day >= start);
-      if (start !== null && shown.length === 0) {
-        return <Text c="dimmed">No history since {formatDate(start)}.</Text>;
+      const shown = state.values.filter((value) => inRange(value.day, range));
+      if (!isEverything(range) && shown.length === 0) {
+        return <Text c="dimmed">No history {describeRange(range)}.</Text>;
       }
       const unvalued = shown.filter((value) => value.missing.length > 0);
       const missing = [...new Set(unvalued.flatMap((value) => value.missing))];
