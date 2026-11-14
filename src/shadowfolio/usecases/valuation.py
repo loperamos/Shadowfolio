@@ -58,8 +58,9 @@ class Valuation:
         """The wallet's value at the end of every day from `start` (default: its first operation's day) to `end`
         (default: today), as `on` would give each, with one price request per symbol and one rate request per currency.
 
-        Returns None if the wallet does not exist, and an empty list if it has no operations. Fails, as a whole, the
-        same way as `on`, and for a period that ends before it starts.
+        Returns None if the wallet does not exist, and an empty list if it has no operations. A day without a price for
+        a holding, or a rate for its currency, is left unvalued and says what is missing. Fails, as a whole, when a
+        provider cannot answer, or for a period that ends before it starts.
         """
         today = self._clock.now().date()
         wallet = self._repo.get(wallet_id)
@@ -89,10 +90,13 @@ class Valuation:
                 raise FxRateUnavailableError(f"could not fetch the {currency}→{wallet.currency} rate right now; try again later") from error
         values = []
         for day, state in zip(days, states, strict=True):
-            day_closes = {symbol: by_day[day] for symbol, by_day in closes.items() if day in by_day}
+            day_closes = {symbol: by_day[day] for symbol, by_day in closes.items() if day in by_day and symbol in state.holdings}
             day_rates = {currency: by_day[day] for currency, by_day in rates.items() if day in by_day}
-            valuation = self._value(state, day_closes.get, day_rates.get, f" on or before {day.isoformat()}")
-            values.append(DailyValue(day, valuation, state.net_deposits))
+            missing = [symbol for symbol in sorted(state.holdings) if symbol not in day_closes]
+            currencies = sorted({close.currency for close in day_closes.values()} - {wallet.currency} - set(day_rates))
+            missing += [f"{currency}→{wallet.currency}" for currency in currencies]
+            valuation = None if missing else value_wallet(state, day_closes, day_rates)
+            values.append(DailyValue(day, valuation, state.cash, state.net_deposits, tuple(missing)))
         return values
 
     def _value(

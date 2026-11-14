@@ -105,11 +105,15 @@ class WalletValuation:
 
 @dataclass(frozen=True)
 class DailyValue:
-    """The wallet at the end of a day, valued at that day's closes, with the money put in up to then."""
+    """The wallet at the end of a day, valued at that day's closes, with the money put in up to then. `valuation` is
+    None when a holding has no price that day, or its currency no rate: `missing` says which (a symbol, or e.g.
+    "USD→EUR"). Nothing is guessed: a day is either fully valued or not."""
 
     day: date
-    valuation: WalletValuation
+    valuation: WalletValuation | None
+    cash: Decimal
     net_deposits: Decimal
+    missing: tuple[str, ...] = ()
 
 
 def value_wallet(wallet: Wallet, quotes: Mapping[str, Quote], rates: Mapping[Currency, FxRate]) -> WalletValuation:

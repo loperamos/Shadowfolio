@@ -255,14 +255,30 @@ def test_daily_values_run_from_the_first_operation_to_today_by_default(client: T
     ]
 
 
-def test_a_day_without_a_close_fails_the_daily_values(client: TestClient, prices: InMemoryPriceData, fx_rates: InMemoryFxRates) -> None:
-    wallet_id = wallet_holding(client, NVDA_BUY)
-    prices.add_close("NVDA", nvda_close(date(2024, 6, 25), "126.09"))
+def test_a_day_without_a_close_is_left_unvalued_and_says_what_is_missing(
+    client: TestClient, prices: InMemoryPriceData, fx_rates: InMemoryFxRates
+) -> None:
+    wallet_id = wallet_holding(client, NVDA_BUY)  # bought on 24 June 2024
+    prices.add_close("NVDA", nvda_close(date(2024, 6, 25), "126.09"))  # nothing for the 24th
     fx_rates.set(FxRate(Currency.USD, Currency.EUR, Decimal("0.9310"), date(2024, 6, 24)))
 
     response = client.get(f"/api/wallets/{wallet_id}/valuation/daily", params={"start": "2024-06-24", "end": "2024-06-25"})
 
-    assert (response.status_code, response.json()["detail"]) == (422, "no price for NVDA on or before 2024-06-24")
+    assert response.status_code == 200
+    # Cash and money put in are known every day; the holdings' value only when every holding has a price and rate.
+    assert [(v["day"], v["cash"], v["holdings_value"], v["total"], v["missing"]) for v in response.json()] == [
+        ("2024-06-24", "2090.32", None, None, ["NVDA"]),
+        ("2024-06-25", "2090.32", "939.12", "3029.44", []),  # 8 x 126.09 USD x 0.9310
+    ]
+
+
+def test_a_day_without_an_exchange_rate_is_left_unvalued(client: TestClient, prices: InMemoryPriceData) -> None:
+    wallet_id = wallet_holding(client, NVDA_BUY)
+    prices.add_close("NVDA", nvda_close(date(2024, 6, 24), "118.11"))
+
+    values = client.get(f"/api/wallets/{wallet_id}/valuation/daily", params={"start": "2024-06-24", "end": "2024-06-24"}).json()
+
+    assert [(v["total"], v["missing"]) for v in values] == [(None, ["USD→EUR"])]
 
 
 def test_a_period_ending_before_it_starts_is_rejected(client: TestClient) -> None:

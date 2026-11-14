@@ -286,15 +286,31 @@ class DailyValueResponse(BaseModel):
 
     day: date
     cash: Decimal
-    holdings_value: Decimal
-    total: Decimal  # cash plus holdings
+    holdings_value: Decimal | None  # null when the day cannot be valued (see missing)
+    total: Decimal | None  # cash plus holdings; null when the day cannot be valued
     net_deposits: Decimal  # deposits minus withdrawals up to then, so a chart can tell money put in from gains
+    missing: list[str]  # what has no price (a symbol) or rate (e.g. "USD→EUR") that day; empty when valued
 
     @classmethod
     def from_daily_value(cls, value: DailyValue) -> "DailyValueResponse":
+        if value.valuation is None:
+            return cls(
+                day=value.day,
+                cash=value.cash,
+                holdings_value=None,
+                total=None,
+                net_deposits=value.net_deposits,
+                missing=list(value.missing),
+            )
         holdings_value = _cents(value.valuation.total - value.valuation.cash)
-        cash = value.valuation.cash
-        return cls(day=value.day, cash=cash, holdings_value=holdings_value, total=cash + holdings_value, net_deposits=value.net_deposits)
+        return cls(
+            day=value.day,
+            cash=value.cash,
+            holdings_value=holdings_value,
+            total=value.cash + holdings_value,
+            net_deposits=value.net_deposits,
+            missing=[],
+        )
 
 
 class QuoteResponse(BaseModel):
