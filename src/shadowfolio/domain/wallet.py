@@ -125,9 +125,7 @@ class Wallet:
         _require_positive(quantity, "quantity")
         if cost < 0:
             raise InvalidAmountError("cost must not be negative")
-        period = self.checked.get(symbol)
-        if period is None or not period.covers(at.date()):
-            raise CorporateActionsNotCheckedError(f"splits of {symbol} have not been checked for {at.date().isoformat()}")
+        self._require_checked(symbol, at)
         return self._with(SharesReceived(operation_id, at, symbol, quantity, cost))
 
     def record_dividend(
@@ -234,10 +232,14 @@ class Wallet:
                 raise MissingSettledAmountError(f"price is in {trade.price_currency}; settled amount in {self.currency} needed")
             settled_amount = trade.quantity * trade.price
         _require_positive(settled_amount, "settled amount")
-        period = self.checked.get(trade.symbol)
-        if period is None or not period.covers(at.date()):
-            raise CorporateActionsNotCheckedError(f"splits of {trade.symbol} have not been checked for {at.date().isoformat()}")
+        self._require_checked(trade.symbol, at)
         return self._with(kind(operation_id, at, trade, settled_amount, fees), replacing)
+
+    def _require_checked(self, symbol: str, at: datetime) -> None:
+        """Shares of `symbol` can only change on a day whose splits are known, so they are counted right."""
+        period = self.checked.get(symbol)
+        if period is None or not period.covers(at.date()):
+            raise CorporateActionsNotCheckedError(f"splits of {symbol} have not been checked for {at.date().isoformat()}")
 
     def _with(self, operation: Operation, replacing: UUID | None = None) -> Self:
         """Insert the operation at its timestamp, in place of `replacing` if given, and check the whole timeline.
