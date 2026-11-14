@@ -24,8 +24,10 @@ from shadowfolio.domain.operations import (
     Split,
     Withdrawal,
 )
+from shadowfolio.domain.performance import Performance
 from shadowfolio.domain.valuation import DailyValue, WalletValuation
 from shadowfolio.domain.wallet import Wallet
+from shadowfolio.usecases.comparison import PerformanceComparison
 from shadowfolio.usecases.imports import ImportReport
 
 
@@ -344,6 +346,55 @@ class BenchmarkResponse(BaseModel):
     @classmethod
     def from_benchmark(cls, benchmark: Benchmark) -> "BenchmarkResponse":
         return cls(symbol=benchmark.symbol, values=[BenchmarkValueResponse(day=v.day, value=v.value) for v in benchmark.values])
+
+
+class PerformanceResponse(BaseModel):
+    """How a wallet or a benchmark did over a period (see domain.performance); returns in percent."""
+
+    start_day: date  # the day whose end value the period starts from
+    end_day: date  # its last valued day
+    start_value: Decimal
+    end_value: Decimal
+    net_deposits: Decimal  # money put in less money taken out in the period
+    gain: Decimal  # end value - start value - net deposits
+    time_weighted_return: Decimal  # ignores when money was put in or taken out
+    time_weighted_return_per_year: Decimal | None  # only for periods of a year or more
+    money_weighted_return: Decimal | None  # includes it; null when no rate explains the end value
+    money_weighted_return_per_year: Decimal | None  # only for periods of a year or more
+
+    @classmethod
+    def from_performance(cls, result: Performance) -> "PerformanceResponse":
+        time_weighted = _ratio_percent(result.time_weighted)
+        assert time_weighted is not None
+        return cls(
+            start_day=result.start_day,
+            end_day=result.end_day,
+            start_value=_cents(result.start_value),
+            end_value=_cents(result.end_value),
+            net_deposits=_cents(result.net_flows),
+            gain=_cents(result.gain),
+            time_weighted_return=time_weighted,
+            time_weighted_return_per_year=_ratio_percent(result.time_weighted_per_year),
+            money_weighted_return=_ratio_percent(result.money_weighted),
+            money_weighted_return_per_year=_ratio_percent(result.money_weighted_per_year),
+        )
+
+
+class PerformanceComparisonResponse(BaseModel):
+    """How the wallet did over a period next to `benchmark_symbol` with the same deposits; null when nothing in the
+    period could be valued."""
+
+    wallet: PerformanceResponse | None
+    benchmark_symbol: str
+    benchmark: PerformanceResponse | None
+
+    @classmethod
+    def from_comparison(cls, comparison: PerformanceComparison) -> "PerformanceComparisonResponse":
+        return cls(
+            wallet=None if comparison.wallet is None else PerformanceResponse.from_performance(comparison.wallet),
+            benchmark_symbol=comparison.benchmark_symbol,
+            benchmark=None if comparison.benchmark is None else PerformanceResponse.from_performance(comparison.benchmark),
+        )
 
 
 class DailyValueResponse(BaseModel):

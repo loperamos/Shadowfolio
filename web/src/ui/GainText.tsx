@@ -1,6 +1,6 @@
 import { Text, type TextProps } from "@mantine/core";
 
-import { formatAmount } from "./format";
+import { formatAmount, formatPercent } from "./format";
 import { NO_WRAP } from "./Money";
 
 type Props = {
@@ -18,6 +18,17 @@ export function GainText({ amount, currency, percent, ...textProps }: Props) {
     <Text span c={color} inherit={textProps.size === undefined} style={NO_WRAP} {...textProps}>
       {signed(formatAmount(amount))} {currency}
       {percent != null && ` (${signed(percent)}%)`}
+    </Text>
+  );
+}
+
+/** A return in percent, written like gains: signed and coloured, e.g. "+5.26%"; with `suffix` after it (e.g. "a year"). */
+export function ReturnText({ percent, suffix, ...textProps }: { percent: string; suffix?: string } & TextProps) {
+  const direction = signOf(percent);
+  const color = direction > 0 ? "teal" : direction < 0 ? "red" : "dimmed";
+  return (
+    <Text span c={color} inherit={textProps.size === undefined} style={NO_WRAP} {...textProps}>
+      {signed(formatPercent(percent))}%{suffix && ` ${suffix}`}
     </Text>
   );
 }

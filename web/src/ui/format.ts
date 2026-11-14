@@ -88,6 +88,11 @@ export function formatAmount(value: string): string {
   return `${negative ? "-" : ""}${grouped}.${fraction.padEnd(MIN_AMOUNT_DECIMALS, "0")}`;
 }
 
+/** A percentage from the API for display, with thousands separators, e.g. 1199.80 → "1,199.80". */
+export function formatPercent(value: string): string {
+  return formatAmount(value);
+}
+
 /** A whole amount for chart axes: thousands separators, no decimals, e.g. 4550 → "4,550". */
 export function formatWholeAmount(value: number): string {
   return formatAmount(Math.round(value).toString()).split(".")[0];
