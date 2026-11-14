@@ -22,7 +22,7 @@ from dataclasses import dataclass, field, replace
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from enum import Enum, auto
-from itertools import groupby
+from itertools import combinations, groupby
 from zoneinfo import ZoneInfo
 
 from shadowfolio.domain.imports import ImportKind, ImportRecord
@@ -110,6 +110,9 @@ ANNOUNCED_KINDS = {
     RowType.ISIN_CHANGE_NOTICE: ImportKind.ISIN_CHANGE,
     RowType.IPO_NOTICE: ImportKind.IPO_SUBSCRIPTION,
 }
+# A conversion that does not settle the oldest waiting items is matched against every combination of them, up to this
+# many items (more is unheard of: DEGIRO converts within a day or two).
+MAX_ITEMS_SEARCHED = 12
 # Rows of cash that may wait for a conversion, in the order read within a minute: paid cash first, so a tax or fee
 # booked in the same minute finds its dividend.
 WAITING_CASH_ORDER = [RowType.DIVIDEND, RowType.CASH_IN_LIEU, RowType.DIVIDEND_TAX, RowType.SECURITIES_FEE, RowType.CONVERSION]
@@ -386,23 +389,32 @@ def _converted(conversion: list[_Row], pockets: _Pockets) -> list[ImportRecord]:
     if len(euros) != 1 or len(other) != 1:
         return [_unknown(row) for row in conversion]
     euro, foreign = euros[0], other[0]
-    items = _settled_by(pockets.by_currency.get(foreign.currency, []), -foreign.amount)
-    if not items:  # nothing waiting: a leftover balance (e.g. a cent of rounding from a trade), converted as it is
+    waiting = pockets.by_currency.get(foreign.currency, [])
+    if not waiting:  # a leftover balance (e.g. a cent of rounding from a trade), converted as it is
         description = f"Leftover {foreign.currency} balance converted"
         return [ImportRecord(ImportKind.INCOME, euro.timestamp, euro.amount, ACCOUNT_CURRENCY, description)]
+    items = _settled_by(waiting, -foreign.amount)
+    if items is None:  # it converts something other than what waits: report it rather than guess
+        return [_unknown(row) for row in conversion]
     pockets.take(foreign.currency, lambda item: any(item is settled for settled in items))
     return _credited(items, euro.amount)
 
 
-def _settled_by(items: list[_Waiting], converted: Decimal) -> list[_Waiting]:
+def _settled_by(items: list[_Waiting], converted: Decimal) -> list[_Waiting] | None:
     """The waiting items a conversion of `converted` (positive when it takes money out of that currency) settles: the
-    oldest ones adding up to exactly that, or else all of them."""
+    oldest ones adding up to exactly that (the usual case), or else the fewest, oldest ones that do; None if none do."""
     total = Decimal(0)
     for count, item in enumerate(items, start=1):
         total += item.net
         if total == converted:
             return items[:count]
-    return list(items)
+    if len(items) > MAX_ITEMS_SEARCHED:
+        return None
+    for size in range(1, len(items) + 1):
+        for chosen in combinations(items, size):  # in order: the oldest first
+            if sum((item.net for item in chosen), Decimal(0)) == converted:
+                return list(chosen)
+    return None
 
 
 def _credited(items: list[_Waiting], amount: Decimal) -> list[ImportRecord]:

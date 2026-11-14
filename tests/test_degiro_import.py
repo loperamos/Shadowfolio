@@ -835,3 +835,40 @@ def test_a_spin_off_giving_no_whole_share_needs_no_ticker() -> None:
     imported = import_degiro(transactions=[spin_off], account=[notice])
 
     assert imported.report.imported
+
+
+WM = "WASTE MANAGEMENT INC,US94106L1098"
+TWO_DIVIDENDS_WAITING = [
+    f'29-03-2024,07:14,28-03-2024,{WM},Dividende,,USD,"2,00",USD,"3,00",',
+    f'28-03-2024,07:39,27-03-2024,{NVIDIA},Dividende,,USD,"1,00",USD,"1,00",',
+    '01-03-2024,10:00,01-03-2024,,,Dépôt flatex,,EUR,"500,00",EUR,"500,00",',
+]
+TWO_TICKERS = {**NVIDIA_TICKER, "US94106L1098": "WM"}
+
+
+def test_a_conversion_can_settle_a_later_waiting_dividend_before_an_earlier_one() -> None:
+    account = [
+        '31-03-2024,07:00,30-03-2024,,,Operation de change - Crédit,,EUR,"0,90",EUR,"502,70",',
+        '31-03-2024,07:00,30-03-2024,,,Opération de change - Débit,"1,1000",USD,"-1,00",USD,"0,00",',
+        '30-03-2024,07:00,29-03-2024,,,Operation de change - Crédit,,EUR,"1,80",EUR,"501,80",',
+        '30-03-2024,07:00,29-03-2024,,,Opération de change - Débit,"1,1000",USD,"-2,00",USD,"1,00",',
+        *TWO_DIVIDENDS_WAITING,
+    ]
+
+    imported = import_degiro(transactions=[], account=account, tickers=TWO_TICKERS)
+
+    credited = {op.symbol: op.amount for op in imported.wallet.operations if isinstance(op, ImportedDividend)}
+    assert credited == {"WM": Decimal("1.80"), "NVDA": Decimal("0.90")}
+
+
+def test_a_conversion_matching_no_waiting_cash_is_reported_not_guessed() -> None:
+    account = [
+        '30-03-2024,07:00,29-03-2024,,,Operation de change - Crédit,,EUR,"2,25",EUR,"502,25",',
+        '30-03-2024,07:00,29-03-2024,,,Opération de change - Débit,"1,1000",USD,"-2,50",USD,"0,50",',
+        *TWO_DIVIDENDS_WAITING,
+    ]
+
+    imported = import_degiro(transactions=[], account=account, tickers=TWO_TICKERS)
+
+    assert not imported.report.imported
+    assert {problem.record.description for problem in imported.report.not_imported} >= {"Opération de change - Débit"}
