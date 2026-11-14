@@ -3,10 +3,11 @@
 A recipe rather than a model: columns are read by position and Account rows are recognised by their description.
 DEGIRO France writes times in Paris time and numbers with a decimal comma.
 
-Cash paid in another currency (a dividend, with its tax withheld and DEGIRO's fee, or cash for a fraction of a share)
-waits in that currency until a conversion (a debit in it and a credit in euros) brings its balance back to zero. Its
-rows are read together as one record credited with the conversion's euros; items converted together share those
-euros in proportion to what each left after tax and fee. Cash paid in euros is credited at once.
+Cash moving in another currency waits there until a conversion with euros brings that currency's balance back to
+zero: money paid in (a dividend, with its tax withheld and DEGIRO's fee; cash for a fraction of a share; tax paid
+back) is converted into euros, and money charged (a fee, or tax, without a dividend) is covered by converting euros.
+The items a conversion settles share its euros in proportion to their amounts. A dividend's rows are read together as
+one record. Cash moving in euros is settled at once.
 """
 
 import csv
@@ -108,6 +109,7 @@ class _OpenCash:
 
     @property
     def net(self) -> Decimal:
+        """In its currency: positive when paid in, negative when charged."""
         return self.row.amount - self.tax - self.fee
 
 
@@ -228,8 +230,12 @@ def _account_records(rows: list[list[str]]) -> list[ImportRecord]:
                 waiting.setdefault(row.currency, []).append(_OpenCash(ImportKind.TAX_REFUND, row))
             elif part is _Part.TAX and (dividend := _last_dividend(waiting, row.currency, row.isin)):
                 dividend.tax += abs(row.amount)
+            elif part is _Part.TAX:  # tax on an earlier dividend
+                waiting.setdefault(row.currency, []).append(_OpenCash(ImportKind.TAX_CHARGED, row))
             elif part is _Part.FEE and (dividend := _last_dividend(waiting, row.currency)):
                 dividend.fee += abs(row.amount)
+            elif part is _Part.FEE:  # a fee on another securities operation
+                waiting.setdefault(row.currency, []).append(_OpenCash(ImportKind.FEE, row))
             elif part is _Part.CONVERSION:
                 continue  # read as a pair below
             elif part is None:
@@ -266,28 +272,31 @@ def _last_dividend(waiting: dict[str, list[_OpenCash]], currency: str, isin: str
 
 
 def _converted(conversion: list[_AccountRow], waiting: dict[str, list[_OpenCash]]) -> list[ImportRecord]:
-    """What a conversion credits: its debit is in the waiting cash's currency, its credit is that cash in euros."""
-    debits = [row for row in conversion if row.amount < 0]
-    credits = [row for row in conversion if row.amount > 0]
-    items = waiting.pop(debits[0].currency, []) if len(debits) == len(credits) == 1 else []
+    """What a conversion settles: the items waiting in its other currency, for the euros it moved. (Its rows are
+    labelled "Débit" and "Crédit" inconsistently; the currencies and signs are what count.)"""
+    euros = [row for row in conversion if row.currency == ACCOUNT_CURRENCY]
+    other = [row for row in conversion if row.currency != ACCOUNT_CURRENCY]
+    items = waiting.pop(other[0].currency, []) if len(euros) == len(other) == 1 else []
     if not items:
         return [_unknown(row) for row in conversion]
-    return _credited(items, credits[0].amount, credits[0].currency)
+    return _credited(items, euros[0].amount, ACCOUNT_CURRENCY)
 
 
 def _credited(items: list[_OpenCash], amount: Decimal, currency: str) -> list[ImportRecord]:
-    """The items as records sharing `amount` (in `currency`) in proportion to what each left after tax and fee."""
+    """The items as records sharing `amount` (signed, in `currency`) in proportion to their own amounts."""
     if not items:
         return []
     total = sum((item.net for item in items), Decimal(0))
     shares = [to_cents(amount * item.net / total) for item in items[:-1]]
     shares.append(amount - sum(shares, Decimal(0)))  # the last takes what rounding left
-    return [_cash_record(item, share, currency) for item, share in zip(items, shares, strict=True)]
+    return [_cash_record(item, abs(share), currency) for item, share in zip(items, shares, strict=True)]
 
 
 def _cash_record(item: _OpenCash, amount: Decimal, currency: str) -> ImportRecord:
+    if item.kind is ImportKind.FEE:
+        return ImportRecord(ImportKind.FEE, item.row.timestamp, amount, currency, item.row.description)
     if item.kind is not ImportKind.DIVIDEND:
-        return ImportRecord(item.kind, item.row.timestamp, amount, currency, item.row.product, isin=item.row.isin)
+        return ImportRecord(item.kind, item.row.timestamp, amount, currency, item.row.product, isin=item.row.isin or None)
     return ImportRecord(
         kind=ImportKind.DIVIDEND,
         timestamp=item.row.timestamp,

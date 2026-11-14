@@ -42,6 +42,7 @@ SECURITY_KINDS = {
     ImportKind.SPIN_OFF,
     ImportKind.CASH_IN_LIEU,
     ImportKind.TAX_REFUND,
+    ImportKind.TAX_CHARGED,
 }
 
 
@@ -95,7 +96,9 @@ class Imports:
                 self._history.record_income(wallet_id, record.timestamp, record.amount, description)
             case ImportKind.TAX_REFUND if ticker and record.amount:
                 self._history.record_income(wallet_id, record.timestamp, record.amount, f"Dividend tax refunded on {ticker}")
-            case ImportKind.FEE:
+            case ImportKind.TAX_CHARGED if ticker and record.amount:
+                self._history.record_fee(wallet_id, record.timestamp, record.amount, f"Dividend tax charged later on {ticker}")
+            case ImportKind.FEE if record.amount:
                 self._history.record_fee(wallet_id, record.timestamp, record.amount, record.description)
             case ImportKind.INCOME if record.amount != 0:
                 self._history.record_income(wallet_id, record.timestamp, record.amount, record.description)

@@ -559,3 +559,40 @@ def test_an_import_where_every_record_goes_in_is_saved() -> None:
 
     assert imported.report.imported
     assert imported.wallet.cash == Decimal("500.00")
+
+
+def test_a_fee_in_dollars_without_a_dividend_is_paid_by_converting_euros() -> None:
+    # As on 22 February 2022: a 0.05 USD fee takes the dollar balance below zero, and DEGIRO converts 0.04 EUR
+    # into dollars the next day to cover it.
+    account = [
+        '23-02-2022,07:37,22-02-2022,,,Operation de change - Crédit,"1,1328",USD,"0,05",USD,"0,00",',
+        '23-02-2022,07:37,22-02-2022,,,Opération de change - Débit,,EUR,"-0,04",EUR,"499,96",',
+        '22-02-2022,15:29,22-02-2022,,,Frais d’opération sur titres,,USD,"-0,05",USD,"-0,05",',
+        '01-02-2022,10:00,01-02-2022,,,Dépôt flatex,,EUR,"500,00",EUR,"500,00",',
+    ]
+
+    imported = import_degiro(transactions=[], account=account)
+
+    assert imported.report.imported
+    assert [(op.amount, op.description) for op in imported.wallet.operations if isinstance(op, Fee)] == [
+        (Decimal("0.04"), "Frais d’opération sur titres")
+    ]
+    assert imported.wallet.cash == Decimal("499.96")
+
+
+def test_dividend_tax_charged_later_is_paid_by_converting_euros() -> None:
+    # As in 2025: more tax on an earlier dividend, without the dividend; DEGIRO converts euros to cover it.
+    account = [
+        '04-12-2025,06:39,03-12-2025,,,Operation de change - Crédit,"1,1640",USD,"0,71",USD,"0,00",',
+        '04-12-2025,06:39,03-12-2025,,,Opération de change - Débit,,EUR,"-0,61",EUR,"499,39",',
+        f'03-12-2025,07:46,26-09-2025,{NVIDIA},Impôts sur dividende,,USD,"-0,71",USD,"-0,71",',
+        '01-11-2025,10:00,01-11-2025,,,Dépôt flatex,,EUR,"500,00",EUR,"500,00",',
+    ]
+
+    imported = import_degiro(transactions=[], account=account, tickers=NVIDIA_TICKER)
+
+    assert imported.report.imported
+    assert [(op.amount, op.description) for op in imported.wallet.operations if isinstance(op, Fee)] == [
+        (Decimal("0.61"), "Dividend tax charged later on NVDA")
+    ]
+    assert imported.wallet.cash == Decimal("499.39")
