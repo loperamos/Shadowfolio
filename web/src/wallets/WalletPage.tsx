@@ -26,6 +26,7 @@ import { UncreditedDividendsNotice } from "./UncreditedDividendsNotice";
 import { WalletActionsMenu } from "./WalletActionsMenu";
 import { WalletSettingsModal } from "./WalletSettingsModal";
 import { ImportStatementModal } from "./ImportStatementModal";
+import { WalletPerformance } from "./WalletPerformance";
 import { useChartLines, WalletValueChart } from "./WalletValueChart";
 import { OperationFilterFields } from "./OperationFilterFields";
 import { matches, useOperationFilters, withoutOperationFilters } from "./operationFilters";
@@ -246,6 +247,7 @@ function WalletDetails({ wallet, operations, version, onEditOperation, onDeleteO
         lines={chartLines}
         onLinesChange={setChartLines}
       />
+      <WalletPerformance walletId={wallet.id} currency={wallet.currency} range={range} refreshKey={version} />
 
       <div>
         <Title order={2} mb="sm">
