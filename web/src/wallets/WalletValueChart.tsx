@@ -40,7 +40,7 @@ export function WalletValueChart({ walletId, currency, refreshKey, period, range
           />
         </Group>
       </Group>
-      <ChartBody state={state} range={range} currency={currency} />
+      <ChartBody state={state} range={range} currency={currency} onSelect={(start, end) => onChoose({ start, end })} />
     </div>
   );
 }
@@ -65,7 +65,9 @@ function DayInput({ label, placeholder, value, onChange, error }: DayInputProps)
   );
 }
 
-function ChartBody({ state, range, currency }: { state: ReturnType<typeof useDailyValues>; range: DayRange; currency: string }) {
+type BodyProps = { state: ReturnType<typeof useDailyValues>; range: DayRange; currency: string; onSelect: (start: string, end: string) => void };
+
+function ChartBody({ state, range, currency, onSelect }: BodyProps) {
   switch (state.status) {
     case "loading":
       return <Skeleton h={CHART_HEIGHT} />;
@@ -90,6 +92,7 @@ function ChartBody({ state, range, currency }: { state: ReturnType<typeof useDai
           <TimeSeriesChart
             points={shown.map(toPoint)}
             currency={currency}
+            onSelect={onSelect}
             series={[
               { name: "total", label: "Value", color: "teal.6" },
               { name: "net_deposits", label: "Net deposits", color: "gray.6", dashed: true },
