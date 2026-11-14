@@ -276,10 +276,26 @@ def _converted(conversion: list[_AccountRow], waiting: dict[str, list[_OpenCash]
     labelled "Débit" and "Crédit" inconsistently; the currencies and signs are what count.)"""
     euros = [row for row in conversion if row.currency == ACCOUNT_CURRENCY]
     other = [row for row in conversion if row.currency != ACCOUNT_CURRENCY]
-    items = waiting.pop(other[0].currency, []) if len(euros) == len(other) == 1 else []
-    if not items:
+    if len(euros) != 1 or len(other) != 1:
         return [_unknown(row) for row in conversion]
-    return _credited(items, euros[0].amount, ACCOUNT_CURRENCY)
+    euro, foreign = euros[0], other[0]
+    items = _settled_by(waiting.get(foreign.currency, []), -foreign.amount)
+    if not items:  # nothing waiting: a leftover balance (e.g. a cent of rounding from a trade), converted as it is
+        description = f"Leftover {foreign.currency} balance converted"
+        return [ImportRecord(ImportKind.INCOME, euro.timestamp, euro.amount, ACCOUNT_CURRENCY, description)]
+    waiting[foreign.currency] = waiting[foreign.currency][len(items) :]  # the oldest ones were settled
+    return _credited(items, euro.amount, ACCOUNT_CURRENCY)
+
+
+def _settled_by(items: list[_OpenCash], converted: Decimal) -> list[_OpenCash]:
+    """The waiting items a conversion of `converted` (positive when it takes money out of that currency) settles: the
+    oldest ones adding up to exactly that, or else all of them."""
+    total = Decimal(0)
+    for count, item in enumerate(items, start=1):
+        total += item.net
+        if total == converted:
+            return items[:count]
+    return list(items)
 
 
 def _credited(items: list[_OpenCash], amount: Decimal, currency: str) -> list[ImportRecord]:

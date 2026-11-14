@@ -596,3 +596,45 @@ def test_dividend_tax_charged_later_is_paid_by_converting_euros() -> None:
         (Decimal("0.61"), "Dividend tax charged later on NVDA")
     ]
     assert imported.wallet.cash == Decimal("499.39")
+
+
+def test_a_conversion_settles_only_the_waiting_cash_it_converts() -> None:
+    # As in March 2024: NVIDIA's dividend (0.55 USD after tax and fee) is converted on its own, though Waste
+    # Management's (1.72 USD) is already waiting; that one is converted the next day.
+    wm = "WASTE MANAGEMENT INC,US94106L1098"
+    account = [
+        '30-03-2024,07:08,29-03-2024,,,Operation de change - Crédit,,EUR,"1,59",EUR,"502,10",',
+        '30-03-2024,07:08,29-03-2024,,,Opération de change - Débit,"1,0817",USD,"-1,72",USD,"0,00",',
+        '29-03-2024,08:08,28-03-2024,,,Operation de change - Crédit,,EUR,"0,51",EUR,"500,51",',
+        '29-03-2024,08:08,28-03-2024,,,Opération de change - Débit,"1,0816",USD,"-0,55",USD,"1,72",',
+        '29-03-2024,07:14,28-03-2024,,,Frais d’opération sur titres,,USD,"-0,19",USD,"2,27",',
+        f'29-03-2024,07:14,28-03-2024,{wm},Dividende,,USD,"2,25",USD,"2,46",',
+        f'29-03-2024,07:14,28-03-2024,{wm},Impôts sur dividende,,USD,"-0,34",USD,"0,21",',
+        '28-03-2024,07:41,27-03-2024,,,Frais d’opération sur titres,,USD,"-0,06",USD,"0,55",',
+        f'28-03-2024,07:39,27-03-2024,{NVIDIA},Impôts sur dividende,,USD,"-0,11",USD,"0,61",',
+        f'28-03-2024,07:39,27-03-2024,{NVIDIA},Dividende,,USD,"0,72",USD,"0,72",',
+        '01-03-2024,10:00,01-03-2024,,,Dépôt flatex,,EUR,"500,00",EUR,"500,00",',
+    ]
+
+    imported = import_degiro(transactions=[], account=account, tickers={**NVIDIA_TICKER, "US94106L1098": "WM"})
+
+    assert imported.report.imported
+    credited = {op.symbol: op.amount for op in imported.wallet.operations if isinstance(op, ImportedDividend)}
+    assert credited == {"NVDA": Decimal("0.51"), "WM": Decimal("1.59")}
+
+
+def test_a_leftover_cent_converted_with_nothing_waiting_is_recorded_as_it_is() -> None:
+    # As on 19 September 2026: a sale left -0.01 USD from rounding, and DEGIRO converted 0.01 EUR to cover it.
+    account = [
+        '19-09-2026,06:31,18-09-2026,,,Opération de change - Débit,,EUR,"-0,01",EUR,"499,99",',
+        '19-09-2026,06:31,18-09-2026,,,Operation de change - Crédit,"1,1456",USD,"0,01",USD,"0,00",',
+        DEPOSIT_500,
+    ]
+
+    imported = import_degiro(transactions=[], account=account)
+
+    assert imported.report.imported
+    assert [(op.amount, op.description) for op in imported.wallet.operations if isinstance(op, Income)] == [
+        (Decimal("-0.01"), "Leftover USD balance converted")
+    ]
+    assert imported.wallet.cash == Decimal("499.99")
