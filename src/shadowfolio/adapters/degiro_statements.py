@@ -14,6 +14,8 @@ from shadowfolio.domain.imports import ImportKind, ImportRecord
 
 TIMEZONE = ZoneInfo("Europe/Paris")
 DATE_TIME_FORMAT = "%d-%m-%Y %H:%M"
+# The account's own currency: the Transactions export gives each trade's value and fees in it.
+ACCOUNT_CURRENCY = "EUR"
 
 # Account rows by description; the first pattern that matches wins.
 ACCOUNT_PATTERNS: list[tuple[re.Pattern[str], ImportKind]] = [
@@ -32,7 +34,8 @@ ACCOUNT_PATTERNS: list[tuple[re.Pattern[str], ImportKind]] = [
 class DegiroStatementReader:
     def read(self, transactions: str, account: str) -> list[ImportRecord]:
         """The records in the two exports, each given as its full text (header first), oldest first."""
-        return sorted((_account_record(cells) for cells in _rows(account)), key=lambda record: record.timestamp)
+        records = [*(_trade(cells) for cells in _rows(transactions)), *(_account_record(cells) for cells in _rows(account))]
+        return sorted(records, key=lambda record: record.timestamp)
 
 
 def _rows(text: str) -> list[list[str]]:
@@ -40,9 +43,32 @@ def _rows(text: str) -> list[list[str]]:
     return [cells for cells in csv.reader(text.splitlines()[1:]) if cells]
 
 
+def _trade(cells: list[str]) -> ImportRecord:
+    """A Transactions row: an execution, identified by its order ID."""
+    date, time, product, isin, _exchange, _venue, quantity, price, price_currency = cells[:9]
+    amount, autofx_fee, brokerage_fee, order_id = cells[11], cells[13], cells[14], cells[16]
+    shares = _number(quantity)
+    return ImportRecord(
+        kind=(ImportKind.BUY if shares > 0 else ImportKind.SELL) if order_id else ImportKind.UNKNOWN,
+        timestamp=_timestamp(date, time),
+        amount=abs(_number(amount)),
+        currency=ACCOUNT_CURRENCY,
+        description=product,
+        isin=isin,
+        quantity=abs(shares),
+        price=_number(price),
+        price_currency=price_currency,
+        fees=abs(_number(autofx_fee)) + abs(_number(brokerage_fee)),
+    )
+
+
 def _account_record(cells: list[str]) -> ImportRecord:
     date, time, _value_date, _product, _isin, description, _fx, currency, amount = cells[:9]
-    kind = next((kind for pattern, kind in ACCOUNT_PATTERNS if pattern.search(description)), ImportKind.UNKNOWN)
+    order_id = cells[11]
+    if order_id:  # every cash line of a trade carries its order ID: the payment, its fees, its currency conversion
+        kind = ImportKind.TRADE_SETTLEMENT
+    else:
+        kind = next((kind for pattern, kind in ACCOUNT_PATTERNS if pattern.search(description)), ImportKind.UNKNOWN)
     return ImportRecord(kind, _timestamp(date, time), abs(_number(amount)), currency, description)
 
 

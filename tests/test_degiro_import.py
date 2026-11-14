@@ -42,15 +42,18 @@ class Imported:
     wallet: Wallet
 
 
-def import_degiro(transactions: list[str], account: list[str]) -> Imported:
-    """Read the exports with these rows (newest first, as DEGIRO lists them) and import them into a new EUR wallet."""
+def import_degiro(transactions: list[str], account: list[str], tickers: dict[str, str] | None = None) -> Imported:
+    """Read the exports with these rows (newest first, as DEGIRO lists them) and import them into a new EUR wallet.
+
+    `tickers` maps each security's ISIN to its ticker, which DEGIRO's exports do not give.
+    """
     repo, clock, fx_rates = InMemoryWalletRepository(), FixedClock(NOW), InMemoryFxRates()
     history = History(repo, clock, InMemoryPriceData(), fx_rates, Sync(repo, clock, InMemoryCorporateActions(), fx_rates))
     wallets = Wallets(repo, clock)
     wallet = wallets.create("owner", "DEGIRO", Currency.EUR, Decimal(0))
 
     records = DegiroStatementReader().read("\n".join([TRANSACTIONS_HEADER, *transactions]), "\n".join([ACCOUNT_HEADER, *account]))
-    report = Imports(history).apply(wallet.id, records)
+    report = Imports(history).apply(wallet.id, records, tickers or {})
 
     imported = wallets.get(wallet.id)
     assert imported is not None
@@ -121,3 +124,53 @@ def test_money_moving_inside_the_broker_changes_nothing(row: str) -> None:
     assert imported.records[-1].kind is ImportKind.INTERNAL_TRANSFER
     assert imported.report.not_imported == []
     assert imported.wallet.cash == Decimal("500.00")
+
+
+NVIDIA = "NVIDIA CORPORATION,US67066G1040"
+DEPOSIT_1000 = '20-06-2024,10:00,20-06-2024,,,Dépôt flatex,,EUR,"1000,00",EUR,"1000,00",'
+# A buy of 8 NVIDIA at 121.81 USD: 905.40 EUR, plus 2.28 EUR of currency conversion (AutoFX) and 2.00 EUR brokerage.
+NVIDIA_BUY = f'24-06-2024,16:26,{NVIDIA},NDQ,XNAS,8,"121,8100",USD,"-974,48",USD,"-905,40","1,0763","-2,28","-2,00","-909,68",order-1'
+# Its cash lines in the Account export: the same money as the trade, so they must not count again.
+NVIDIA_BUY_CASH = [
+    '24-06-2024,16:26,24-06-2024,,,Operation de change - Crédit,,USD,"974,48",USD,"0,00",order-1',
+    '24-06-2024,16:26,24-06-2024,,,Opération de change - Débit,"1,0763",EUR,"-907,68",EUR,"92,32",order-1',
+    f'24-06-2024,16:26,24-06-2024,{NVIDIA},Frais DEGIRO de courtage et/ou de parties tierces,,EUR,"-2,00",EUR,"90,32",order-1',
+    f'24-06-2024,16:26,24-06-2024,{NVIDIA},"Achat 8 NVIDIA Corporation@121,81 USD (US67066G1040)",,USD,"-974,48",USD,"-974,48",order-1',
+]
+# A sale of 3 of them at 130 USD: 362.00 EUR, less 0.91 EUR AutoFX and 2.00 EUR brokerage.
+NVIDIA_SELL = f'01-07-2024,15:40,{NVIDIA},NDQ,XNAS,-3,"130,0000",USD,"390,00",USD,"362,00","1,0773","-0,91","-2,00","359,09",order-2'
+NVIDIA_TICKER = {"US67066G1040": "NVDA"}
+
+
+def test_a_buy_adds_the_shares_and_takes_its_cost_and_fees_from_the_cash() -> None:
+    imported = import_degiro(transactions=[NVIDIA_BUY], account=[*NVIDIA_BUY_CASH, DEPOSIT_1000], tickers=NVIDIA_TICKER)
+
+    buy = next(record for record in imported.records if record.kind is ImportKind.BUY)
+    assert (buy.timestamp, buy.isin, buy.quantity, buy.price, buy.price_currency) == (
+        datetime(2024, 6, 24, 14, 26, tzinfo=UTC),
+        "US67066G1040",
+        Decimal(8),
+        Decimal("121.81"),
+        "USD",
+    )
+    assert (buy.amount, buy.currency, buy.fees) == (Decimal("905.40"), "EUR", Decimal("4.28"))
+    assert [record.kind for record in imported.records].count(ImportKind.TRADE_SETTLEMENT) == len(NVIDIA_BUY_CASH)
+    assert imported.wallet.holdings == {"NVDA": Decimal(8)}
+    assert imported.wallet.cash == Decimal("90.32")  # 1000 - 905.40 - 4.28
+
+
+def test_a_sale_removes_the_shares_and_adds_its_proceeds_less_fees() -> None:
+    imported = import_degiro(transactions=[NVIDIA_SELL, NVIDIA_BUY], account=[DEPOSIT_1000], tickers=NVIDIA_TICKER)
+
+    assert imported.records[-1].kind is ImportKind.SELL
+    assert imported.wallet.holdings == {"NVDA": Decimal(5)}
+    assert imported.wallet.cash == Decimal("449.41")  # 90.32 + 362.00 - 2.91
+
+
+def test_a_trade_in_a_security_without_a_known_ticker_is_reported() -> None:
+    imported = import_degiro(transactions=[NVIDIA_BUY], account=[DEPOSIT_1000])
+
+    assert [(problem.record.isin, problem.reason) for problem in imported.report.not_imported] == [
+        ("US67066G1040", "no ticker for US67066G1040")
+    ]
+    assert imported.wallet.holdings == {}
