@@ -67,7 +67,7 @@ class Imports:
         unchanged = _same_ticker_isin_changes(records, tickers)
         for record in records:
             if record.kind is ImportKind.ISIN_CHANGE:
-                if record.timestamp not in unchanged:
+                if _isin_change_key(record) not in unchanged:
                     report.not_imported.append(NotImported(record, "an ISIN change to another ticker is not imported yet"))
                 continue
             try:
@@ -137,11 +137,15 @@ class Imports:
         return trade, None
 
 
-def _same_ticker_isin_changes(records: list[ImportRecord], tickers: Mapping[str, str]) -> set[datetime]:
-    """When the ISIN changes recorded at each moment keep the holding under one known ticker, so the wallet sees no
-    change. (An ISIN change moves a holding between identifiers, one record for each side.)"""
-    sides: dict[datetime, set[str | None]] = {}
+def _same_ticker_isin_changes(records: list[ImportRecord], tickers: Mapping[str, str]) -> set[tuple[datetime, Decimal | None]]:
+    """The ISIN changes that keep a holding under one known ticker, so the wallet sees no change. An ISIN change moves
+    shares between identifiers, one record for each side: its two records share the moment and the number of shares."""
+    sides: dict[tuple[datetime, Decimal | None], set[str | None]] = {}
     for record in records:
         if record.kind is ImportKind.ISIN_CHANGE:
-            sides.setdefault(record.timestamp, set()).add(tickers.get(record.isin or ""))
-    return {moment for moment, tickers_seen in sides.items() if len(tickers_seen) == 1 and None not in tickers_seen}
+            sides.setdefault(_isin_change_key(record), set()).add(tickers.get(record.isin or ""))
+    return {key for key, tickers_seen in sides.items() if len(tickers_seen) == 1 and None not in tickers_seen}
+
+
+def _isin_change_key(record: ImportRecord) -> tuple[datetime, Decimal | None]:
+    return record.timestamp, record.quantity

@@ -800,3 +800,25 @@ def test_a_dividend_whose_value_date_is_before_the_market_data_payment_date_stil
 
     assert [op for op in imported.wallet.operations if isinstance(op, Dividend)] == []
     assert imported.wallet.cash == Decimal("380.35")  # 500 - 120.80 + 1.15
+
+
+def test_two_isin_changes_in_the_same_minute_are_paired_by_their_shares() -> None:
+    # Meituan's change (1 share) and, at the same minute, another holding's (12 shares), each within one ticker.
+    other_change = [
+        '27-03-2023,08:44,TENCENT HOLDINGS - OLD LINE,XX0000000001,DEG,,-12,"45,0000",EUR,"540,00",EUR,"540,00","1,0000","0,00",,"540,00",',
+        f'27-03-2023,08:44,{TENCENT},TDG,,12,"45,0000",EUR,"-540,00",EUR,"-540,00","1,0000","0,00",,"-540,00",',
+    ]
+    other_notices = [
+        '27-03-2023,08:44,27-03-2023,TENCENT HOLDINGS - OLD LINE,XX0000000001,"Changement ISIN: Vente 12 Tencent@45 EUR (XX0000000001)",,'
+        'EUR,"540,00",EUR,"596,10",',
+        f'27-03-2023,08:44,27-03-2023,{TENCENT},"Changement ISIN: Achat 12 Tencent@45 EUR (KYG875721634)",,EUR,"-540,00",EUR,"56,10",',
+    ]
+
+    imported = import_degiro(
+        transactions=[*other_change, *MEITUAN_ISIN_CHANGES, MEITUAN_SPIN_OFF, TENCENT_BUY],
+        account=[*other_notices, *MEITUAN_ISIN_CHANGE_NOTICES, MEITUAN_SPIN_OFF_NOTICE, DEPOSIT_600],
+        tickers={**TENCENT_TICKERS, "RCC188527108": "3690.HK", "XX0000000001": "0700.HK"},
+    )
+
+    assert imported.report.imported
+    assert imported.wallet.holdings == {"0700.HK": Decimal(12), "3690.HK": Decimal(1)}
