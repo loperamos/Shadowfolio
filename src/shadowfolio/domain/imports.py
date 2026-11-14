@@ -15,6 +15,7 @@ class ImportKind(StrEnum):
     TRADE_SETTLEMENT = "trade_settlement"
     DIVIDEND = "dividend"
     FEE = "fee"  # a charge not tied to one trade
+    SPLIT = "split"  # a stock split's rows; the wallet applies splits from market data
     INCOME = "income"  # interest, compensations; its amount is signed (negative for interest charged)
     # Money moving between accounts that are all the investor's (a broker and its partner bank, a cash fund).
     INTERNAL_TRANSFER = "internal_transfer"

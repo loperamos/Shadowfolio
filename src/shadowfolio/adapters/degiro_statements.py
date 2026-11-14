@@ -11,7 +11,7 @@ share those euros in proportion to what each left after tax and fee.
 
 import csv
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from decimal import Decimal
 from enum import Enum, auto
@@ -37,6 +37,7 @@ ACCOUNT_PATTERNS: list[tuple[re.Pattern[str], ImportKind]] = [
         (r"^(Degiro Cash Sweep Transfer|Virement (vers|depuis) votre Compte Espèces à la flatexDEGIRO Bank)", ImportKind.INTERNAL_TRANSFER),
         (r"^(Variation Fonds Monétaires|Conversion Fonds Monétaires finalisée)", ImportKind.INTERNAL_TRANSFER),
         (r"^Frais de connexion aux places boursières", ImportKind.FEE),
+        (r"^Ajustement fractionnement:", ImportKind.SPLIT),
         (r"^(Flatex Interest|Flatex Interest Income|Compensation Fonds Monétaires DEGIRO)$", ImportKind.INCOME),
     ]
 ]
@@ -89,7 +90,7 @@ class _OpenDividend:
 class DegiroStatementReader:
     def read(self, transactions: str, account: str) -> list[ImportRecord]:
         """The records in the two exports, each given as its full text (header first), oldest first."""
-        records = [*(_trade(cells) for cells in _rows(transactions)), *_account_records(_rows(account))]
+        records = [*_transaction_records(_rows(transactions)), *_account_records(_rows(account))]
         return sorted(records, key=lambda record: record.timestamp)
 
 
@@ -98,12 +99,37 @@ def _rows(text: str) -> list[list[str]]:
     return [cells for cells in csv.reader(text.splitlines()[1:]) if cells]
 
 
-def _trade(cells: list[str]) -> ImportRecord:
-    """A Transactions row: an execution, identified by its order ID."""
+def _transaction_records(rows: list[list[str]]) -> list[ImportRecord]:
+    """Executions, identified by their order ID, and the rows corporate actions book without one."""
+    records = [_transaction(cells) for cells in rows]
+    # Corporate-action rows (no order ID), grouped by moment and security.
+    groups: dict[tuple[datetime, str], list[int]] = {}
+    for index, cells in enumerate(rows):
+        if not cells[16]:
+            groups.setdefault((records[index].timestamp, cells[3]), []).append(index)
+    for indexes in groups.values():
+        if _is_split([rows[index] for index in indexes]):
+            for index in indexes:
+                records[index] = replace(records[index], kind=ImportKind.SPLIT)
+    return records
+
+
+def _is_split(rows: list[list[str]]) -> bool:
+    """A split is booked as two rows of one security at the same moment: the old shares out and the new ones in, for
+    the same money."""
+    if len(rows) != len(("old shares", "new shares")):
+        return False
+    first, second = rows
+    opposite = (_number(first[6]) > 0) != (_number(second[6]) > 0)
+    return opposite and _number(first[11]) + _number(second[11]) == 0
+
+
+def _transaction(cells: list[str]) -> ImportRecord:
     date, time, product, isin, _exchange, _venue, quantity, price, price_currency = cells[:9]
     amount, autofx_fee, brokerage_fee, order_id = cells[11], cells[13], cells[14], cells[16]
     shares = _number(quantity)
     return ImportRecord(
+        # Without an order ID, a corporate action: read as unknown unless recognised (see _transaction_records).
         kind=(ImportKind.BUY if shares > 0 else ImportKind.SELL) if order_id else ImportKind.UNKNOWN,
         timestamp=_timestamp(date, time),
         amount=abs(_number(amount)),

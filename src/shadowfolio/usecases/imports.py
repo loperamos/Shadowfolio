@@ -55,8 +55,8 @@ class Imports:
                         report.not_imported.append(NotImported(record, f"no ticker for {record.isin}"))
                         continue
                     self._record_dividend(wallet_id, record, ticker)
-                case ImportKind.INTERNAL_TRANSFER | ImportKind.TRADE_SETTLEMENT:
-                    pass  # not money in or out of the wallet, or already counted with its trade
+                case ImportKind.INTERNAL_TRANSFER | ImportKind.TRADE_SETTLEMENT | ImportKind.SPLIT:
+                    pass  # not money in or out of the wallet, already counted with its trade, or applied from market data
                 case ImportKind.UNKNOWN:
                     report.not_imported.append(NotImported(record, "unknown row"))
         return report

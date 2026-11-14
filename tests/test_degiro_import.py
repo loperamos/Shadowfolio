@@ -16,7 +16,7 @@ from shadowfolio.adapters.in_memory_corporate_actions import InMemoryCorporateAc
 from shadowfolio.adapters.in_memory_fx_rates import InMemoryFxRates
 from shadowfolio.adapters.in_memory_price_data import InMemoryPriceData
 from shadowfolio.adapters.in_memory_wallet_repository import InMemoryWalletRepository
-from shadowfolio.domain.corporate_actions import DividendEvent
+from shadowfolio.domain.corporate_actions import DividendEvent, SplitEvent
 from shadowfolio.domain.imports import ImportKind, ImportRecord
 from shadowfolio.domain.money import Currency, FxRate
 from shadowfolio.domain.operations import Dividend, Fee, ImportedDividend, Income
@@ -48,16 +48,16 @@ def import_degiro(
     transactions: list[str],
     account: list[str],
     tickers: dict[str, str] | None = None,
-    market_dividends: tuple[DividendEvent, ...] = (),
+    corporate_actions: tuple[SplitEvent | DividendEvent, ...] = (),
     fx_rates: tuple[FxRate, ...] = (),
 ) -> Imported:
     """Read the exports with these rows (newest first, as DEGIRO lists them) and import them into a new EUR wallet.
 
-    `tickers` maps each security's ISIN to its ticker, which DEGIRO's exports do not give. `market_dividends` and
-    `fx_rates` are what market data knows (the wallet credits dividends from it automatically).
+    `tickers` maps each security's ISIN to its ticker, which DEGIRO's exports do not give. `corporate_actions` and
+    `fx_rates` are what market data knows (the wallet applies splits and credits dividends from it automatically).
     """
     repo, clock, rates = InMemoryWalletRepository(), FixedClock(NOW), InMemoryFxRates(*fx_rates)
-    sync = Sync(repo, clock, InMemoryCorporateActions(*market_dividends), rates)
+    sync = Sync(repo, clock, InMemoryCorporateActions(*corporate_actions), rates)
     history = History(repo, clock, InMemoryPriceData(), rates, sync)
     wallets = Wallets(repo, clock)
     wallet = wallets.create("owner", "DEGIRO", Currency.EUR, Decimal(0))
@@ -286,7 +286,7 @@ def test_an_imported_dividend_replaces_the_one_credited_from_market_data() -> No
         transactions=[NVIDIA_BUY],
         account=[*NVIDIA_DIVIDEND, DEPOSIT_1000],
         tickers=NVIDIA_TICKER,
-        market_dividends=(paid,),
+        corporate_actions=(paid,),
         fx_rates=(rate,),
     )
 
@@ -320,3 +320,30 @@ def test_interest_and_compensations_are_income_and_charged_interest_is_negative(
     income = [(op.amount, op.description) for op in imported.wallet.operations if isinstance(op, Income)]
     assert income == [(Decimal("-0.01"), "Flatex Interest"), (Decimal("8.89"), "Compensation Fonds Monétaires DEGIRO")]
     assert imported.wallet.cash == Decimal("508.88")
+
+
+def test_a_split_comes_from_market_data_and_its_statement_rows_are_skipped() -> None:
+    # 2 NVIDIA bought before the 10-for-1 split of 10 June 2024; DEGIRO books the split as a sale of the 2 old shares
+    # and a purchase of 20 new ones, with no order ID and no money moving.
+    buy = f'01-05-2024,16:00,{NVIDIA},NDQ,XNAS,2,"900,0000",USD,"-1800,00",USD,"-1680,00","1,0714","-4,20","-2,00","-1686,20",order-4'
+    split = [
+        f'10-06-2024,00:00,{NVIDIA},NDQ,,20,"120,8880",USD,"-2417,76",USD,"-2245,95","1,0765","0,00",,"-2245,95",',
+        f'10-06-2024,00:00,{NVIDIA},NDQ,,-2,"1208,8800",USD,"2417,76",USD,"2245,95","1,0765","0,00",,"2245,95",',
+    ]
+    split_cash = [
+        f'10-06-2024,10:52,10-06-2024,{NVIDIA},"Ajustement fractionnement: 20 NVIDIA Corporation @ 120,888 USD (US67066G1040)",,'
+        'USD,"-2417,76",USD,"0,00",',
+        f'10-06-2024,10:52,10-06-2024,{NVIDIA},"Ajustement fractionnement: 2 NVIDIA Corporation @ 1208,88 USD (US67066G1040)",,'
+        'USD,"2417,76",USD,"2417,76",',
+    ]
+    deposit = '20-04-2024,10:00,20-04-2024,,,Dépôt flatex,,EUR,"2000,00",EUR,"2000,00",'
+    ten_for_one = SplitEvent("NVDA", date(2024, 6, 10), Decimal(1), Decimal(10), "nvda-split-2024")
+
+    imported = import_degiro(
+        transactions=[*split, buy], account=[*split_cash, deposit], tickers=NVIDIA_TICKER, corporate_actions=(ten_for_one,)
+    )
+
+    assert [record.kind for record in imported.records].count(ImportKind.SPLIT) == 4
+    assert imported.report.not_imported == []
+    assert imported.wallet.holdings == {"NVDA": Decimal(20)}
+    assert imported.wallet.cash == Decimal("313.80")  # 2000 - 1680.00 - 6.20
