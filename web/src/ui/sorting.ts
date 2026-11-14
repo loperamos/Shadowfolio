@@ -1,5 +1,7 @@
 import { useSearchParams } from "react-router";
 
+import { useUpdateQuery } from "./url";
+
 // How a table is sorted, kept in the URL (?sort=value&order=desc) when not its default, so a view can be shared.
 export enum SortOrder {
   ASCENDING = "asc",
@@ -17,7 +19,8 @@ const ORDER_PARAM = "order";
  * first for amounts).
  */
 export function useSort<K extends string>(keys: readonly K[], fallback: Sort<K>): [Sort<K>, (key: K, firstOrder: SortOrder) => void] {
-  const [params, setParams] = useSearchParams();
+  const [params] = useSearchParams();
+  const updateQuery = useUpdateQuery();
   const key = keys.find((known) => known === params.get(SORT_PARAM));
   const order = Object.values(SortOrder).find((known) => known === params.get(ORDER_PARAM));
   const sort = key !== undefined && order !== undefined ? { key, order } : fallback;
@@ -25,21 +28,17 @@ export function useSort<K extends string>(keys: readonly K[], fallback: Sort<K>)
   function sortBy(next: K, firstOrder: SortOrder) {
     const reversed = sort.order === SortOrder.ASCENDING ? SortOrder.DESCENDING : SortOrder.ASCENDING;
     const nextSort = next === sort.key ? { key: next, order: reversed } : { key: next, order: firstOrder };
-    // Replacing the history entry: Back leaves the page instead of stepping through sorts.
-    setParams(
-      (current) => {
-        const updated = new URLSearchParams(current);
-        if (nextSort.key === fallback.key && nextSort.order === fallback.order) {
-          updated.delete(SORT_PARAM);
-          updated.delete(ORDER_PARAM);
-        } else {
-          updated.set(SORT_PARAM, nextSort.key);
-          updated.set(ORDER_PARAM, nextSort.order);
-        }
-        return updated;
-      },
-      { replace: true },
-    );
+    updateQuery((current) => {
+      const updated = new URLSearchParams(current);
+      if (nextSort.key === fallback.key && nextSort.order === fallback.order) {
+        updated.delete(SORT_PARAM);
+        updated.delete(ORDER_PARAM);
+      } else {
+        updated.set(SORT_PARAM, nextSort.key);
+        updated.set(ORDER_PARAM, nextSort.order);
+      }
+      return updated;
+    });
   }
   return [sort, sortBy];
 }

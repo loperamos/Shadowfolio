@@ -1,7 +1,10 @@
 import { Alert, Group, SegmentedControl, Skeleton, Text, Title } from "@mantine/core";
 import { DateInput } from "@mantine/dates";
 import { IconCalendar } from "@tabler/icons-react";
+import { memo } from "react";
 import { useSearchParams } from "react-router";
+
+import { useUpdateQuery } from "../ui/url";
 
 import type { DailyValueResponse } from "../api/generated";
 import { TimeSeriesChart } from "../ui/TimeSeriesChart";
@@ -22,27 +25,24 @@ const DEFAULT_LINES: string[] = [Line.VALUE];
 const LINES_PARAM = "lines";
 const LINES_SEPARATOR = ",";
 
-/** The lines shown, from the URL, and a way to change them. */
-function useLines(): [string[], (lines: string[]) => void] {
-  const [params, setParams] = useSearchParams();
+/** The chart's lines shown, from the URL, and a way to change them. */
+export function useChartLines(): [string[], (lines: string[]) => void] {
+  const [params] = useSearchParams();
+  const updateQuery = useUpdateQuery();
   const value = params.get(LINES_PARAM);
   const known: string[] = Object.values(Line);
   const lines = value === null ? DEFAULT_LINES : value.split(LINES_SEPARATOR).filter((line) => known.includes(line));
   function setLines(next: string[]) {
-    // Replacing the history entry, as for the period.
-    setParams(
-      (current) => {
-        const updated = new URLSearchParams(current);
-        const isDefault = next.length === DEFAULT_LINES.length && next.every((line) => DEFAULT_LINES.includes(line));
-        if (isDefault) {
-          updated.delete(LINES_PARAM);
-        } else {
-          updated.set(LINES_PARAM, next.join(LINES_SEPARATOR));
-        }
-        return updated;
-      },
-      { replace: true },
-    );
+    updateQuery((current) => {
+      const updated = new URLSearchParams(current);
+      const isDefault = next.length === DEFAULT_LINES.length && next.every((line) => DEFAULT_LINES.includes(line));
+      if (isDefault) {
+        updated.delete(LINES_PARAM);
+      } else {
+        updated.set(LINES_PARAM, next.join(LINES_SEPARATOR));
+      }
+      return updated;
+    });
   }
   return [lines, setLines];
 }
@@ -55,10 +55,13 @@ type ChartProps = {
   period: Period | null;
   range: DayRange;
   onChoose: (choice: Period | DayRange) => void;
+  // The lines shown (see useChartLines).
+  lines: string[];
+  onLinesChange: (lines: string[]) => void;
 };
 
 /** The wallet's value over time against the money put in, over a period chosen here (which the page also follows). */
-export function WalletValueChart({ walletId, currency, refreshKey, period, range, onChoose }: ChartProps) {
+function WalletValueChartView({ walletId, currency, refreshKey, period, range, onChoose, lines, onLinesChange }: ChartProps) {
   const state = useDailyValues(walletId, refreshKey);
   const backwards = range.start !== null && range.end !== null && range.start > range.end;
   return (
@@ -78,7 +81,14 @@ export function WalletValueChart({ walletId, currency, refreshKey, period, range
           />
         </Group>
       </Group>
-      <ChartBody state={state} range={range} currency={currency} onSelect={(start, end) => onChoose({ start, end })} />
+      <ChartBody
+        state={state}
+        range={range}
+        currency={currency}
+        onSelect={(start, end) => onChoose({ start, end })}
+        lines={lines}
+        onLinesChange={onLinesChange}
+      />
     </div>
   );
 }
@@ -103,10 +113,33 @@ function DayInput({ label, placeholder, value, onChange, error }: DayInputProps)
   );
 }
 
-type BodyProps = { state: ReturnType<typeof useDailyValues>; range: DayRange; currency: string; onSelect: (start: string, end: string) => void };
+/**
+ * The chart, drawn again only when what it shows changes: drawing thousands of days is slow, and the rest of the page
+ * (sorting, filters, pages) changes the URL often. Its callbacks change the URL as it is when
+ * called (see useUpdateQuery), so an earlier one does the same as a new one.
+ */
+export const WalletValueChart = memo(
+  WalletValueChartView,
+  (before, after) =>
+    before.walletId === after.walletId &&
+    before.currency === after.currency &&
+    before.refreshKey === after.refreshKey &&
+    before.period === after.period &&
+    before.range.start === after.range.start &&
+    before.range.end === after.range.end &&
+    before.lines.join() === after.lines.join(),
+);
 
-function ChartBody({ state, range, currency, onSelect }: BodyProps) {
-  const [lines, setLines] = useLines();
+type BodyProps = {
+  state: ReturnType<typeof useDailyValues>;
+  range: DayRange;
+  currency: string;
+  onSelect: (start: string, end: string) => void;
+  lines: string[];
+  onLinesChange: (lines: string[]) => void;
+};
+
+function ChartBody({ state, range, currency, onSelect, lines, onLinesChange }: BodyProps) {
   switch (state.status) {
     case "loading":
       return <Skeleton h={CHART_HEIGHT} />;
@@ -137,7 +170,7 @@ function ChartBody({ state, range, currency, onSelect }: BodyProps) {
               { name: Line.NET_DEPOSITS, label: "Net deposits", color: "gray.6", dashed: true },
             ]}
             shown={lines}
-            onShownChange={setLines}
+            onShownChange={onLinesChange}
           />
           {/* Unvalued days are gaps in the line, never guesses; say why. */}
           {unvalued.length > 0 && (

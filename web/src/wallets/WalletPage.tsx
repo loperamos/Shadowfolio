@@ -26,7 +26,9 @@ import { UncreditedDividendsNotice } from "./UncreditedDividendsNotice";
 import { WalletActionsMenu } from "./WalletActionsMenu";
 import { WalletSettingsModal } from "./WalletSettingsModal";
 import { ImportStatementModal } from "./ImportStatementModal";
-import { WalletValueChart } from "./WalletValueChart";
+import { useChartLines, WalletValueChart } from "./WalletValueChart";
+import { OperationFilterFields } from "./OperationFilterFields";
+import { matches, useOperationFilters, withoutOperationFilters } from "./operationFilters";
 import { describeRange, inRange, isEverything, Period, periodSearch, usePeriod } from "./period";
 import { WalletDayChange, WalletGain, WalletValue } from "./WalletValue";
 
@@ -177,7 +179,13 @@ function WalletDetails({ wallet, operations, version, onEditOperation, onDeleteO
   // Splits that changed nothing (no shares held on their date) are left out: they only add noise.
   const effective = operations.filter((op) => op.had_effect !== false);
   const { period, range, choose, params } = usePeriod(todayAsInputValue());
-  const shownOperations = effective.filter((op) => inRange(dateInputValueOf(op.timestamp), range));
+  const [chartLines, setChartLines] = useChartLines();
+  const { filters, setTypes, setSymbol } = useOperationFilters();
+  const shownOperations = effective.filter((op) => inRange(dateInputValueOf(op.timestamp), range) && matches(op, filters));
+  const filtered = !isEverything(range) || filters.types.length > 0 || filters.symbol !== null;
+  // The filters offer what the wallet has.
+  const types = [...new Set(effective.map((op) => op.type))].map((type) => ({ value: type, label: operationTypeLabel(type) }));
+  const symbols = [...new Set(effective.flatMap((op) => (op.symbol ? [op.symbol] : [])))].sort();
   // Newest first, as in a statement; a page at a time.
   const operationsPage = usePage([...shownOperations].reverse());
   const valuation = useWalletValuation(wallet.id, version);
@@ -228,7 +236,16 @@ function WalletDetails({ wallet, operations, version, onEditOperation, onDeleteO
         </Alert>
       )}
 
-      <WalletValueChart walletId={wallet.id} currency={wallet.currency} refreshKey={version} period={period} range={range} onChoose={choose} />
+      <WalletValueChart
+        walletId={wallet.id}
+        currency={wallet.currency}
+        refreshKey={version}
+        period={period}
+        range={range}
+        onChoose={choose}
+        lines={chartLines}
+        onLinesChange={setChartLines}
+      />
 
       <div>
         <Title order={2} mb="sm">
@@ -269,14 +286,18 @@ function WalletDetails({ wallet, operations, version, onEditOperation, onDeleteO
       </div>
 
       <div>
-        <Title order={2} mb="sm">
-          Operations
-        </Title>
-        {/* Filtered by the chart's period: say so, so a shorter list never looks like missing operations. */}
-        {!isEverything(range) && effective.length > 0 && (
+        <Group justify="space-between" align="flex-start" mb="sm">
+          <Title order={2}>Operations</Title>
+          {effective.length > 0 && (
+            <OperationFilterFields filters={filters} types={types} symbols={symbols} onTypesChange={setTypes} onSymbolChange={setSymbol} />
+          )}
+        </Group>
+        {/* Filtered by the chart's period or the filters: say so, so a shorter list never looks like missing operations. */}
+        {filtered && effective.length > 0 && (
           <Text c="dimmed" size="sm" mb="sm">
-            {shownOperations.length === 0 ? "No operations" : `Showing ${shownOperations.length} of ${effective.length} operations`} {describeRange(range)}.{" "}
-            <Anchor component={Link} to={{ search: periodSearch(params, Period.ALL).toString() }} replace>
+            {shownOperations.length === 0 ? "No operations" : `Showing ${shownOperations.length} of ${effective.length} operations`}
+            {isEverything(range) ? "" : ` ${describeRange(range)}`}.{" "}
+            <Anchor component={Link} to={{ search: periodSearch(withoutOperationFilters(params), Period.ALL).toString() }} replace>
               Show all
             </Anchor>
           </Text>
@@ -305,8 +326,8 @@ function WalletDetails({ wallet, operations, version, onEditOperation, onDeleteO
                   <Table.Td>{op.automatic ? formatDate(op.timestamp.slice(0, 10)) : formatDateTime(op.timestamp)}</Table.Td>
                   <Table.Td>
                     <Group gap={6} wrap="nowrap">
-                      <Text span inherit tt="capitalize">
-                        {op.type}
+                      <Text span inherit>
+                        {operationTypeLabel(op.type)}
                       </Text>
                       {op.automatic && <AutomaticBadge />}
                     </Group>
@@ -340,6 +361,12 @@ function WalletDetails({ wallet, operations, version, onEditOperation, onDeleteO
       </div>
     </Stack>
   );
+}
+
+/** An operation type for display, e.g. "Shares received". */
+function operationTypeLabel(type: string): string {
+  const words = type.replaceAll("_", " ");
+  return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
 /** What a holding (symbol and shares) is sorted by in `column`; null while its valuation is not there. */

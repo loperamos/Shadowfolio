@@ -23,6 +23,8 @@ export const TOOLTIP_WIDTH = rem(260);
 export const PERCENT_INPUT_WIDTH = rem(110); // up to 99.99 and the % sign
 // Width of a search field above a list: room for a name, without stretching across the page.
 export const SEARCH_INPUT_WIDTH = rem(260);
+// Width of a filter above a list (e.g. by type), room for a couple of choices before they wrap.
+export const FILTER_INPUT_WIDTH = rem(200);
 
 // Height of time-series charts, in px.
 export const CHART_HEIGHT = 280;

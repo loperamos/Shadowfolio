@@ -8,6 +8,7 @@ import { Money } from "../ui/Money";
 import { SortableTh } from "../ui/SortableTh";
 import { sorted, SortOrder, useSort } from "../ui/sorting";
 import { ICON_SIZE, SEARCH_INPUT_WIDTH, TABLE_MIN_WIDTH } from "../ui/theme";
+import { useUpdateQuery } from "../ui/url";
 import { HindsightBadge } from "./HindsightBadges";
 import { type ValuationState, useWalletValuations } from "./useWalletValuation";
 import { WalletActionsMenu } from "./WalletActionsMenu";
@@ -40,7 +41,8 @@ type Props = {
 export function WalletTable({ wallets, error, selectedIds, onSelectionChange, onRename, onSettings, onImport, onDuplicate, onDelete }: Props) {
   const valuations = useWalletValuations((wallets ?? []).map((wallet) => wallet.id));
   const [sort, sortBy] = useSort(Object.values(WalletColumn), DEFAULT_SORT);
-  const [params, setParams] = useSearchParams();
+  const [params] = useSearchParams();
+  const updateQuery = useUpdateQuery();
   const search = params.get(SEARCH_PARAM) ?? "";
   if (error) {
     return <Alert color="red">{error}</Alert>;
@@ -58,8 +60,7 @@ export function WalletTable({ wallets, error, selectedIds, onSelectionChange, on
   const allSelected = shown.length > 0 && shown.every((wallet) => selectedIds.has(wallet.id));
   const someSelected = !allSelected && shown.some((wallet) => selectedIds.has(wallet.id));
 
-  // Replacing the history entry while typing, so Back leaves the page.
-  const setSearch = (value: string) => setParams((current) => searchFor(current, value), { replace: true });
+  const setSearch = (value: string) => updateQuery((current) => searchFor(current, value));
 
   const th = (column: WalletColumn, label: string, firstOrder = SortOrder.DESCENDING, align: "left" | "right" = "right") => (
     <SortableTh column={column} sort={sort} onSort={sortBy} firstOrder={firstOrder} align={align}>
