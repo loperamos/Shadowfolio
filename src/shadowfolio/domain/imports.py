@@ -14,6 +14,7 @@ class ImportKind(StrEnum):
     # A cash-statement row that only pays for, or receives, a trade already read as a buy or sell.
     TRADE_SETTLEMENT = "trade_settlement"
     DIVIDEND = "dividend"
+    DIVIDEND_REVERSED = "dividend_reversed"  # a dividend taken back after it was credited (often booked again later)
     FEE = "fee"  # a charge not tied to one trade
     SPLIT = "split"  # a stock split's rows; the wallet applies splits from market data
     SPIN_OFF = "spin_off"  # shares received from a company splitting off part of its business

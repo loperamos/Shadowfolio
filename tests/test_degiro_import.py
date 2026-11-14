@@ -638,3 +638,80 @@ def test_a_leftover_cent_converted_with_nothing_waiting_is_recorded_as_it_is() -
         (Decimal("-0.01"), "Leftover USD balance converted")
     ]
     assert imported.wallet.cash == Decimal("499.99")
+
+
+GOOGL = "ALPHABET INC. CLASS A,US02079K3059"
+
+
+def test_a_dividend_booked_and_reversed_several_times_counts_once() -> None:
+    # As Alphabet's dividend of 16 March 2026 (the value date): booked four times and reversed three times, with its
+    # tax and fees likewise, then converted (7.56 USD into 6.53 EUR); one fee was given back the next day.
+    paid, value = "17-03-2026", "16-03-2026"
+    account = [
+        '19-03-2026,06:33,18-03-2026,,,Operation de change - Crédit,,EUR,"0,83",EUR,"507,36",',
+        '19-03-2026,06:33,18-03-2026,,,Opération de change - Débit,"1,1481",USD,"-0,95",USD,"0,00",',
+        f'18-03-2026,12:15,{value},,,Frais d’opération sur titres,,USD,"0,95",USD,"0,95",',
+        '18-03-2026,06:36,17-03-2026,,,Operation de change - Crédit,,EUR,"6,53",EUR,"506,53",',
+        '18-03-2026,06:36,17-03-2026,,,Opération de change - Débit,"1,1570",USD,"-7,56",USD,"0,00",',
+        f'{paid},08:10,{value},{GOOGL},Impôts sur dividende,,USD,"1,67",USD,"7,56",',
+        f'{paid},08:10,{value},{GOOGL},Dividende,,USD,"-11,13",USD,"5,89",',
+        f'{paid},07:51,{value},,,Frais d’opération sur titres,,USD,"-0,95",USD,"17,02",',
+        f'{paid},07:50,{value},{GOOGL},Impôts sur dividende,,USD,"-1,67",USD,"17,97",',
+        f'{paid},07:48,{value},{GOOGL},Dividende,,USD,"11,13",USD,"19,64",',
+        f'{paid},07:47,{value},,,Frais d’opération sur titres,,USD,"-0,95",USD,"8,51",',
+        f'{paid},07:46,{value},,,Frais d’opération sur titres,,USD,"0,95",USD,"9,46",',
+        f'{paid},07:45,{value},{GOOGL},Dividende,,USD,"11,13",USD,"8,51",',
+        f'{paid},07:45,{value},{GOOGL},Impôts sur dividende,,USD,"-1,67",USD,"-2,62",',
+        f'{paid},07:44,{value},{GOOGL},Dividende,,USD,"11,13",USD,"-0,95",',
+        f'{paid},07:44,{value},{GOOGL},Impôts sur dividende,,USD,"-1,67",USD,"-12,08",',
+        f'{paid},07:39,{value},{GOOGL},Impôts sur dividende,,USD,"1,67",USD,"-10,41",',
+        f'{paid},07:39,{value},{GOOGL},Dividende,,USD,"-11,13",USD,"-12,08",',
+        f'{paid},07:39,{value},{GOOGL},Dividende,,USD,"-11,13",USD,"-0,95",',
+        f'{paid},07:39,{value},{GOOGL},Impôts sur dividende,,USD,"1,67",USD,"10,18",',
+        f'{paid},07:39,{value},,,Frais d’opération sur titres,,USD,"-0,95",USD,"8,51",',
+        f'{paid},07:28,{value},{GOOGL},Impôts sur dividende,,USD,"-1,67",USD,"9,46",',
+        f'{paid},07:26,{value},{GOOGL},Dividende,,USD,"11,13",USD,"11,13",',
+        '01-03-2026,10:00,01-03-2026,,,Dépôt flatex,,EUR,"500,00",EUR,"500,00",',
+    ]
+
+    imported = import_degiro(transactions=[], account=account, tickers={"US02079K3059": "GOOGL"})
+
+    assert imported.report.imported
+    [dividend] = [op for op in imported.wallet.operations if isinstance(op, ImportedDividend)]
+    assert (dividend.gross, dividend.tax, dividend.fee, dividend.amount) == (
+        Decimal("11.13"),
+        Decimal("1.67"),
+        Decimal("1.90"),
+        Decimal("6.53"),
+    )
+    assert [(op.amount, op.description) for op in imported.wallet.operations if isinstance(op, Income)] == [
+        (Decimal("0.83"), "Frais d’opération sur titres (given back)")
+    ]
+    assert imported.wallet.cash == Decimal("507.36")
+
+
+def test_a_dividend_reversed_and_booked_again_counts_once() -> None:
+    # As Microsoft's September 2025 dividend in December: reversed (covered by converting euros), then booked again.
+    msft, value = "MICROSOFT CORPORATION,US5949181045", "11-09-2025"
+    account = [
+        '05-12-2025,06:44,04-12-2025,,,Operation de change - Crédit,,EUR,"0,61",EUR,"500,00",',
+        '05-12-2025,06:44,04-12-2025,,,Opération de change - Débit,"1,1673",USD,"-0,71",USD,"0,00",',
+        f'04-12-2025,08:18,{value},,,Frais d’opération sur titres,,USD,"-0,07",USD,"0,71",',
+        f'04-12-2025,08:15,{value},{msft},Impôts sur dividende,,USD,"-0,12",USD,"0,78",',
+        f'04-12-2025,08:15,{value},{msft},Dividende,,USD,"0,83",USD,"0,90",',
+        f'04-12-2025,08:14,{value},,,Frais d’opération sur titres,,USD,"0,07",USD,"0,07",',
+        '04-12-2025,06:39,03-12-2025,,,Opération de change - Débit,,EUR,"-0,61",EUR,"499,39",',
+        '04-12-2025,06:39,03-12-2025,,,Operation de change - Crédit,"1,1642",USD,"0,71",USD,"0,00",',
+        f'03-12-2025,18:07,{value},{msft},Impôts sur dividende,,USD,"0,12",USD,"-0,71",',
+        f'03-12-2025,18:05,{value},{msft},Dividende,,USD,"-0,83",USD,"-0,83",',
+        '01-12-2025,10:00,01-12-2025,,,Dépôt flatex,,EUR,"500,00",EUR,"500,00",',
+    ]
+
+    imported = import_degiro(transactions=[], account=account, tickers={"US5949181045": "MSFT"})
+
+    assert imported.report.imported
+    assert [(op.amount, op.description) for op in imported.wallet.operations if isinstance(op, Income)] == [
+        (Decimal("-0.61"), "Dividend of MSFT reversed")
+    ]
+    assert [op.amount for op in imported.wallet.operations if isinstance(op, ImportedDividend)] == [Decimal("0.61")]
+    assert imported.wallet.cash == Decimal("500.00")

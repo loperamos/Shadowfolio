@@ -6,7 +6,8 @@ DEGIRO France writes times in Paris time and numbers with a decimal comma.
 Cash moving in another currency waits there until a conversion with euros brings that currency's balance back to
 zero: money paid in (a dividend, with its tax withheld and DEGIRO's fee; cash for a fraction of a share; tax paid
 back) is converted into euros, and money charged (a fee, or tax, without a dividend) is covered by converting euros.
-The items a conversion settles share its euros in proportion to their amounts. A dividend's rows are read together as
+The items a conversion settles share its euros in proportion to their amounts. A dividend's rows (the dividend, its
+tax and DEGIRO's fees, each possibly booked and reversed several times) share its value date and are read together as
 one record. Cash moving in euros is settled at once.
 """
 
@@ -89,6 +90,7 @@ CASH_PATTERNS: list[tuple[re.Pattern[str], _Part]] = [
 @dataclass(frozen=True)
 class _AccountRow:
     timestamp: datetime
+    value_date: str  # as printed: the day the money counts from, shared by a payment's rows
     product: str
     isin: str
     description: str
@@ -103,14 +105,15 @@ class _OpenCash:
     waiting to be credited in euros."""
 
     kind: ImportKind
-    row: _AccountRow
-    tax: Decimal = Decimal(0)
-    fee: Decimal = Decimal(0)
+    row: _AccountRow  # the first row
+    amount: Decimal  # signed, in the row's currency; for a dividend, before tax and fee
+    tax: Decimal = Decimal(0)  # withheld, so positive
+    fee: Decimal = Decimal(0)  # charged, so positive
 
     @property
     def net(self) -> Decimal:
         """In its currency: positive when paid in, negative when charged."""
-        return self.row.amount - self.tax - self.fee
+        return self.amount - self.tax - self.fee
 
 
 class DegiroStatementReader:
@@ -222,20 +225,23 @@ def _account_records(rows: list[list[str]]) -> list[ImportRecord]:
         minute = sorted(same_minute, key=_part_order)
         for row in minute:
             part = None if row.order_id else _part(row)
-            if part is _Part.DIVIDEND:
-                waiting.setdefault(row.currency, []).append(_OpenCash(ImportKind.DIVIDEND, row))
+            dividend = _waiting_dividend(waiting, row) if part in (_Part.DIVIDEND, _Part.TAX, _Part.FEE) else None
+            if part is _Part.DIVIDEND and dividend:  # booked again, or reversed (a negative amount)
+                dividend.amount += row.amount
+            elif part is _Part.DIVIDEND:
+                new_dividend = _with_earlier_parts(_OpenCash(ImportKind.DIVIDEND, row, row.amount), waiting)
+                waiting.setdefault(row.currency, []).append(new_dividend)
+            elif part is _Part.TAX and dividend:
+                dividend.tax -= row.amount  # withheld (negative row), or given back (positive row)
+            elif part is _Part.FEE and dividend:
+                dividend.fee -= row.amount
             elif part is _Part.CASH_IN_LIEU:
-                waiting.setdefault(row.currency, []).append(_OpenCash(ImportKind.CASH_IN_LIEU, row))
-            elif part is _Part.TAX and row.amount > 0:  # tax paid back, weeks after the dividend
-                waiting.setdefault(row.currency, []).append(_OpenCash(ImportKind.TAX_REFUND, row))
-            elif part is _Part.TAX and (dividend := _last_dividend(waiting, row.currency, row.isin)):
-                dividend.tax += abs(row.amount)
-            elif part is _Part.TAX:  # tax on an earlier dividend
-                waiting.setdefault(row.currency, []).append(_OpenCash(ImportKind.TAX_CHARGED, row))
-            elif part is _Part.FEE and (dividend := _last_dividend(waiting, row.currency)):
-                dividend.fee += abs(row.amount)
-            elif part is _Part.FEE:  # a fee on another securities operation
-                waiting.setdefault(row.currency, []).append(_OpenCash(ImportKind.FEE, row))
+                waiting.setdefault(row.currency, []).append(_OpenCash(ImportKind.CASH_IN_LIEU, row, row.amount))
+            elif part is _Part.TAX:  # apart from its dividend: paid back, or charged, later
+                kind = ImportKind.TAX_REFUND if row.amount > 0 else ImportKind.TAX_CHARGED
+                waiting.setdefault(row.currency, []).append(_OpenCash(kind, row, row.amount))
+            elif part is _Part.FEE:  # on another securities operation, or given back
+                waiting.setdefault(row.currency, []).append(_OpenCash(ImportKind.FEE, row, row.amount))
             elif part is _Part.CONVERSION:
                 continue  # read as a pair below
             elif part is None:
@@ -252,8 +258,8 @@ def _account_records(rows: list[list[str]]) -> list[ImportRecord]:
 
 
 def _account_row(cells: list[str]) -> _AccountRow:
-    date, time, _value_date, product, isin, description, _fx, currency, amount = cells[:9]
-    return _AccountRow(_timestamp(date, time), product, isin, description, currency, _number(amount), cells[11])
+    date, time, value_date, product, isin, description, _fx, currency, amount = cells[:9]
+    return _AccountRow(_timestamp(date, time), value_date, product, isin, description, currency, _number(amount), cells[11])
 
 
 def _part(row: _AccountRow) -> _Part | None:
@@ -265,9 +271,33 @@ def _part_order(row: _AccountRow) -> int:
     return PART_ORDER.index(part) if part else len(PART_ORDER)
 
 
-def _last_dividend(waiting: dict[str, list[_OpenCash]], currency: str, isin: str | None = None) -> _OpenCash | None:
-    """The latest dividend waiting in this currency (and of this security, if given)."""
-    candidates = [c for c in waiting.get(currency, []) if c.kind is ImportKind.DIVIDEND and (isin is None or c.row.isin == isin)]
+def _with_earlier_parts(dividend: _OpenCash, waiting: dict[str, list[_OpenCash]]) -> _OpenCash:
+    """The dividend with the fees and taxes of its payment booked before it (e.g. an old fee given back just before the
+    dividend is booked again), taken out of what waits on its own."""
+    row = dividend.row
+    parts = [
+        item
+        for item in waiting.get(row.currency, [])
+        if item.row.value_date == row.value_date
+        and (item.kind is ImportKind.FEE or (item.kind in (ImportKind.TAX_REFUND, ImportKind.TAX_CHARGED) and item.row.isin == row.isin))
+    ]
+    for part in parts:
+        if part.kind is ImportKind.FEE:
+            dividend.fee -= part.amount
+        else:
+            dividend.tax -= part.amount
+    waiting[row.currency] = [item for item in waiting.get(row.currency, []) if all(item is not part for part in parts)]
+    return dividend
+
+
+def _waiting_dividend(waiting: dict[str, list[_OpenCash]], row: _AccountRow) -> _OpenCash | None:
+    """The waiting dividend a row belongs to: same currency and value date, and the same security when the row names
+    one (DEGIRO's fee rows do not)."""
+    candidates = [
+        item
+        for item in waiting.get(row.currency, [])
+        if item.kind is ImportKind.DIVIDEND and item.row.value_date == row.value_date and (not row.isin or item.row.isin == row.isin)
+    ]
     return candidates[-1] if candidates else None
 
 
@@ -309,8 +339,12 @@ def _credited(items: list[_OpenCash], amount: Decimal, currency: str) -> list[Im
 
 
 def _cash_record(item: _OpenCash, amount: Decimal, currency: str) -> ImportRecord:
+    if item.kind is ImportKind.FEE and item.net > 0:
+        return ImportRecord(ImportKind.INCOME, item.row.timestamp, amount, currency, f"{item.row.description} (given back)")
     if item.kind is ImportKind.FEE:
         return ImportRecord(ImportKind.FEE, item.row.timestamp, amount, currency, item.row.description)
+    if item.kind is ImportKind.DIVIDEND and item.net < 0:  # reversed after it was converted
+        return ImportRecord(ImportKind.DIVIDEND_REVERSED, item.row.timestamp, amount, currency, item.row.product, isin=item.row.isin)
     if item.kind is not ImportKind.DIVIDEND:
         return ImportRecord(item.kind, item.row.timestamp, amount, currency, item.row.product, isin=item.row.isin or None)
     return ImportRecord(
@@ -321,7 +355,7 @@ def _cash_record(item: _OpenCash, amount: Decimal, currency: str) -> ImportRecor
         description=item.row.product,
         isin=item.row.isin,
         dividend_currency=item.row.currency,
-        gross=item.row.amount,
+        gross=item.amount,
         tax=item.tax,
         dividend_fee=item.fee,
     )
