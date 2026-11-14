@@ -102,14 +102,14 @@ web/            the React frontend; its API client is generated from the backend
 
 | Port | Gives the core | Adapters |
 | --- | --- | --- |
-| `PriceData` | Minute bars, daily bars, latest price | Fake (fixtures), real provider |
+| `PriceData` | Minute bars, daily bars, latest price | Fake (fixtures), Alpaca, cache of past daily closes (SQLite file) |
 | `CorporateActions` | Dividends and splits | Fake, real provider |
 | `CompanyData` | Profile and fundamentals (after the MVP) | Fake, real provider |
-| `FxRates` | Daily rates | Fake, ECB |
-| `SymbolResolver` | ISIN ↔ ticker | Fake, OpenFIGI |
-| `StatementParser` | Document → proposed operations | Fake, LLM provider |
+| `FxRates` | Daily rates | Fake, ECB, cache of past daily rates (SQLite file) |
+| `SecurityLookup` | ISIN (and trading venue) → ticker | Fake, OpenFIGI |
+| `StatementReader` | A broker's export → broker-neutral import records | DEGIRO (CSV) |
 | `Clock` | "Now" | System clock, fixed clock, simulated clock (backtests) |
-| `Repository` | Persistence | In-memory, SQLite, Postgres |
+| `WalletRepository` | Persistence | In-memory, SQLite (Postgres later) |
 
 Rules:
 - The domain never does I/O and never reads the system time; time always comes from `Clock`.
@@ -165,13 +165,14 @@ Done:
 - Wallets: create, list, rename, duplicate and delete.
 - History: deposits, withdrawals and past buys and sells at their real dates, with the broker's price, fees and settled amount; edit and delete; every change checked against the whole timeline.
 - Valuation: latest prices (Alpaca, development only) and ECB rates, one total in the wallet's currency.
-- Web: wallet list and wallet page with value, holdings and operations.
+- Web: wallet list and wallet page with value, holdings and operations; sorting, filters and paging, kept in the URL.
+- Cost basis and gains (FIFO lots).
+- Past operations priced from market data when no price is given: minute bars and the first fill-model rule.
+- Splits, then dividends (`CorporateActions`).
+- Value over time: daily bars and historical FX, with gaps for days without a price, a period chosen by preset, dates or dragging, and past market data cached.
+- Import, first broker: DEGIRO's Transactions and Account exports, with preview and confirm; tickers looked up by ISIN (OpenFIGI); fees, income, broker dividends and received shares as operations.
 
 Next, in order:
-1. Cost basis and gains (FIFO lots).
-2. Past operations priced from market data when no price is given: minute bars and the first fill-model rule.
-3. Splits, then dividends (`CorporateActions`).
-4. Value over time: daily bars and historical FX.
 5. Copy a wallet at time T.
 6. Orders now: market and limit orders, the fill model and the order-filling job.
 7. Comparison: benchmarks with the same deposits, metrics, charts, hindsight label.
