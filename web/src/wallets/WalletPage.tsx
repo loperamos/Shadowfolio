@@ -13,7 +13,7 @@ import { formatDate, formatDateTime, shortDecimal } from "../ui/format";
 import { ICON_SIZE, TABLE_MIN_WIDTH } from "../ui/theme";
 import { DeleteOperationModal } from "./DeleteOperationModal";
 import { OperationActionsMenu } from "./OperationActionsMenu";
-import { isEditable, OperationModal } from "./OperationModal";
+import { OperationModal } from "./OperationModal";
 import { DeleteWalletsModal } from "./DeleteWalletsModal";
 import { DuplicateWalletModal } from "./DuplicateWalletModal";
 import { type ValuationState, useWalletValuation } from "./useWalletValuation";
@@ -291,9 +291,7 @@ function WalletDetails({ wallet, operations, version, onEditOperation, onDeleteO
                     {op.withholding != null && Number(op.withholding) !== 0 && <Money amount={op.withholding} currency={wallet.currency} />}
                   </Table.Td>
                   <Table.Td>
-                    {/* Automatic operations have no actions; they are marked in the Type column instead. */}
-                    {/* Operations from market data or imports have no actions; the edit dialog only knows manual ones. */}
-                    {isEditable(op) && <OperationActionsMenu operation={op} onEdit={onEditOperation} onDelete={onDeleteOperation} />}
+                    <OperationActionsMenu operation={op} onEdit={onEditOperation} onDelete={onDeleteOperation} />
                   </Table.Td>
                 </Table.Tr>
               ))}
