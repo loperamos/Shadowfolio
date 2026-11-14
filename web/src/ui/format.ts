@@ -46,6 +46,11 @@ export function todayAsInputValue(): string {
   return dayjs().format(DATE_VALUE_FORMAT);
 }
 
+/** The day after a date input value, as one. */
+export function dayAfter(date: string): string {
+  return dayjs(date).add(1, "day").format(DATE_VALUE_FORMAT);
+}
+
 /** The current local time, as a time input value (to the minute). */
 export function nowAsTimeValue(): string {
   return dayjs().format(TIME_VALUE_FORMAT);
