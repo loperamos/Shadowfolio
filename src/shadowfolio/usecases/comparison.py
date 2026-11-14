@@ -9,7 +9,7 @@ from uuid import UUID
 from shadowfolio.domain.comparison import Benchmark, benchmark_values
 from shadowfolio.domain.errors import CorporateActionsUnavailableNowError, FxRateUnavailableError, PriceUnavailableError
 from shadowfolio.domain.operations import Deposit, Withdrawal
-from shadowfolio.domain.performance import DayValue, Performance, performance
+from shadowfolio.domain.performance import DayValue, Performance, cumulative_returns, performance
 from shadowfolio.domain.valuation import DailyValue
 from shadowfolio.domain.wallet import Wallet
 from shadowfolio.ports.clock import Clock
@@ -22,6 +22,15 @@ from shadowfolio.usecases.valuation import Valuation
 # The benchmark when none is chosen: the US market as a whole, the usual yardstick. Any symbol market data prices
 # can be one (e.g. an ETF following another index).
 DEFAULT_BENCHMARK = "SPY"
+
+
+@dataclass(frozen=True)
+class ReturnsComparison:
+    """The wallet's and the benchmark's return since the start of a period, per day (None when unvalued)."""
+
+    wallet: tuple[tuple[date, Decimal | None], ...]
+    benchmark_symbol: str
+    benchmark: tuple[tuple[date, Decimal | None], ...]
 
 
 @dataclass(frozen=True)
@@ -59,20 +68,44 @@ class Comparison:
     ) -> PerformanceComparison | None:
         """How the wallet and the benchmark did from `start` (default: the wallet's first operation) to `end` (default:
         today). Returns None if the wallet does not exist; fails as a whole when a provider cannot answer."""
+        found = self._points(wallet_id, symbol)
+        if found is None:
+            return None
+        wallet_points, benchmark_symbol, benchmark_points, first_day = found
+        start, end = start or first_day, end or self._clock.now().date()
+        return PerformanceComparison(performance(wallet_points, start, end), benchmark_symbol, performance(benchmark_points, start, end))
+
+    def returns_daily(
+        self, wallet_id: UUID, start: date | None = None, end: date | None = None, symbol: str = DEFAULT_BENCHMARK
+    ) -> ReturnsComparison | None:
+        """The wallet's and the benchmark's time-weighted return from `start` (default: the wallet's first operation) to
+        the end of each day up to `end` (default: today), as returns can be compared whatever money each had. Returns
+        None if the wallet does not exist; fails as a whole when a provider cannot answer."""
+        found = self._points(wallet_id, symbol)
+        if found is None:
+            return None
+        wallet_points, benchmark_symbol, benchmark_points, first_day = found
+        start, end = start or first_day, end or self._clock.now().date()
+        return ReturnsComparison(
+            cumulative_returns(wallet_points, start, end), benchmark_symbol, cumulative_returns(benchmark_points, start, end)
+        )
+
+    def _points(self, wallet_id: UUID, symbol: str) -> tuple[list[DayValue], str, list[DayValue], date] | None:
+        """The wallet's and the benchmark's daily values with the money moved each day, the benchmark's symbol, and the
+        wallet's first day (today when it has none). None if the wallet does not exist."""
         wallet = self._repo.get(wallet_id)
         if wallet is None:
             return None
         daily = self._valuation.daily(wallet_id) or []
         benchmark = self._benchmark(wallet, daily, _normalized(symbol))
-        start = start or (daily[0].day if daily else self._clock.now().date())
-        end = end or self._clock.now().date()
         wallet_points, previous_deposits = [], Decimal(0)
         for value in daily:
             total = None if value.valuation is None else value.valuation.total
             wallet_points.append(DayValue(value.day, total, value.net_deposits - previous_deposits))
             previous_deposits = value.net_deposits
         benchmark_points = [DayValue(value.day, value.value, value.flow) for value in benchmark.values]
-        return PerformanceComparison(performance(wallet_points, start, end), benchmark.symbol, performance(benchmark_points, start, end))
+        first_day = daily[0].day if daily else self._clock.now().date()
+        return wallet_points, benchmark.symbol, benchmark_points, first_day
 
     def _benchmark(self, wallet: Wallet, daily: list[DailyValue], symbol: str) -> Benchmark:
         """`symbol` as the wallet's benchmark, given the wallet's own daily values; every day unvalued when market

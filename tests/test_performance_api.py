@@ -66,3 +66,23 @@ def test_the_benchmark_can_be_another_symbol_or_have_no_prices(client: TestClien
     assert (qqq["benchmark_symbol"], qqq["benchmark"]["time_weighted_return"]) == ("QQQ", "-5.00")
     # Without prices there is nothing to compare with; the wallet's own numbers are still there.
     assert (unknown["benchmark_symbol"], unknown["benchmark"], unknown["wallet"]["gain"]) == ("ZZZZ", None, "0.00")
+
+
+def test_daily_returns_follow_the_wallet_and_the_benchmark_from_zero(client: TestClient, prices: InMemoryPriceData) -> None:
+    wallet_id: str = client.post("/api/wallets", json={"name": "W", "currency": "USD", "cash": "0"}).json()["id"]
+    client.post(f"/api/wallets/{wallet_id}/deposits", json={"amount": "1000", "timestamp": "2024-06-03T09:00:00Z"})
+    spy_close(prices, MONDAY, "500")
+    spy_close(prices, TUESDAY, "550")
+
+    response = client.get(f"/api/wallets/{wallet_id}/returns/daily", params={"start": "2024-06-04"})
+
+    assert response.status_code == 200
+    result = response.json()
+    # From the end of Monday: the wallet held cash only; SPY rose 10% on Tuesday and kept that close on Wednesday.
+    assert [(r["day"], r["value"]) for r in result["wallet"]] == [("2024-06-03", "0.00"), ("2024-06-04", "0.00"), ("2024-06-05", "0.00")]
+    assert result["benchmark_symbol"] == "SPY"
+    assert [(r["day"], r["value"]) for r in result["benchmark"]] == [
+        ("2024-06-03", "0.00"),
+        ("2024-06-04", "10.00"),
+        ("2024-06-05", "10.00"),
+    ]

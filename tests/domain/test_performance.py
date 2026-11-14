@@ -5,7 +5,7 @@ from decimal import Decimal
 
 import pytest
 
-from shadowfolio.domain.performance import DayValue, performance
+from shadowfolio.domain.performance import DayValue, cumulative_returns, performance
 
 DAY0 = date(2024, 1, 1)
 
@@ -73,3 +73,18 @@ def test_a_wallet_starting_empty_starts_with_its_first_deposit() -> None:
 
 def test_a_period_without_any_valued_day_has_no_performance() -> None:
     assert performance([day(0, None), day(1, None)], DAY0, DAY0 + timedelta(days=1)) is None
+
+
+def test_cumulative_returns_start_at_zero_and_skip_unvalued_days() -> None:
+    # +10%, then 1000 more put in while flat, an unvalued day, then +10% again on the whole.
+    points = [day(0, "1000"), day(1, "1100"), day(2, "2100", flow="1000"), day(3, None), day(4, "2310")]
+
+    returns = cumulative_returns(points, DAY0 + timedelta(days=1), DAY0 + timedelta(days=4))
+
+    assert [((when - DAY0).days, value) for when, value in returns] == [
+        (0, Decimal(0)),
+        (1, close_to("0.10")),
+        (2, close_to("0.10")),
+        (3, None),
+        (4, close_to("0.21")),
+    ]

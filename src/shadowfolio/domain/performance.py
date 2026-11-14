@@ -45,29 +45,16 @@ class Performance:
 def performance(points: Sequence[DayValue], start: date, end: date) -> Performance | None:
     """How it did from `start` to `end` (both included), given its daily values oldest first. None when no day in the
     period could be valued."""
-    in_period = [point for point in points if start - timedelta(days=1) <= point.day <= end]
-    valued = [index for index, point in enumerate(in_period) if point.value is not None]
-    if not valued:
+    chained = _chained(points, start, end)
+    if not chained:
         return None
-    base = in_period[valued[0]]
-    assert base.value is not None
-    last_value = base.value
-    end_point = base
-    growth = Decimal(1)
-    pending = net_flows = Decimal(0)
-    flows: list[tuple[date, Decimal]] = []  # from the owner's side: money in is spent (negative), the end value received
-    for point in in_period[valued[0] + 1 :]:
-        pending += point.flow
-        if point.flow:
-            flows.append((point.day, -point.flow))
-        if point.value is None:
-            continue
-        if last_value > 0:  # an empty wallet has no growth to measure until money comes in
-            growth *= (point.value - pending) / last_value
-        net_flows += pending
-        last_value, pending, end_point = point.value, Decimal(0), point
-    assert end_point.value is not None
-    flows = [(day, amount) for day, amount in flows if day <= end_point.day]
+    base = chained[0].point
+    end_link = next(link for link in reversed(chained) if link.growth is not None)
+    end_point, growth = end_link.point, end_link.growth
+    assert base.value is not None and end_point.value is not None and growth is not None
+    # From the owner's side: money in is spent (negative), the end value received.
+    flows = [(link.point.day, -link.point.flow) for link in chained[1:] if link.point.flow and link.point.day <= end_point.day]
+    net_flows = sum((link.point.flow for link in chained[1:] if link.point.day <= end_point.day), Decimal(0))
     days = (end_point.day - base.day).days
     daily_rate = _daily_rate([(base.day, -base.value), *flows, (end_point.day, end_point.value)], base.day)
     a_year_or_more = days >= DAYS_PER_YEAR
@@ -83,6 +70,42 @@ def performance(points: Sequence[DayValue], start: date, end: date) -> Performan
         money_weighted=None if daily_rate is None else (1 + daily_rate) ** days - 1,
         money_weighted_per_year=(1 + daily_rate) ** DAYS_PER_YEAR - 1 if a_year_or_more and daily_rate is not None else None,
     )
+
+
+def cumulative_returns(points: Sequence[DayValue], start: date, end: date) -> tuple[tuple[date, Decimal | None], ...]:
+    """The time-weighted return from the start of the period to the end of each of its days, from 0 on the day it
+    starts from (see `performance`); None for days that could not be valued. Empty when none could."""
+    return tuple((link.point.day, None if link.growth is None else link.growth - 1) for link in _chained(points, start, end))
+
+
+@dataclass(frozen=True)
+class _Link:
+    point: DayValue
+    growth: Decimal | None  # since the start, at the end of this day; None when it could not be valued
+
+
+def _chained(points: Sequence[DayValue], start: date, end: date) -> list[_Link]:
+    """The period's days from the one it starts from (the day before `start`, or its first valued day), each with the
+    growth since then: each valued day's value, less the money moved since the previous valued day, against that
+    day's value."""
+    in_period = [point for point in points if start - timedelta(days=1) <= point.day <= end]
+    valued = [index for index, point in enumerate(in_period) if point.value is not None]
+    if not valued:
+        return []
+    base = in_period[valued[0]]
+    assert base.value is not None
+    links = [_Link(base, Decimal(1))]
+    last_value, growth, pending = base.value, Decimal(1), Decimal(0)
+    for point in in_period[valued[0] + 1 :]:
+        pending += point.flow
+        if point.value is None:
+            links.append(_Link(point, None))
+            continue
+        if last_value > 0:  # an empty wallet has no growth to measure until money comes in
+            growth *= (point.value - pending) / last_value
+        last_value, pending = point.value, Decimal(0)
+        links.append(_Link(point, growth))
+    return links
 
 
 def _daily_rate(flows: Sequence[tuple[date, Decimal]], first_day: date) -> Decimal | None:

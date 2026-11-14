@@ -1228,6 +1228,101 @@
           }
         }
       }
+    },
+    "/api/wallets/{wallet_id}/returns/daily": {
+      "get": {
+        "summary": "Daily Returns",
+        "description": "The wallet's and `symbol`'s (default SPY) time-weighted return since `start` (default: the wallet's first\noperation), at the end of every day up to `end` (default: today): comparable whatever money each had.",
+        "operationId": "daily_returns",
+        "parameters": [
+          {
+            "name": "wallet_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Wallet Id"
+            }
+          },
+          {
+            "name": "start",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start"
+            }
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End"
+            }
+          },
+          {
+            "name": "symbol",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "SPY",
+              "title": "Symbol"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReturnsComparisonResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Malformed request or broken business rule",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1461,6 +1556,32 @@
           "EUR"
         ],
         "title": "Currency"
+      },
+      "DailyReturnResponse": {
+        "properties": {
+          "day": {
+            "type": "string",
+            "format": "date",
+            "title": "Day"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "type": "object",
+        "required": [
+          "day",
+          "value"
+        ],
+        "title": "DailyReturnResponse"
       },
       "DailyValueResponse": {
         "properties": {
@@ -2162,6 +2283,36 @@
           "previous_close"
         ],
         "title": "QuoteResponse"
+      },
+      "ReturnsComparisonResponse": {
+        "properties": {
+          "wallet": {
+            "items": {
+              "$ref": "#/components/schemas/DailyReturnResponse"
+            },
+            "type": "array",
+            "title": "Wallet"
+          },
+          "benchmark_symbol": {
+            "type": "string",
+            "title": "Benchmark Symbol"
+          },
+          "benchmark": {
+            "items": {
+              "$ref": "#/components/schemas/DailyReturnResponse"
+            },
+            "type": "array",
+            "title": "Benchmark"
+          }
+        },
+        "type": "object",
+        "required": [
+          "wallet",
+          "benchmark_symbol",
+          "benchmark"
+        ],
+        "title": "ReturnsComparisonResponse",
+        "description": "The wallet's and `benchmark_symbol`'s time-weighted return since the start of a period, per day."
       },
       "SellEdit": {
         "properties": {

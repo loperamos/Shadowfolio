@@ -27,7 +27,7 @@ from shadowfolio.domain.operations import (
 from shadowfolio.domain.performance import Performance
 from shadowfolio.domain.valuation import DailyValue, WalletValuation
 from shadowfolio.domain.wallet import Wallet
-from shadowfolio.usecases.comparison import PerformanceComparison
+from shadowfolio.usecases.comparison import PerformanceComparison, ReturnsComparison
 from shadowfolio.usecases.imports import ImportReport
 
 
@@ -395,6 +395,26 @@ class PerformanceComparisonResponse(BaseModel):
             benchmark_symbol=comparison.benchmark_symbol,
             benchmark=None if comparison.benchmark is None else PerformanceResponse.from_performance(comparison.benchmark),
         )
+
+
+class DailyReturnResponse(BaseModel):
+    day: date
+    value: Decimal | None  # the return since the start of the period, in percent; null when the day could not be valued
+
+
+class ReturnsComparisonResponse(BaseModel):
+    """The wallet's and `benchmark_symbol`'s time-weighted return since the start of a period, per day."""
+
+    wallet: list[DailyReturnResponse]
+    benchmark_symbol: str
+    benchmark: list[DailyReturnResponse]
+
+    @classmethod
+    def from_comparison(cls, comparison: ReturnsComparison) -> "ReturnsComparisonResponse":
+        def daily(returns: tuple[tuple[date, Decimal | None], ...]) -> list[DailyReturnResponse]:
+            return [DailyReturnResponse(day=day, value=_ratio_percent(value)) for day, value in returns]
+
+        return cls(wallet=daily(comparison.wallet), benchmark_symbol=comparison.benchmark_symbol, benchmark=daily(comparison.benchmark))
 
 
 class DailyValueResponse(BaseModel):
