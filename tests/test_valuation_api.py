@@ -270,7 +270,7 @@ def test_a_day_without_a_close_is_left_unvalued_and_says_what_is_missing(
     client: TestClient, prices: InMemoryPriceData, fx_rates: InMemoryFxRates
 ) -> None:
     wallet_id = wallet_holding(client, NVDA_BUY)  # bought on 24 June 2024
-    prices.add_close("NVDA", nvda_close(date(2024, 6, 25), "126.09"))  # nothing for the 24th
+    prices.add_close("NVDA", nvda_close(date(2024, 6, 25), "126.09"))  # nothing for the 24th (e.g. before its history)
     fx_rates.set(FxRate(Currency.USD, Currency.EUR, Decimal("0.9310"), date(2024, 6, 24)))
 
     response = client.get(f"/api/wallets/{wallet_id}/valuation/daily", params={"start": "2024-06-24", "end": "2024-06-25"})
@@ -280,6 +280,18 @@ def test_a_day_without_a_close_is_left_unvalued_and_says_what_is_missing(
     assert [(v["day"], v["cash"], v["holdings_value"], v["total"], v["missing"]) for v in response.json()] == [
         ("2024-06-24", "2090.32", None, None, ["NVDA"]),
         ("2024-06-25", "2090.32", "939.12", "3029.44", []),  # 8 x 126.09 USD x 0.9310
+    ]
+
+
+def test_a_holding_market_data_has_no_prices_for_is_valued_at_the_nearest_trades_price(client: TestClient) -> None:
+    wallet_id = wallet_holding(client, TSLA_BUY)  # 5 bought at 295.05 EUR on 15 Nov 2024; no closes at all
+
+    response = client.get(f"/api/wallets/{wallet_id}/valuation/daily", params={"start": "2024-11-15", "end": "2024-11-16"})
+
+    # The price the wallet traded at stands in for the missing closes, and each day says which holdings are estimated.
+    assert [(v["day"], v["holdings_value"], v["total"], v["missing"], v["estimated"]) for v in response.json()] == [
+        ("2024-11-15", "1475.25", "2996.10", [], ["TSLA"]),  # 5 x 295.05 + cash 3000 - 1479.15
+        ("2024-11-16", "1475.25", "2996.10", [], ["TSLA"]),
     ]
 
 

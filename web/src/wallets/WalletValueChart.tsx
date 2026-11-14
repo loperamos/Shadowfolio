@@ -164,6 +164,8 @@ function ChartBody({ state, benchmark, range, currency, onSelect, lines, onLines
       }
       const unvalued = shown.filter((value) => value.missing.length > 0);
       const missing = [...new Set(unvalued.flatMap((value) => value.missing))];
+      const withEstimates = shown.filter((value) => value.estimated.length > 0);
+      const estimated = [...new Set(withEstimates.flatMap((value) => value.estimated))];
       // The benchmark comes on its own; until then (or if it fails) its line has no points.
       const benchmarkValues = new Map(benchmark.status === "loaded" ? benchmark.benchmark.values.map((v) => [v.day, v.value]) : []);
       const benchmarkLabel = `${benchmark.status === "loaded" ? benchmark.benchmark.symbol : "Benchmark"} with the same deposits`;
@@ -184,6 +186,13 @@ function ChartBody({ state, benchmark, range, currency, onSelect, lines, onLines
           {lines.includes(Line.BENCHMARK) && benchmark.status === "error" && (
             <Text c="dimmed" size="sm" mt="xs">
               {benchmarkLabel} unavailable: {benchmark.message}
+            </Text>
+          )}
+          {/* Estimated prices are only for listings market data does not cover; say which, and on how many days. */}
+          {withEstimates.length > 0 && (
+            <Text c="dimmed" size="sm" mt="xs">
+              Estimated on {withEstimates.length} of these {shown.length} days: no market prices for {estimated.join(", ")}, so they are valued
+              at the price you last traded them at (or next, if you had not yet).
             </Text>
           )}
           {/* Unvalued days are gaps in the line, never guesses; say why. */}

@@ -1400,6 +1400,13 @@
             },
             "type": "array",
             "title": "Missing"
+          },
+          "estimated": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Estimated"
           }
         },
         "type": "object",
@@ -1409,7 +1416,8 @@
           "holdings_value",
           "total",
           "net_deposits",
-          "missing"
+          "missing",
+          "estimated"
         ],
         "title": "DailyValueResponse",
         "description": "The wallet at the end of a day, valued at that day's closing prices, in its currency."

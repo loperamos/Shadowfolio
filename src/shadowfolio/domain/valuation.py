@@ -1,11 +1,12 @@
 """Valuation: what a wallet is worth, in its own currency, given market prices and exchange rates."""
 
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 
 from shadowfolio.domain.money import Currency, FxRate, to_cents
+from shadowfolio.domain.operations import Buy, Operation, Sell
 from shadowfolio.domain.wallet import Wallet
 
 
@@ -103,15 +104,27 @@ class WalletValuation:
 
 @dataclass(frozen=True)
 class DailyValue:
-    """The wallet at the end of a day, valued at that day's closes, with the money put in up to then. `valuation` is
-    None when a holding has no price that day, or its currency no rate: `missing` says which (a symbol, or e.g.
-    "USD→EUR"). Nothing is guessed: a day is either fully valued or not."""
+    """The wallet at the end of a day, valued at that day's closes, with the money put in up to then. A holding
+    market data has no prices for is valued at an estimated price (see `estimated_price`), and `estimated` says which. `valuation`
+    is None when a holding has no price at all that day, or its currency no rate: `missing` says which (a symbol, or
+    e.g. "USD→EUR")."""
 
     day: date
     valuation: WalletValuation | None
     cash: Decimal
     net_deposits: Decimal
     missing: tuple[str, ...] = ()
+    estimated: tuple[str, ...] = ()
+
+
+def estimated_price(operations: Iterable[Operation], symbol: str, day: date) -> Quote | None:
+    """A price standing in for a missing close of `symbol` on `day` (e.g. a listing market data does not cover): that
+    of the wallet's last trade in it on or before that day, else of its next one (e.g. shares received without a
+    price, sold later). None when the wallet never traded it. Operations are oldest first."""
+    trades = [op for op in operations if isinstance(op, Buy | Sell) and op.trade.symbol == symbol]
+    before = [op for op in trades if op.timestamp.astimezone(UTC).date() <= day]
+    nearest = before[-1] if before else next(iter(trades), None)
+    return None if nearest is None else Quote(nearest.trade.price, nearest.trade.price_currency, nearest.timestamp)
 
 
 def value_wallet(wallet: Wallet, quotes: Mapping[str, Quote], rates: Mapping[Currency, FxRate]) -> WalletValuation:

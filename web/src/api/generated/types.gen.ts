@@ -154,6 +154,10 @@ export type DailyValueResponse = {
      * Missing
      */
     missing: Array<string>;
+    /**
+     * Estimated
+     */
+    estimated: Array<string>;
 };
 
 /**
