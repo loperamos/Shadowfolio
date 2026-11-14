@@ -18,6 +18,7 @@ from shadowfolio.adapters.in_memory_price_data import InMemoryPriceData
 from shadowfolio.adapters.in_memory_wallet_repository import InMemoryWalletRepository
 from shadowfolio.domain.imports import ImportKind, ImportRecord
 from shadowfolio.domain.money import Currency
+from shadowfolio.domain.operations import ImportedDividend
 from shadowfolio.domain.wallet import Wallet
 from shadowfolio.usecases.history import History
 from shadowfolio.usecases.imports import ImportReport, Imports
@@ -186,3 +187,82 @@ def test_a_trade_in_euros_on_a_european_exchange() -> None:
 
     assert imported.wallet.holdings == {"TSLA": Decimal(5)}
     assert imported.wallet.cash == Decimal("20.85")  # 1500 - 1475.25 - 3.90
+
+
+DEPOSIT_500 = '01-09-2026,10:00,01-09-2026,,,Dépôt flatex,,EUR,"500,00",EUR,"500,00",'
+# NVIDIA's dividend as DEGIRO books it (newest first): 9.50 USD, less 1.43 USD of US tax and a 0.81 USD fee; the
+# remaining 7.26 USD is converted the next day into 6.43 EUR.
+NVIDIA_DIVIDEND = [
+    '03-10-2026,06:53,02-10-2026,,,Operation de change - Crédit,,EUR,"6,43",EUR,"506,43",',
+    '03-10-2026,06:53,02-10-2026,,,Opération de change - Débit,"1,1283",USD,"-7,26",USD,"0,00",',
+    '02-10-2026,07:49,01-10-2026,,,Frais d’opération sur titres,,USD,"-0,81",USD,"7,26",',
+    f'02-10-2026,07:48,01-10-2026,{NVIDIA},Impôts sur dividende,,USD,"-1,43",USD,"8,07",',
+    f'02-10-2026,07:48,01-10-2026,{NVIDIA},Dividende,,USD,"9,50",USD,"9,50",',
+]
+
+
+def test_a_dividend_with_its_tax_fee_and_conversion_is_one_dividend_credited_in_euros() -> None:
+    imported = import_degiro(transactions=[], account=[*NVIDIA_DIVIDEND, DEPOSIT_500], tickers=NVIDIA_TICKER)
+
+    assert imported.records[-1] == ImportRecord(
+        kind=ImportKind.DIVIDEND,
+        timestamp=datetime(2026, 10, 2, 5, 48, tzinfo=UTC),
+        amount=Decimal("6.43"),
+        currency="EUR",
+        description="NVIDIA CORPORATION",
+        isin="US67066G1040",
+        dividend_currency="USD",
+        gross=Decimal("9.50"),
+        tax=Decimal("1.43"),
+        dividend_fee=Decimal("0.81"),
+    )
+    assert imported.report.not_imported == []
+    [dividend] = [op for op in imported.wallet.operations if isinstance(op, ImportedDividend)]
+    assert (dividend.symbol, dividend.currency, dividend.gross, dividend.tax, dividend.fee, dividend.amount) == (
+        "NVDA",
+        "USD",
+        Decimal("9.50"),
+        Decimal("1.43"),
+        Decimal("0.81"),
+        Decimal("6.43"),
+    )
+    assert imported.wallet.cash == Decimal("506.43")
+
+
+def test_dividends_converted_together_share_the_euros_in_proportion() -> None:
+    meta = '"META PLATFORMS, INC. CLASS A",US30303M1027'
+    account = [
+        '30-09-2026,06:50,29-09-2026,,,Operation de change - Crédit,,EUR,"9,00",EUR,"509,00",',
+        '30-09-2026,06:50,29-09-2026,,,Opération de change - Débit,"1,1000",USD,"-9,90",USD,"0,00",',
+        f'29-09-2026,07:30,28-09-2026,{meta},Dividende,,USD,"3,30",USD,"9,90",',
+        f'29-09-2026,07:30,28-09-2026,{NVIDIA},Dividende,,USD,"6,60",USD,"6,60",',
+        DEPOSIT_500,
+    ]
+
+    imported = import_degiro(transactions=[], account=account, tickers={**NVIDIA_TICKER, "US30303M1027": "META"})
+
+    credited = {op.symbol: op.amount for op in imported.wallet.operations if isinstance(op, ImportedDividend)}
+    assert credited == {"NVDA": Decimal("6.00"), "META": Decimal("3.00")}
+    assert imported.wallet.cash == Decimal("509.00")
+
+
+def test_a_dividend_in_hong_kong_dollars_without_tax() -> None:
+    tencent = "TENCENT HOLDINGS LIMITED,KYG875721634"
+    account = [
+        '07-06-2023,07:32,06-06-2023,,,Operation de change - Crédit,,EUR,"3,09",EUR,"503,09",',
+        '07-06-2023,07:32,06-06-2023,,,Opération de change - Débit,"8,3977",HKD,"-25,92",HKD,"0,00",',
+        '06-06-2023,07:17,05-06-2023,,,Frais d’opération sur titres,,HKD,"-2,88",HKD,"25,92",',
+        f'06-06-2023,07:17,05-06-2023,{tencent},Dividende,,HKD,"28,80",HKD,"28,80",',
+        '01-06-2023,10:00,01-06-2023,,,Dépôt flatex,,EUR,"500,00",EUR,"500,00",',
+    ]
+
+    imported = import_degiro(transactions=[], account=account, tickers={"KYG875721634": "0700.HK"})
+
+    [dividend] = [op for op in imported.wallet.operations if isinstance(op, ImportedDividend)]
+    assert (dividend.currency, dividend.gross, dividend.tax, dividend.fee, dividend.amount) == (
+        "HKD",  # only shown: wallets and prices are not in Hong Kong dollars
+        Decimal("28.80"),
+        Decimal(0),
+        Decimal("2.88"),
+        Decimal("3.09"),
+    )

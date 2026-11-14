@@ -13,6 +13,7 @@ class ImportKind(StrEnum):
     SELL = "sell"
     # A cash-statement row that only pays for, or receives, a trade already read as a buy or sell.
     TRADE_SETTLEMENT = "trade_settlement"
+    DIVIDEND = "dividend"
     # Money moving between accounts that are all the investor's (a broker and its partner bank, a cash fund).
     INTERNAL_TRANSFER = "internal_transfer"
     UNKNOWN = "unknown"  # a row the reader does not recognise
@@ -33,3 +34,9 @@ class ImportRecord:
     price: Decimal | None = None  # per share, in `price_currency`
     price_currency: str | None = None
     fees: Decimal | None = None  # every fee of the trade, in `currency`
+    # Dividends only: `amount` is then what was credited in `currency` (the account's), and these are in the
+    # dividend's own currency: before tax, the tax withheld, and the broker's fee.
+    dividend_currency: str | None = None
+    gross: Decimal | None = None
+    tax: Decimal | None = None
+    dividend_fee: Decimal | None = None

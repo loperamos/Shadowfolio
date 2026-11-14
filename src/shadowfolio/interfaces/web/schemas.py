@@ -8,7 +8,18 @@ from uuid import UUID
 from pydantic import AwareDatetime, BaseModel, Field
 
 from shadowfolio.domain.money import Currency
-from shadowfolio.domain.operations import Buy, Deposit, Dividend, Operation, OperationType, PriceSource, Sell, Split, Withdrawal
+from shadowfolio.domain.operations import (
+    Buy,
+    Deposit,
+    Dividend,
+    ImportedDividend,
+    Operation,
+    OperationType,
+    PriceSource,
+    Sell,
+    Split,
+    Withdrawal,
+)
 from shadowfolio.domain.valuation import DailyValue, WalletValuation
 from shadowfolio.domain.wallet import Wallet
 
@@ -195,6 +206,16 @@ class OperationResponse(BaseModel):
                     split_new_rate=operation.new_rate,
                     automatic=True,
                     had_effect=had_effect,
+                )
+            case ImportedDividend():
+                # From a broker statement: amount is what was credited, fees the broker's fee and the tax, in its currency.
+                return cls(
+                    id=operation.id,
+                    type=operation.type,
+                    timestamp=operation.timestamp,
+                    amount=operation.amount,
+                    fees=Decimal(0),
+                    symbol=operation.symbol,
                 )
             case Dividend():
                 # quantity: the shares that qualified; price: the amount per share, in its currency; amount: credited (net).

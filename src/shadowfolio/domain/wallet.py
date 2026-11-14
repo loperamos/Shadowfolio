@@ -22,7 +22,7 @@ from shadowfolio.domain.errors import (
 )
 from shadowfolio.domain.ledger import Ledger, build_ledger
 from shadowfolio.domain.money import Currency, to_cents
-from shadowfolio.domain.operations import Buy, Deposit, Dividend, Operation, PriceSource, Sell, Split, Trade, Withdrawal
+from shadowfolio.domain.operations import Buy, Deposit, Dividend, ImportedDividend, Operation, PriceSource, Sell, Split, Trade, Withdrawal
 
 
 @dataclass(frozen=True)
@@ -92,6 +92,13 @@ class Wallet:
     def withdraw(self, operation_id: UUID, amount: Decimal, at: datetime, replacing: UUID | None = None) -> Self:
         _require_positive(amount, "amount")
         return self._with(Withdrawal(operation_id, at, amount), replacing)
+
+    def record_dividend(
+        self, operation_id: UUID, at: datetime, symbol: str, currency: str, gross: Decimal, tax: Decimal, fee: Decimal, amount: Decimal
+    ) -> Self:
+        """A dividend as a broker statement reports it (see ImportedDividend); `amount` is what the wallet received."""
+        _require_positive(amount, "amount")
+        return self._with(ImportedDividend(operation_id, at, symbol, currency, gross, tax, fee, amount))
 
     def buy(
         self,

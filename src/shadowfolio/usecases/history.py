@@ -37,6 +37,18 @@ class History:
         self._repo.update(updated)
         return updated
 
+    def record_dividend(
+        self, wallet_id: UUID, timestamp: datetime, symbol: str, currency: str, gross: Decimal, tax: Decimal, fee: Decimal, amount: Decimal
+    ) -> Wallet | None:
+        """Record a dividend as a broker statement reports it: gross, tax and fee in its currency, and `amount`, what
+        was credited in the wallet's currency."""
+        wallet = self._repo.get(wallet_id)
+        if wallet is None:
+            return None
+        updated = wallet.record_dividend(uuid4(), self._at(timestamp), symbol, currency, gross, tax, fee, amount)
+        self._repo.update(updated)
+        return updated
+
     def withdraw(self, wallet_id: UUID, amount: Decimal, timestamp: datetime | None = None, replacing: UUID | None = None) -> Wallet | None:
         """Take cash out of a wallet, now or at a past timestamp."""
         wallet = self._repo.get(wallet_id)

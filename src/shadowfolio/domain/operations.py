@@ -200,6 +200,34 @@ class Dividend(BaseOperation):
         return True
 
 
+@dataclass(frozen=True)
+class ImportedDividend(BaseOperation):
+    """A cash dividend as a broker statement reports it: `gross` in `currency`, less the `tax` withheld and the
+    broker's `fee` (both in `currency`), credited as `amount` in the wallet's currency after conversion. `currency`
+    is kept as printed, as it may be one wallets do not use (e.g. HKD)."""
+
+    type: ClassVar[OperationType] = OperationType.DIVIDEND
+
+    symbol: str
+    currency: str
+    gross: Decimal
+    tax: Decimal
+    fee: Decimal
+    amount: Decimal
+
+    @property
+    def cash_delta(self) -> Decimal:
+        return self.amount
+
+    @property
+    def holding_change(self) -> tuple[str, Decimal] | None:
+        return None
+
+    @property
+    def automatic(self) -> bool:
+        return False
+
+
 # Every concrete kind. Code that handles each kind matches on this, so mypy reports a kind
 # that is not handled.
-Operation = Deposit | Withdrawal | Buy | Sell | Split | Dividend
+Operation = Deposit | Withdrawal | Buy | Sell | Split | Dividend | ImportedDividend

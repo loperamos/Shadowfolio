@@ -43,6 +43,12 @@ class Imports:
                         report.not_imported.append(NotImported(record, f"no ticker for {record.isin}"))
                         continue
                     self._record_trade(wallet_id, record, ticker)
+                case ImportKind.DIVIDEND:
+                    ticker = tickers.get(record.isin or "")
+                    if ticker is None:
+                        report.not_imported.append(NotImported(record, f"no ticker for {record.isin}"))
+                        continue
+                    self._record_dividend(wallet_id, record, ticker)
                 case ImportKind.INTERNAL_TRANSFER | ImportKind.TRADE_SETTLEMENT:
                     pass  # not money in or out of the wallet, or already counted with its trade
                 case ImportKind.UNKNOWN:
@@ -61,4 +67,17 @@ class Imports:
             price_currency=Currency(record.price_currency),
             settled_amount=record.amount,
             fees=record.fees or Decimal(0),
+        )
+
+    def _record_dividend(self, wallet_id: UUID, record: ImportRecord, ticker: str) -> None:
+        assert record.dividend_currency is not None and record.gross is not None
+        self._history.record_dividend(
+            wallet_id,
+            record.timestamp,
+            ticker,
+            record.dividend_currency,
+            record.gross,
+            record.tax or Decimal(0),
+            record.dividend_fee or Decimal(0),
+            record.amount,
         )
