@@ -1136,16 +1136,37 @@
             "title": "Cash"
           },
           "holdings_value": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Holdings Value"
           },
           "total": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Total"
           },
           "net_deposits": {
             "type": "string",
             "title": "Net Deposits"
+          },
+          "missing": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Missing"
           }
         },
         "type": "object",
@@ -1154,7 +1175,8 @@
           "cash",
           "holdings_value",
           "total",
-          "net_deposits"
+          "net_deposits",
+          "missing"
         ],
         "title": "DailyValueResponse",
         "description": "The wallet at the end of a day, valued at that day's closing prices, in its currency."

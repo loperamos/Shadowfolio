@@ -107,15 +107,19 @@ export type DailyValueResponse = {
     /**
      * Holdings Value
      */
-    holdings_value: string;
+    holdings_value: string | null;
     /**
      * Total
      */
-    total: string;
+    total: string | null;
     /**
      * Net Deposits
      */
     net_deposits: string;
+    /**
+     * Missing
+     */
+    missing: Array<string>;
 };
 
 /**

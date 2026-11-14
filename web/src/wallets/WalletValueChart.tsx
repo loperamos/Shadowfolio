@@ -71,15 +71,25 @@ function ChartBody({ state, range, currency }: { state: ReturnType<typeof useDai
       }
       const start = rangeStart(range, state.values[state.values.length - 1].day);
       const shown = start === null ? state.values : state.values.filter((value) => value.day >= start);
+      const unvalued = shown.filter((value) => value.missing.length > 0);
+      const missing = [...new Set(unvalued.flatMap((value) => value.missing))];
       return (
-        <TimeSeriesChart
-          points={shown.map(toPoint)}
-          currency={currency}
-          series={[
-            { name: "total", label: "Value", color: "teal.6" },
-            { name: "net_deposits", label: "Net deposits", color: "gray.6", dashed: true },
-          ]}
-        />
+        <>
+          <TimeSeriesChart
+            points={shown.map(toPoint)}
+            currency={currency}
+            series={[
+              { name: "total", label: "Value", color: "teal.6" },
+              { name: "net_deposits", label: "Net deposits", color: "gray.6", dashed: true },
+            ]}
+          />
+          {/* Unvalued days are gaps in the line, never guesses; say why. */}
+          {unvalued.length > 0 && (
+            <Text c="dimmed" size="sm" mt="xs">
+              Not valued on {unvalued.length} of these {shown.length} days: no price or exchange rate for {missing.join(", ")}.
+            </Text>
+          )}
+        </>
       );
     }
   }
@@ -87,5 +97,5 @@ function ChartBody({ state, range, currency }: { state: ReturnType<typeof useDai
 
 // For drawing only: the chart needs numbers. Amounts stay exact strings everywhere else.
 function toPoint(value: DailyValueResponse) {
-  return { day: value.day, total: Number(value.total), net_deposits: Number(value.net_deposits) };
+  return { day: value.day, total: value.total == null ? null : Number(value.total), net_deposits: Number(value.net_deposits) };
 }

@@ -11,7 +11,8 @@ export type ChartSeries = {
 };
 
 type Props = {
-  points: ({ day: string } & Record<string, number | string>)[]; // oldest first; `day` as YYYY-MM-DD
+  // Oldest first; `day` as YYYY-MM-DD. A null value is a day without one: the line has a gap there.
+  points: ({ day: string } & Record<string, number | string | null>)[];
   series: ChartSeries[];
   currency: string;
 };
@@ -32,6 +33,7 @@ export function TimeSeriesChart({ points, series, currency }: Props) {
       dataKey="date"
       series={series.map(({ name, label, color, dashed }) => ({ name, label, color, strokeDasharray: dashed ? DASHED : undefined }))}
       curveType="linear"
+      connectNulls={false}
       withDots={false}
       withLegend
       fillOpacity={0.15}
