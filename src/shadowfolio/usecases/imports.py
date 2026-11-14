@@ -1,0 +1,14 @@
+"""Import use cases: turning records read from a broker statement into a wallet's operations."""
+
+from uuid import UUID
+
+from shadowfolio.domain.imports import ImportRecord
+from shadowfolio.usecases.history import History
+
+
+class Imports:
+    def __init__(self, history: History) -> None:
+        self._history = history
+
+    def apply(self, wallet_id: UUID, records: list[ImportRecord]) -> None:
+        """Record the records' operations in the wallet."""
