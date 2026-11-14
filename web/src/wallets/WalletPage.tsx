@@ -9,7 +9,7 @@ import { walletPath, WALLETS_PATH } from "../routes";
 import { EditableTitle } from "../ui/EditableTitle";
 import { GainText } from "../ui/GainText";
 import { Money } from "../ui/Money";
-import { formatDate, formatDateTime, shortDecimal } from "../ui/format";
+import { dateInputValueOf, formatDate, formatDateTime, shortDecimal, todayAsInputValue } from "../ui/format";
 import { ICON_SIZE, TABLE_MIN_WIDTH } from "../ui/theme";
 import { DeleteOperationModal } from "./DeleteOperationModal";
 import { OperationActionsMenu } from "./OperationActionsMenu";
@@ -24,6 +24,7 @@ import { WalletActionsMenu } from "./WalletActionsMenu";
 import { WalletSettingsModal } from "./WalletSettingsModal";
 import { ImportStatementModal } from "./ImportStatementModal";
 import { WalletValueChart } from "./WalletValueChart";
+import { describeRange, inRange, isEverything, Period, periodSearch, usePeriod } from "./period";
 import { WalletDayChange, WalletGain, WalletValue } from "./WalletValue";
 
 const NOT_FOUND_STATUS = 404;
@@ -160,7 +161,9 @@ type DetailsProps = Loaded & {
 
 function WalletDetails({ wallet, operations, version, onEditOperation, onDeleteOperation }: DetailsProps) {
   // Splits that changed nothing (no shares held on their date) are left out: they only add noise.
-  const shownOperations = operations.filter((op) => op.had_effect !== false);
+  const effective = operations.filter((op) => op.had_effect !== false);
+  const { period, range, choose, params } = usePeriod(todayAsInputValue());
+  const shownOperations = effective.filter((op) => inRange(dateInputValueOf(op.timestamp), range));
   const holdings = Object.entries(wallet.holdings);
   const valuation = useWalletValuation(wallet.id, version);
   return (
@@ -203,7 +206,7 @@ function WalletDetails({ wallet, operations, version, onEditOperation, onDeleteO
         </Alert>
       )}
 
-      <WalletValueChart walletId={wallet.id} currency={wallet.currency} refreshKey={version} />
+      <WalletValueChart walletId={wallet.id} currency={wallet.currency} refreshKey={version} period={period} range={range} onChoose={choose} />
 
       <div>
         <Title order={2} mb="sm">
@@ -246,9 +249,18 @@ function WalletDetails({ wallet, operations, version, onEditOperation, onDeleteO
         <Title order={2} mb="sm">
           Operations
         </Title>
-        {shownOperations.length === 0 ? (
+        {/* Filtered by the chart's period: say so, so a shorter list never looks like missing operations. */}
+        {!isEverything(range) && effective.length > 0 && (
+          <Text c="dimmed" size="sm" mb="sm">
+            {shownOperations.length === 0 ? "No operations" : `Showing ${shownOperations.length} of ${effective.length} operations`} {describeRange(range)}.{" "}
+            <Anchor component={Link} to={{ search: periodSearch(params, Period.ALL).toString() }} replace>
+              Show all
+            </Anchor>
+          </Text>
+        )}
+        {effective.length === 0 ? (
           <Text c="dimmed">No operations yet. Use “Add operation” to record deposits and trades at their real dates.</Text>
-        ) : (
+        ) : shownOperations.length === 0 ? null : (
           <Table.ScrollContainer minWidth={TABLE_MIN_WIDTH}>
           <Table striped>
             <Table.Thead>

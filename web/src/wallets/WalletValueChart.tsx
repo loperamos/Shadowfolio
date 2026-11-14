@@ -1,61 +1,73 @@
 import { Alert, Group, SegmentedControl, Skeleton, Text, Title } from "@mantine/core";
-import dayjs from "dayjs";
-import { useState } from "react";
+import { DateInput } from "@mantine/dates";
+import { IconCalendar } from "@tabler/icons-react";
 
 import type { DailyValueResponse } from "../api/generated";
 import { TimeSeriesChart } from "../ui/TimeSeriesChart";
-import { CHART_HEIGHT } from "../ui/theme";
+import { DATE_INPUT_FORMAT, parseDateInput } from "../ui/format";
+import { CHART_HEIGHT, DATE_INPUT_WIDTH, ICON_SIZE } from "../ui/theme";
+import { type DayRange, describeRange, inRange, isEverything, Period } from "./period";
 import { useDailyValues } from "./useDailyValues";
 
-// Periods to show, ending on the last day with a value, as on most brokers' and finance sites' charts.
-enum Range {
-  MONTH = "1M",
-  HALF_YEAR = "6M",
-  YEAR_TO_DATE = "YTD",
-  YEAR = "1Y",
-  ALL = "All",
-}
+type ChartProps = {
+  walletId: string;
+  currency: string;
+  refreshKey: number;
+  // The preset shown, or null for chosen dates; `range` is the days either covers.
+  period: Period | null;
+  range: DayRange;
+  onChoose: (choice: Period | DayRange) => void;
+};
 
-/** The first day shown for `range`, given the last day with a value (YYYY-MM-DD); null shows everything. */
-function rangeStart(range: Range, lastDay: string): string | null {
-  const last = dayjs(lastDay);
-  switch (range) {
-    case Range.MONTH:
-      return last.subtract(1, "month").format("YYYY-MM-DD");
-    case Range.HALF_YEAR:
-      return last.subtract(6, "month").format("YYYY-MM-DD");
-    case Range.YEAR_TO_DATE:
-      return last.startOf("year").format("YYYY-MM-DD");
-    case Range.YEAR:
-      return last.subtract(1, "year").format("YYYY-MM-DD");
-    case Range.ALL:
-      return null;
-  }
-}
-
-/** The wallet's value over time against the money put in, with a choice of period. */
-export function WalletValueChart({ walletId, currency, refreshKey }: { walletId: string; currency: string; refreshKey: number }) {
+/** The wallet's value over time against the money put in, over a period chosen here (which the page also follows). */
+export function WalletValueChart({ walletId, currency, refreshKey, period, range, onChoose }: ChartProps) {
   const state = useDailyValues(walletId, refreshKey);
-  const [range, setRange] = useState(Range.ALL);
+  const backwards = range.start !== null && range.end !== null && range.start > range.end;
   return (
     <div>
-      <Group justify="space-between" mb="sm">
+      <Group justify="space-between" align="flex-start" mb="sm">
         <Title order={2}>Value over time</Title>
-        <SegmentedControl
-          size="xs"
-          aria-label="Period"
-          data={Object.values(Range)}
-          value={range}
-          onChange={(value) => setRange(value as Range)}
-          disabled={state.status !== "loaded" || state.values.length === 0}
-        />
+        <Group gap="xs" align="flex-start">
+          {/* A preset, or dates typed or picked: as in Grafana's and Google Analytics' period pickers. */}
+          <SegmentedControl size="xs" aria-label="Period" data={Object.values(Period)} value={period ?? ""} onChange={(value) => onChoose(value as Period)} />
+          <DayInput label="From" placeholder="First day" value={range.start} onChange={(start) => onChoose({ ...range, start })} />
+          <DayInput
+            label="To"
+            placeholder="Today"
+            value={range.end}
+            onChange={(end) => onChoose({ ...range, end })}
+            error={backwards ? "Before “From”" : undefined}
+          />
+        </Group>
       </Group>
-      <ChartBody state={state} range={range} currency={currency} />
+      <ChartBody state={state} range={range} currency={currency} onSelect={(start, end) => onChoose({ start, end })} />
     </div>
   );
 }
 
-function ChartBody({ state, range, currency }: { state: ReturnType<typeof useDailyValues>; range: Range; currency: string }) {
+type DayInputProps = { label: string; placeholder: string; value: string | null; onChange: (value: string | null) => void; error?: string };
+
+function DayInput({ label, placeholder, value, onChange, error }: DayInputProps) {
+  return (
+    <DateInput
+      size="xs"
+      aria-label={label}
+      w={DATE_INPUT_WIDTH}
+      placeholder={placeholder}
+      valueFormat={DATE_INPUT_FORMAT}
+      dateParser={parseDateInput}
+      leftSection={<IconCalendar size={ICON_SIZE} />}
+      clearable
+      value={value}
+      onChange={onChange}
+      error={error}
+    />
+  );
+}
+
+type BodyProps = { state: ReturnType<typeof useDailyValues>; range: DayRange; currency: string; onSelect: (start: string, end: string) => void };
+
+function ChartBody({ state, range, currency, onSelect }: BodyProps) {
   switch (state.status) {
     case "loading":
       return <Skeleton h={CHART_HEIGHT} />;
@@ -69,8 +81,10 @@ function ChartBody({ state, range, currency }: { state: ReturnType<typeof useDai
       if (state.values.length === 0) {
         return <Text c="dimmed">No history yet. Add an operation to see the wallet’s value over time.</Text>;
       }
-      const start = rangeStart(range, state.values[state.values.length - 1].day);
-      const shown = start === null ? state.values : state.values.filter((value) => value.day >= start);
+      const shown = state.values.filter((value) => inRange(value.day, range));
+      if (!isEverything(range) && shown.length === 0) {
+        return <Text c="dimmed">No history {describeRange(range)}.</Text>;
+      }
       const unvalued = shown.filter((value) => value.missing.length > 0);
       const missing = [...new Set(unvalued.flatMap((value) => value.missing))];
       return (
@@ -78,6 +92,7 @@ function ChartBody({ state, range, currency }: { state: ReturnType<typeof useDai
           <TimeSeriesChart
             points={shown.map(toPoint)}
             currency={currency}
+            onSelect={onSelect}
             series={[
               { name: "total", label: "Value", color: "teal.6" },
               { name: "net_deposits", label: "Net deposits", color: "gray.6", dashed: true },
