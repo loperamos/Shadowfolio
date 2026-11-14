@@ -26,6 +26,7 @@ import { UncreditedDividendsNotice } from "./UncreditedDividendsNotice";
 import { WalletActionsMenu } from "./WalletActionsMenu";
 import { WalletSettingsModal } from "./WalletSettingsModal";
 import { ImportStatementModal } from "./ImportStatementModal";
+import { useBenchmarkChoice } from "./benchmarkChoice";
 import { WalletPerformance } from "./WalletPerformance";
 import { useChartLines, WalletValueChart } from "./WalletValueChart";
 import { OperationFilterFields } from "./OperationFilterFields";
@@ -181,6 +182,7 @@ function WalletDetails({ wallet, operations, version, onEditOperation, onDeleteO
   const effective = operations.filter((op) => op.had_effect !== false);
   const { period, range, choose, params } = usePeriod(todayAsInputValue());
   const [chartLines, setChartLines] = useChartLines();
+  const [benchmarkSymbol, chooseBenchmark] = useBenchmarkChoice();
   const { filters, setTypes, setSymbol } = useOperationFilters();
   const shownOperations = effective.filter((op) => inRange(dateInputValueOf(op.timestamp), range) && matches(op, filters));
   const filtered = !isEverything(range) || filters.types.length > 0 || filters.symbol !== null;
@@ -245,9 +247,17 @@ function WalletDetails({ wallet, operations, version, onEditOperation, onDeleteO
         range={range}
         onChoose={choose}
         lines={chartLines}
+        benchmarkSymbol={benchmarkSymbol}
         onLinesChange={setChartLines}
       />
-      <WalletPerformance walletId={wallet.id} currency={wallet.currency} range={range} refreshKey={version} />
+      <WalletPerformance
+        walletId={wallet.id}
+        currency={wallet.currency}
+        range={range}
+        refreshKey={version}
+        benchmarkSymbol={benchmarkSymbol}
+        onBenchmarkChange={chooseBenchmark}
+      />
 
       <div>
         <Title order={2} mb="sm">

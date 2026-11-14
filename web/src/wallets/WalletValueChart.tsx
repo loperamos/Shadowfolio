@@ -57,15 +57,16 @@ type ChartProps = {
   period: Period | null;
   range: DayRange;
   onChoose: (choice: Period | DayRange) => void;
-  // The lines shown (see useChartLines).
+  // The lines shown (see useChartLines), and the benchmark's symbol (null for the default).
   lines: string[];
+  benchmarkSymbol: string | null;
   onLinesChange: (lines: string[]) => void;
 };
 
 /** The wallet's value over time against the money put in, over a period chosen here (which the page also follows). */
-function WalletValueChartView({ walletId, currency, refreshKey, period, range, onChoose, lines, onLinesChange }: ChartProps) {
+function WalletValueChartView({ walletId, currency, refreshKey, period, range, onChoose, lines, benchmarkSymbol, onLinesChange }: ChartProps) {
   const state = useDailyValues(walletId, refreshKey);
-  const benchmark = useBenchmark(walletId, refreshKey);
+  const benchmark = useBenchmark(walletId, benchmarkSymbol, refreshKey);
   const backwards = range.start !== null && range.end !== null && range.start > range.end;
   return (
     <div>
@@ -131,7 +132,8 @@ export const WalletValueChart = memo(
     before.period === after.period &&
     before.range.start === after.range.start &&
     before.range.end === after.range.end &&
-    before.lines.join() === after.lines.join(),
+    before.lines.join() === after.lines.join() &&
+    before.benchmarkSymbol === after.benchmarkSymbol,
 );
 
 type BodyProps = {
@@ -186,6 +188,11 @@ function ChartBody({ state, benchmark, range, currency, onSelect, lines, onLines
           {lines.includes(Line.BENCHMARK) && benchmark.status === "error" && (
             <Text c="dimmed" size="sm" mt="xs">
               {benchmarkLabel} unavailable: {benchmark.message}
+            </Text>
+          )}
+          {lines.includes(Line.BENCHMARK) && benchmark.status === "loaded" && benchmark.benchmark.values.every((v) => v.value === null) && (
+            <Text c="dimmed" size="sm" mt="xs">
+              No market prices for {benchmark.benchmark.symbol}: there is nothing to compare with.
             </Text>
           )}
           {/* Estimated prices are only for listings market data does not cover; say which, and on how many days. */}

@@ -19,8 +19,9 @@ from shadowfolio.ports.price_data import PriceData, PriceDataUnavailableError
 from shadowfolio.ports.wallet_repository import WalletRepository
 from shadowfolio.usecases.valuation import Valuation
 
-# The US market as a whole: the usual yardstick, with prices from the first day of market data.
-BENCHMARK_SYMBOL = "SPY"
+# The benchmark when none is chosen: the US market as a whole, the usual yardstick. Any symbol market data prices
+# can be one (e.g. an ETF following another index).
+DEFAULT_BENCHMARK = "SPY"
 
 
 @dataclass(frozen=True)
@@ -44,23 +45,25 @@ class Comparison:
         # The wallet's own daily values: a withdrawal sells the share of the benchmark it took from the wallet.
         self._valuation = Valuation(repo, clock, prices, fx_rates)
 
-    def benchmark_daily(self, wallet_id: UUID) -> Benchmark | None:
+    def benchmark_daily(self, wallet_id: UUID, symbol: str = DEFAULT_BENCHMARK) -> Benchmark | None:
         """The benchmark's value at the end of every day from the wallet's first operation to today, given the wallet's
         deposits and withdrawals. Returns None if the wallet does not exist; fails as a whole when a provider cannot
         answer."""
         wallet = self._repo.get(wallet_id)
         if wallet is None:
             return None
-        return self._benchmark(wallet, self._valuation.daily(wallet_id) or [])
+        return self._benchmark(wallet, self._valuation.daily(wallet_id) or [], _normalized(symbol))
 
-    def performance(self, wallet_id: UUID, start: date | None = None, end: date | None = None) -> PerformanceComparison | None:
+    def performance(
+        self, wallet_id: UUID, start: date | None = None, end: date | None = None, symbol: str = DEFAULT_BENCHMARK
+    ) -> PerformanceComparison | None:
         """How the wallet and the benchmark did from `start` (default: the wallet's first operation) to `end` (default:
         today). Returns None if the wallet does not exist; fails as a whole when a provider cannot answer."""
         wallet = self._repo.get(wallet_id)
         if wallet is None:
             return None
         daily = self._valuation.daily(wallet_id) or []
-        benchmark = self._benchmark(wallet, daily)
+        benchmark = self._benchmark(wallet, daily, _normalized(symbol))
         start = start or (daily[0].day if daily else self._clock.now().date())
         end = end or self._clock.now().date()
         wallet_points, previous_deposits = [], Decimal(0)
@@ -69,12 +72,13 @@ class Comparison:
             wallet_points.append(DayValue(value.day, total, value.net_deposits - previous_deposits))
             previous_deposits = value.net_deposits
         benchmark_points = [DayValue(value.day, value.value, value.flow) for value in benchmark.values]
-        return PerformanceComparison(performance(wallet_points, start, end), BENCHMARK_SYMBOL, performance(benchmark_points, start, end))
+        return PerformanceComparison(performance(wallet_points, start, end), benchmark.symbol, performance(benchmark_points, start, end))
 
-    def _benchmark(self, wallet: Wallet, daily: list[DailyValue]) -> Benchmark:
-        """The benchmark for the wallet, given the wallet's own daily values."""
+    def _benchmark(self, wallet: Wallet, daily: list[DailyValue], symbol: str) -> Benchmark:
+        """`symbol` as the wallet's benchmark, given the wallet's own daily values; every day unvalued when market
+        data has no prices for it."""
         if not wallet.operations:
-            return Benchmark(BENCHMARK_SYMBOL, ())
+            return Benchmark(symbol, ())
         start = wallet.operations[0].timestamp.astimezone(UTC).date()
         end = self._clock.now().date()
         days = [start + timedelta(days=offset) for offset in range((end - start).days + 1)]
@@ -84,9 +88,9 @@ class Comparison:
                 day = op.timestamp.astimezone(UTC).date()
                 flows[day] = flows.get(day, Decimal(0)) + op.cash_delta
         try:
-            closes = self._prices.closes_between(BENCHMARK_SYMBOL, start, end)
+            closes = self._prices.closes_between(symbol, start, end)
         except PriceDataUnavailableError as error:
-            raise PriceUnavailableError(f"could not fetch the price of {BENCHMARK_SYMBOL} right now; try again later") from error
+            raise PriceUnavailableError(f"could not fetch the price of {symbol} right now; try again later") from error
         # What one unit of the benchmark's currency is worth in the wallet's, per day.
         currency = next(iter(closes.values())).currency if closes else wallet.currency
         rates = {day: Decimal(1) for day in days}
@@ -97,10 +101,13 @@ class Comparison:
                 raise FxRateUnavailableError(f"could not fetch the {currency}→{wallet.currency} rate right now; try again later") from error
             rates = {day: rate.rate for day, rate in fx.items()}
         try:
-            dividends = self._corporate_actions.dividends(BENCHMARK_SYMBOL, start, end)
+            dividends = self._corporate_actions.dividends(symbol, start, end)
         except CorporateActionsUnavailableError as error:
-            raise CorporateActionsUnavailableNowError(
-                f"could not fetch {BENCHMARK_SYMBOL}'s dividends right now; try again later"
-            ) from error
+            raise CorporateActionsUnavailableNowError(f"could not fetch {symbol}'s dividends right now; try again later") from error
         wallet_values = {value.day: value.valuation.total for value in daily if value.valuation is not None}
-        return Benchmark(BENCHMARK_SYMBOL, benchmark_values(days, flows, wallet_values, closes, rates, dividends, wallet.withholding_rate))
+        return Benchmark(symbol, benchmark_values(days, flows, wallet_values, closes, rates, dividends, wallet.withholding_rate))
+
+
+def _normalized(symbol: str) -> str:
+    """Symbols as market data writes them (e.g. "qqq " is QQQ)."""
+    return symbol.strip().upper()
