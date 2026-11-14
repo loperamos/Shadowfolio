@@ -4,6 +4,7 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field, replace
 from datetime import UTC, date, datetime, time, timedelta
 from decimal import Decimal
+from functools import cached_property
 from typing import Self
 from uuid import UUID, uuid5
 
@@ -62,11 +63,14 @@ class Wallet:
         if not Decimal(0) <= self.withholding_rate < Decimal(1):
             raise InvalidRateError("withholding tax must be at least 0% and below 100%")
 
-    @property
+    # A wallet never changes, so what is worked out from its operations is kept: reading a past state's holdings
+    # many times (e.g. for every day of a valuation) replays its operations once.
+
+    @cached_property
     def cash(self) -> Decimal:
         return sum((op.cash_delta for op in self.operations), Decimal(0))
 
-    @property
+    @cached_property
     def net_deposits(self) -> Decimal:
         """Money put in less money taken out (deposits minus withdrawals), in the wallet's currency."""
         return sum((op.cash_delta for op in self.operations if isinstance(op, Deposit | Withdrawal)), Decimal(0))
@@ -76,12 +80,12 @@ class Wallet:
         """Whether any trade was priced from market data after the fact, so results are not a forward test."""
         return any(isinstance(op, Buy | Sell) and op.trade.price_source is PriceSource.MARKET for op in self.operations)
 
-    @property
+    @cached_property
     def ledger(self) -> Ledger:
         """What each holding cost and what selling has gained (FIFO)."""
         return build_ledger(self.operations)
 
-    @property
+    @cached_property
     def holdings(self) -> dict[str, Decimal]:
         """Shares held per symbol. Symbols sold out entirely are left out."""
         return _replay(self.operations)
