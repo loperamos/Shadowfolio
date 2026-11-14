@@ -9,11 +9,14 @@ import os
 from collections.abc import Callable
 from datetime import UTC, date, datetime
 from decimal import Decimal
+from pathlib import Path
 
 import pytest
 from dotenv import load_dotenv
 
 from shadowfolio.adapters.alpaca_price_data import AlpacaConfig, AlpacaPriceData
+from shadowfolio.adapters.cached_price_data import CachedPriceData
+from shadowfolio.adapters.fixed_clock import FixedClock
 from shadowfolio.adapters.in_memory_price_data import InMemoryPriceData
 from shadowfolio.domain.money import Currency
 from shadowfolio.domain.valuation import Quote
@@ -47,12 +50,17 @@ def _alpaca() -> PriceData:
     return AlpacaPriceData(AlpacaConfig(key_id=key_id, secret_key=secret_key))
 
 
-ADAPTERS: dict[str, Callable[[], PriceData]] = {"in_memory": _in_memory, "alpaca": _alpaca}
+def _cached(cache_dir: Path) -> PriceData:
+    """The cache in front of the fake."""
+    return CachedPriceData(_in_memory(), "in_memory", cache_dir / "cache.sqlite", FixedClock(datetime(2026, 3, 3, tzinfo=UTC)))
 
 
-@pytest.fixture(params=["in_memory", pytest.param("alpaca", marks=pytest.mark.live)])
-def prices(request: pytest.FixtureRequest) -> PriceData:
-    return ADAPTERS[request.param]()
+ADAPTERS: dict[str, Callable[[Path], PriceData]] = {"in_memory": lambda _: _in_memory(), "cached": _cached, "alpaca": lambda _: _alpaca()}
+
+
+@pytest.fixture(params=["in_memory", "cached", pytest.param("alpaca", marks=pytest.mark.live)])
+def prices(request: pytest.FixtureRequest, tmp_path: Path) -> PriceData:
+    return ADAPTERS[request.param](tmp_path)
 
 
 def test_known_symbol_has_a_usable_quote(prices: PriceData) -> None:
