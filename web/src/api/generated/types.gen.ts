@@ -448,6 +448,14 @@ export type PerformanceComparisonResponse = {
      */
     benchmark_symbol: string;
     benchmark: PerformanceResponse | null;
+    /**
+     * Wallet Returns
+     */
+    wallet_returns: Array<DailyReturnResponse>;
+    /**
+     * Benchmark Returns
+     */
+    benchmark_returns: Array<DailyReturnResponse>;
 };
 
 /**
@@ -529,26 +537,6 @@ export type QuoteResponse = {
      * Previous Close
      */
     previous_close: string | null;
-};
-
-/**
- * ReturnsComparisonResponse
- *
- * The wallet's and `benchmark_symbol`'s time-weighted return since the start of a period, per day.
- */
-export type ReturnsComparisonResponse = {
-    /**
-     * Wallet
-     */
-    wallet: Array<DailyReturnResponse>;
-    /**
-     * Benchmark Symbol
-     */
-    benchmark_symbol: string;
-    /**
-     * Benchmark
-     */
-    benchmark: Array<DailyReturnResponse>;
 };
 
 /**
@@ -1524,50 +1512,3 @@ export type WalletPerformanceResponses = {
 };
 
 export type WalletPerformanceResponse = WalletPerformanceResponses[keyof WalletPerformanceResponses];
-
-export type DailyReturnsData = {
-    body?: never;
-    path: {
-        /**
-         * Wallet Id
-         */
-        wallet_id: string;
-    };
-    query?: {
-        /**
-         * Start
-         */
-        start?: string | null;
-        /**
-         * End
-         */
-        end?: string | null;
-        /**
-         * Symbol
-         */
-        symbol?: string;
-    };
-    url: '/api/wallets/{wallet_id}/returns/daily';
-};
-
-export type DailyReturnsErrors = {
-    /**
-     * Not found
-     */
-    404: ErrorResponse;
-    /**
-     * Malformed request or broken business rule
-     */
-    422: ErrorResponse;
-};
-
-export type DailyReturnsError = DailyReturnsErrors[keyof DailyReturnsErrors];
-
-export type DailyReturnsResponses = {
-    /**
-     * Successful Response
-     */
-    200: ReturnsComparisonResponse;
-};
-
-export type DailyReturnsResponse = DailyReturnsResponses[keyof DailyReturnsResponses];

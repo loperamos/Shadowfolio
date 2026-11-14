@@ -1,8 +1,13 @@
 import { Button, Group, Paper, Text, Tooltip } from "@mantine/core";
-import { IconCopy, IconTrash } from "@tabler/icons-react";
+import { IconCopy, IconScale, IconTrash } from "@tabler/icons-react";
+import { Link } from "react-router";
 
 import type { WalletResponse } from "../api/generated";
+import { comparePath } from "../routes";
 import { ICON_SIZE } from "../ui/theme";
+
+// Fewest wallets a comparison takes.
+const MIN_TO_COMPARE = 2;
 
 type Props = {
   selected: WalletResponse[];
@@ -17,6 +22,7 @@ export function WalletSelectionBar({ selected, onDuplicate, onDelete, onClear }:
     return null;
   }
   const single = selected.length === 1 ? selected[0] : null;
+  const comparable = selected.length >= MIN_TO_COMPARE;
 
   return (
     <Paper withBorder p="xs" mb="sm">
@@ -29,6 +35,20 @@ export function WalletSelectionBar({ selected, onDuplicate, onDelete, onClear }:
               <Button variant="default" size="xs" leftSection={<IconCopy size={ICON_SIZE} />} disabled={single === null} onClick={() => single && onDuplicate(single)}>
                 Duplicate
               </Button>
+            </span>
+          </Tooltip>
+          <Tooltip label="Select two or more wallets to compare" disabled={comparable}>
+            <span>
+              {/* A link, so a comparison opens in a new tab too. */}
+              {comparable ? (
+                <Button component={Link} to={comparePath(selected.map((wallet) => wallet.id))} variant="default" size="xs" leftSection={<IconScale size={ICON_SIZE} />}>
+                  Compare
+                </Button>
+              ) : (
+                <Button variant="default" size="xs" leftSection={<IconScale size={ICON_SIZE} />} disabled>
+                  Compare
+                </Button>
+              )}
             </span>
           </Tooltip>
           <Button color="red" variant="light" size="xs" leftSection={<IconTrash size={ICON_SIZE} />} onClick={() => onDelete(selected)}>

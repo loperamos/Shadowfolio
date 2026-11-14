@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { BenchmarkDailyData, BenchmarkDailyErrors, BenchmarkDailyResponses, CopyWalletData, CopyWalletErrors, CopyWalletResponses, CreateWalletData, CreateWalletErrors, CreateWalletResponses, DailyReturnsData, DailyReturnsErrors, DailyReturnsResponses, DailyValuationData, DailyValuationErrors, DailyValuationResponses, DeleteOperationData, DeleteOperationErrors, DeleteOperationResponses, DeleteWalletData, DeleteWalletErrors, DeleteWalletResponses, DepositData, DepositErrors, DepositResponses, EditOperationData, EditOperationErrors, EditOperationResponses, GetWalletData, GetWalletErrors, GetWalletResponses, ImportDegiroData, ImportDegiroErrors, ImportDegiroResponses, LatestQuoteData, LatestQuoteErrors, LatestQuoteResponses, ListOperationsData, ListOperationsErrors, ListOperationsResponses, ListWalletsData, ListWalletsResponses, PreviewDegiroImportData, PreviewDegiroImportErrors, PreviewDegiroImportResponses, RecordBuyData, RecordBuyErrors, RecordBuyResponses, RecordSellData, RecordSellErrors, RecordSellResponses, SyncAllWalletsData, SyncAllWalletsErrors, SyncAllWalletsResponses, UpdateWalletData, UpdateWalletErrors, UpdateWalletResponses, WalletPerformanceData, WalletPerformanceErrors, WalletPerformanceResponses, WalletValuationData, WalletValuationErrors, WalletValuationResponses, WithdrawData, WithdrawErrors, WithdrawResponses } from './types.gen';
+import type { BenchmarkDailyData, BenchmarkDailyErrors, BenchmarkDailyResponses, CopyWalletData, CopyWalletErrors, CopyWalletResponses, CreateWalletData, CreateWalletErrors, CreateWalletResponses, DailyValuationData, DailyValuationErrors, DailyValuationResponses, DeleteOperationData, DeleteOperationErrors, DeleteOperationResponses, DeleteWalletData, DeleteWalletErrors, DeleteWalletResponses, DepositData, DepositErrors, DepositResponses, EditOperationData, EditOperationErrors, EditOperationResponses, GetWalletData, GetWalletErrors, GetWalletResponses, ImportDegiroData, ImportDegiroErrors, ImportDegiroResponses, LatestQuoteData, LatestQuoteErrors, LatestQuoteResponses, ListOperationsData, ListOperationsErrors, ListOperationsResponses, ListWalletsData, ListWalletsResponses, PreviewDegiroImportData, PreviewDegiroImportErrors, PreviewDegiroImportResponses, RecordBuyData, RecordBuyErrors, RecordBuyResponses, RecordSellData, RecordSellErrors, RecordSellResponses, SyncAllWalletsData, SyncAllWalletsErrors, SyncAllWalletsResponses, UpdateWalletData, UpdateWalletErrors, UpdateWalletResponses, WalletPerformanceData, WalletPerformanceErrors, WalletPerformanceResponses, WalletValuationData, WalletValuationErrors, WalletValuationResponses, WithdrawData, WithdrawErrors, WithdrawResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -205,14 +205,7 @@ export const benchmarkDaily = <ThrowOnError extends boolean = false>(options: Op
  * Wallet Performance
  *
  * How the wallet did from `start` (default: its first operation) to `end` (default: today), next to `symbol`
- * (default SPY) with the same deposits: gain, and returns that ignore (time-weighted) or include (money-weighted) when money moved.
+ * (default SPY) with the same deposits: gain, and returns that ignore (time-weighted) or include (money-weighted)
+ * when money moved; and both time-weighted returns day by day, from the start of the period.
  */
 export const walletPerformance = <ThrowOnError extends boolean = false>(options: Options<WalletPerformanceData, ThrowOnError>): RequestResult<WalletPerformanceResponses, WalletPerformanceErrors, ThrowOnError> => (options.client ?? client).get<WalletPerformanceResponses, WalletPerformanceErrors, ThrowOnError>({ url: '/api/wallets/{wallet_id}/performance', ...options });
-
-/**
- * Daily Returns
- *
- * The wallet's and `symbol`'s (default SPY) time-weighted return since `start` (default: the wallet's first
- * operation), at the end of every day up to `end` (default: today): comparable whatever money each had.
- */
-export const dailyReturns = <ThrowOnError extends boolean = false>(options: Options<DailyReturnsData, ThrowOnError>): RequestResult<DailyReturnsResponses, DailyReturnsErrors, ThrowOnError> => (options.client ?? client).get<DailyReturnsResponses, DailyReturnsErrors, ThrowOnError>({ url: '/api/wallets/{wallet_id}/returns/daily', ...options });

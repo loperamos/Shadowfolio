@@ -1,7 +1,8 @@
 import { Anchor, Container, Stack, Text, Title } from "@mantine/core";
 import { Link, Navigate, Route, Routes } from "react-router";
 
-import { WALLET_PATH, WALLETS_PATH } from "./routes";
+import { COMPARE_PATH, WALLET_PATH, WALLETS_PATH } from "./routes";
+import { ComparePage } from "./wallets/ComparePage";
 import { WalletPage } from "./wallets/WalletPage";
 import { WalletsPage } from "./wallets/WalletsPage";
 
@@ -12,6 +13,7 @@ export function App() {
         <Route path="/" element={<Navigate to={WALLETS_PATH} replace />} />
         <Route path={WALLETS_PATH} element={<WalletsPage />} />
         <Route path={WALLET_PATH} element={<WalletPage />} />
+        <Route path={COMPARE_PATH} element={<ComparePage />} />
         <Route path="*" element={<PageNotFound />} />
       </Routes>
     </Container>

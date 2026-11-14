@@ -25,21 +25,16 @@ DEFAULT_BENCHMARK = "SPY"
 
 
 @dataclass(frozen=True)
-class ReturnsComparison:
-    """The wallet's and the benchmark's return since the start of a period, per day (None when unvalued)."""
-
-    wallet: tuple[tuple[date, Decimal | None], ...]
-    benchmark_symbol: str
-    benchmark: tuple[tuple[date, Decimal | None], ...]
-
-
-@dataclass(frozen=True)
 class PerformanceComparison:
-    """How the wallet and the benchmark did over the same period; None for either when no day in it was valued."""
+    """How the wallet and the benchmark did over the same period (None for either when no day in it was valued), and
+    their time-weighted return from its start to the end of each day (None when unvalued): unlike values, returns
+    compare whatever money each had."""
 
     wallet: Performance | None
     benchmark_symbol: str
     benchmark: Performance | None
+    wallet_returns: tuple[tuple[date, Decimal | None], ...]
+    benchmark_returns: tuple[tuple[date, Decimal | None], ...]
 
 
 class Comparison:
@@ -67,27 +62,19 @@ class Comparison:
         self, wallet_id: UUID, start: date | None = None, end: date | None = None, symbol: str = DEFAULT_BENCHMARK
     ) -> PerformanceComparison | None:
         """How the wallet and the benchmark did from `start` (default: the wallet's first operation) to `end` (default:
-        today). Returns None if the wallet does not exist; fails as a whole when a provider cannot answer."""
+        today), and their returns day by day. Returns None if the wallet does not exist; fails as a whole when a
+        provider cannot answer."""
         found = self._points(wallet_id, symbol)
         if found is None:
             return None
         wallet_points, benchmark_symbol, benchmark_points, first_day = found
         start, end = start or first_day, end or self._clock.now().date()
-        return PerformanceComparison(performance(wallet_points, start, end), benchmark_symbol, performance(benchmark_points, start, end))
-
-    def returns_daily(
-        self, wallet_id: UUID, start: date | None = None, end: date | None = None, symbol: str = DEFAULT_BENCHMARK
-    ) -> ReturnsComparison | None:
-        """The wallet's and the benchmark's time-weighted return from `start` (default: the wallet's first operation) to
-        the end of each day up to `end` (default: today), as returns can be compared whatever money each had. Returns
-        None if the wallet does not exist; fails as a whole when a provider cannot answer."""
-        found = self._points(wallet_id, symbol)
-        if found is None:
-            return None
-        wallet_points, benchmark_symbol, benchmark_points, first_day = found
-        start, end = start or first_day, end or self._clock.now().date()
-        return ReturnsComparison(
-            cumulative_returns(wallet_points, start, end), benchmark_symbol, cumulative_returns(benchmark_points, start, end)
+        return PerformanceComparison(
+            performance(wallet_points, start, end),
+            benchmark_symbol,
+            performance(benchmark_points, start, end),
+            cumulative_returns(wallet_points, start, end),
+            cumulative_returns(benchmark_points, start, end),
         )
 
     def _points(self, wallet_id: UUID, symbol: str) -> tuple[list[DayValue], str, list[DayValue], date] | None:

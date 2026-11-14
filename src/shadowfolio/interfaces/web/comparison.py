@@ -7,7 +7,7 @@ from fastapi import APIRouter
 
 from shadowfolio.domain.errors import DomainError
 from shadowfolio.interfaces.web.errors import INVALID, NOT_FOUND, rule_violation, wallet_not_found
-from shadowfolio.interfaces.web.schemas import BenchmarkResponse, PerformanceComparisonResponse, ReturnsComparisonResponse
+from shadowfolio.interfaces.web.schemas import BenchmarkResponse, PerformanceComparisonResponse
 from shadowfolio.usecases.comparison import DEFAULT_BENCHMARK, Comparison
 
 
@@ -33,7 +33,8 @@ def comparison_router(comparison: Comparison) -> APIRouter:
         wallet_id: UUID, start: date | None = None, end: date | None = None, symbol: str = DEFAULT_BENCHMARK
     ) -> PerformanceComparisonResponse:
         """How the wallet did from `start` (default: its first operation) to `end` (default: today), next to `symbol`
-        (default SPY) with the same deposits: gain, and returns that ignore (time-weighted) or include (money-weighted) when money moved."""
+        (default SPY) with the same deposits: gain, and returns that ignore (time-weighted) or include (money-weighted)
+        when money moved; and both time-weighted returns day by day, from the start of the period."""
         try:
             result = comparison.performance(wallet_id, start, end, symbol)
         except DomainError as error:
@@ -41,19 +42,5 @@ def comparison_router(comparison: Comparison) -> APIRouter:
         if result is None:
             raise wallet_not_found()
         return PerformanceComparisonResponse.from_comparison(result)
-
-    @router.get("/wallets/{wallet_id}/returns/daily", responses=NOT_FOUND | INVALID)
-    def daily_returns(
-        wallet_id: UUID, start: date | None = None, end: date | None = None, symbol: str = DEFAULT_BENCHMARK
-    ) -> ReturnsComparisonResponse:
-        """The wallet's and `symbol`'s (default SPY) time-weighted return since `start` (default: the wallet's first
-        operation), at the end of every day up to `end` (default: today): comparable whatever money each had."""
-        try:
-            result = comparison.returns_daily(wallet_id, start, end, symbol)
-        except DomainError as error:
-            raise rule_violation(error) from error
-        if result is None:
-            raise wallet_not_found()
-        return ReturnsComparisonResponse.from_comparison(result)
 
     return router

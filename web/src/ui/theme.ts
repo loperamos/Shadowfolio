@@ -28,6 +28,9 @@ export const SYMBOL_INPUT_WIDTH = rem(120);
 // Width of a filter above a list (e.g. by type), room for a couple of choices before they wrap.
 export const FILTER_INPUT_WIDTH = rem(200);
 
+// Colours of the wallets drawn side by side in a comparison, in order (theme colours; repeated past the last).
+export const COMPARISON_COLORS = ["teal.6", "orange.6", "grape.6", "cyan.6", "red.6", "lime.7"];
+
 // Height of time-series charts, in px.
 export const CHART_HEIGHT = 280;
 // How strongly the days being selected by dragging across a chart are shaded (0 to 1).
