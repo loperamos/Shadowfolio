@@ -34,10 +34,8 @@ class HoldingValue:
 
     @property
     def value_in_wallet_currency(self) -> Decimal:
-        """Worth of the holding in the wallet's currency; converted values are rounded to cents."""
-        if self.fx_rate is None:
-            return self.value
-        return to_cents(self.value * self.fx_rate.rate)
+        """Worth of the holding in the wallet's currency, rounded to cents."""
+        return to_cents(self.value if self.fx_rate is None else self.value * self.fx_rate.rate)
 
     @property
     def gain(self) -> Decimal:
@@ -54,7 +52,7 @@ class HoldingValue:
         if self.quote.previous_close is None:
             return None
         change = self.quantity * (self.quote.price - self.quote.previous_close)
-        return change if self.fx_rate is None else to_cents(change * self.fx_rate.rate)
+        return to_cents(change if self.fx_rate is None else change * self.fx_rate.rate)
 
     @property
     def day_change_ratio(self) -> Decimal | None:

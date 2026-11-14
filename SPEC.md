@@ -7,7 +7,7 @@ Working name. Drafted 2026-11-11 from the lessons of the first `investing-sandbo
 A hosted, subscription service where people test investing strategies against real market prices:
 
 1. **Simulated wallets.** Every operation, whether entered by hand, imported or placed by an agent, is priced from real market data. The fill rules are visible.
-2. **Import from any broker.** An LLM reads the user's statements and proposes operations. The app checks them, and the user confirms before anything is saved.
+2. **Import from any broker.** A reader per broker turns the user's exports into proposed operations; an LLM may cover brokers without their own reader. The app checks them, and the user confirms before anything is saved.
 3. **Bring your own agent.** Users connect their own LLMs or agents over MCP or the API to operate wallets and read market information. Agents stay external: the service exposes the API but does not run them.
 4. **Fair comparison.** Wallets, strategies and benchmarks such as SPY get the same deposits on the same dates. The app compares them on standard metrics.
 
@@ -34,7 +34,7 @@ A hosted, subscription service where people test investing strategies against re
 
 **User (web UI and HTTP API)**
 1. Create, rename, copy or delete a wallet, choosing its currency and starting cash.
-2. Import a broker statement: the LLM proposes operations, the app checks them, and the user confirms.
+2. Import a broker statement: the app reads it and proposes operations, checks them, and the user confirms.
 3. Add a past operation at a given time; the app checks or fills in its price.
 4. Place or cancel an order now.
 5. View a wallet: holdings, value over time, dividends and operations.
@@ -102,14 +102,14 @@ web/            the React frontend; its API client is generated from the backend
 
 | Port | Gives the core | Adapters |
 | --- | --- | --- |
-| `PriceData` | Minute bars, daily bars, latest price | Fake (fixtures), real provider |
+| `PriceData` | Minute bars, daily bars, latest price | Fake (fixtures), Alpaca, cache of past daily closes (SQLite file) |
 | `CorporateActions` | Dividends and splits | Fake, real provider |
 | `CompanyData` | Profile and fundamentals (after the MVP) | Fake, real provider |
-| `FxRates` | Daily rates | Fake, ECB |
-| `SymbolResolver` | ISIN ↔ ticker | Fake, OpenFIGI |
-| `StatementParser` | Document → proposed operations | Fake, LLM provider |
+| `FxRates` | Daily rates | Fake, ECB, cache of past daily rates (SQLite file) |
+| `SecurityLookup` | ISIN (and trading venue) → ticker | Fake, OpenFIGI |
+| `StatementReader` | A broker's export → broker-neutral import records | DEGIRO (CSV) |
 | `Clock` | "Now" | System clock, fixed clock, simulated clock (backtests) |
-| `Repository` | Persistence | In-memory, SQLite, Postgres |
+| `WalletRepository` | Persistence | In-memory, SQLite (Postgres later) |
 
 Rules:
 - The domain never does I/O and never reads the system time; time always comes from `Clock`.
@@ -153,7 +153,7 @@ None found combines a user's real wallet, their own agents and fair comparison i
 ## Legal
 
 - Show a clear "not investment advice" disclaimer; the product is analysis and simulation.
-- GDPR: user financial data and uploaded statements must be protected. Tell users that statements are sent to an LLM provider for parsing.
+- GDPR: user financial data and uploaded statements must be protected. If an LLM reads a statement, tell users it is sent to an LLM provider.
 - Market-data display rights are covered under Data providers.
 
 ## MVP plan
@@ -165,19 +165,20 @@ Done:
 - Wallets: create, list, rename, duplicate and delete.
 - History: deposits, withdrawals and past buys and sells at their real dates, with the broker's price, fees and settled amount; edit and delete; every change checked against the whole timeline.
 - Valuation: latest prices (Alpaca, development only) and ECB rates, one total in the wallet's currency.
-- Web: wallet list and wallet page with value, holdings and operations.
+- Web: wallet list and wallet page with value, holdings and operations; sorting, filters and paging, kept in the URL.
+- Cost basis and gains (FIFO lots).
+- Past operations priced from market data when no price is given: minute bars and the first fill-model rule.
+- Splits, then dividends (`CorporateActions`).
+- Value over time: daily bars and historical FX, with gaps for days without a price, a period chosen by preset, dates or dragging, and past market data cached.
+- Import, first broker: DEGIRO's Transactions and Account exports, with preview and confirm; tickers looked up by ISIN (OpenFIGI); fees, income, broker dividends and received shares as operations.
 
 Next, in order:
-1. Cost basis and gains (FIFO lots).
-2. Past operations priced from market data when no price is given: minute bars and the first fill-model rule.
-3. Splits, then dividends (`CorporateActions`).
-4. Value over time: daily bars and historical FX.
 5. Copy a wallet at time T.
 6. Orders now: market and limit orders, the fill model and the order-filling job.
 7. Comparison: benchmarks with the same deposits, metrics, charts, hindsight label.
 8. MCP: tokens with owner and trading scopes, wallet grants, decision log.
 9. Licensed data provider: trial the shortlisted providers against the contract tests and pick one.
-10. LLM import: preview, checks, confirm.
+10. Import: more brokers and operation types, with an LLM reader for brokers without their own.
 11. Accounts, auth and hosting, then a public beta.
 
 No paid subscription is needed before the licensed-provider slice.
