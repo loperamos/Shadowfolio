@@ -355,6 +355,7 @@ class DailyValueResponse(BaseModel):
     total: Decimal | None  # cash plus holdings; null when the day cannot be valued
     net_deposits: Decimal  # deposits minus withdrawals up to then, so a chart can tell money put in from gains
     missing: list[str]  # what has no price (a symbol) or rate (e.g. "USD→EUR") that day; empty when valued
+    estimated: list[str]  # holdings without a close that day, valued at the price of the wallet's nearest trade in them
 
     @classmethod
     def from_daily_value(cls, value: DailyValue) -> "DailyValueResponse":
@@ -366,6 +367,7 @@ class DailyValueResponse(BaseModel):
                 total=None,
                 net_deposits=value.net_deposits,
                 missing=list(value.missing),
+                estimated=list(value.estimated),
             )
         holdings_value = _cents(value.valuation.total - value.valuation.cash)
         return cls(
@@ -375,6 +377,7 @@ class DailyValueResponse(BaseModel):
             total=value.cash + holdings_value,
             net_deposits=value.net_deposits,
             missing=[],
+            estimated=list(value.estimated),
         )
 
 

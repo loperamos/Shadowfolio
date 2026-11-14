@@ -6,7 +6,8 @@ from uuid import UUID
 
 from shadowfolio.domain.errors import FutureTimestampError, FxRateUnavailableError, InvalidPeriodError, PriceUnavailableError
 from shadowfolio.domain.money import Currency, FxRate
-from shadowfolio.domain.valuation import DailyValue, Quote, WalletValuation, value_wallet
+from shadowfolio.domain.operations import Buy, Sell
+from shadowfolio.domain.valuation import DailyValue, Quote, WalletValuation, estimated_price, value_wallet
 from shadowfolio.domain.wallet import Wallet
 from shadowfolio.ports.clock import Clock
 from shadowfolio.ports.fx_rates import FxRates, FxRatesUnavailableError
@@ -58,9 +59,10 @@ class Valuation:
         """The wallet's value at the end of every day from `start` (default: its first operation's day) to `end`
         (default: today), as `on` would give each, with one price request per symbol and one rate request per currency.
 
-        Returns None if the wallet does not exist, and an empty list if it has no operations. A day without a price for
-        a holding, or a rate for its currency, is left unvalued and says what is missing. Fails, as a whole, when a
-        provider cannot answer, or for a period that ends before it starts.
+        Returns None if the wallet does not exist, and an empty list if it has no operations. A holding market data has
+        no prices for at all is valued at the price of the wallet's nearest trade in it, and the day says so; a day
+        still without a price for a holding, or a rate for its currency, is left unvalued and says what is missing.
+        Fails, as a whole, when a provider cannot answer, or for a period that ends before it starts.
         """
         today = self._clock.now().date()
         wallet = self._repo.get(wallet_id)
@@ -82,8 +84,17 @@ class Valuation:
                 closes[symbol] = self._prices.closes_between(symbol, start, end)
             except PriceDataUnavailableError as error:
                 raise PriceUnavailableError(f"could not fetch the price of {symbol} right now; try again later") from error
+        # Symbols market data has no prices for at all (e.g. listings it does not cover) are valued at the price of the
+        # wallet's nearest trade in them; days before a covered symbol's history starts are left unvalued.
+        trades = {
+            symbol: [op for op in wallet.operations if isinstance(op, Buy | Sell) and op.trade.symbol == symbol]
+            for symbol, by_day in closes.items()
+            if not by_day
+        }
+        quoted_in = {close.currency for by_day in closes.values() for close in by_day.values()}
+        quoted_in |= {op.trade.price_currency for by_symbol in trades.values() for op in by_symbol}
         rates: dict[Currency, dict[date, FxRate]] = {}
-        for currency in {close.currency for by_day in closes.values() for close in by_day.values()} - {wallet.currency}:
+        for currency in quoted_in - {wallet.currency}:
             try:
                 rates[currency] = self._fx_rates.rates_between(currency, wallet.currency, start, end)
             except FxRatesUnavailableError as error:
@@ -91,12 +102,18 @@ class Valuation:
         values = []
         for day, state in zip(days, states, strict=True):
             day_closes = {symbol: by_day[day] for symbol, by_day in closes.items() if day in by_day and symbol in state.holdings}
+            estimated = []
+            for symbol in sorted(set(state.holdings) & set(trades)):
+                quote = estimated_price(trades[symbol], symbol, day)
+                if quote is not None:
+                    day_closes[symbol] = quote
+                    estimated.append(symbol)
             day_rates = {currency: by_day[day] for currency, by_day in rates.items() if day in by_day}
             missing = [symbol for symbol in sorted(state.holdings) if symbol not in day_closes]
             currencies = sorted({close.currency for close in day_closes.values()} - {wallet.currency} - set(day_rates))
             missing += [f"{currency}→{wallet.currency}" for currency in currencies]
             valuation = None if missing else value_wallet(state, day_closes, day_rates)
-            values.append(DailyValue(day, valuation, state.cash, state.net_deposits, tuple(missing)))
+            values.append(DailyValue(day, valuation, state.cash, state.net_deposits, tuple(missing), tuple(estimated)))
         return values
 
     def _value(
