@@ -61,3 +61,17 @@ def test_a_deposit_adds_its_amount_to_the_cash(description: str) -> None:
     # DEGIRO writes Paris time: 15:32 in summer is 13:32 UTC.
     assert records == [ImportRecord(ImportKind.DEPOSIT, datetime(2024, 6, 1, 13, 32, tzinfo=UTC), Decimal("500.00"), "EUR")]
     assert wallet.cash == Decimal("500.00")
+
+
+@pytest.mark.parametrize("description", ["Retrait flatex", "Retrait instantané SEPA"])
+def test_a_withdrawal_takes_its_amount_from_the_cash(description: str) -> None:
+    records, wallet = import_degiro(
+        transactions=[],
+        account=[
+            f'07-10-2025,14:11,07-10-2025,,,{description},,EUR,"-200,00",EUR,"300,00",',
+            '01-06-2024,15:32,01-06-2024,,,Dépôt flatex,,EUR,"500,00",EUR,"500,00",',
+        ],
+    )
+
+    assert records[-1] == ImportRecord(ImportKind.WITHDRAWAL, datetime(2025, 10, 7, 12, 11, tzinfo=UTC), Decimal("200.00"), "EUR")
+    assert wallet.cash == Decimal("300.00")

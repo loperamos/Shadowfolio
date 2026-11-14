@@ -16,7 +16,13 @@ TIMEZONE = ZoneInfo("Europe/Paris")
 DATE_TIME_FORMAT = "%d-%m-%Y %H:%M"
 
 # Account rows by description; the first pattern that matches wins.
-ACCOUNT_PATTERNS: list[tuple[re.Pattern[str], ImportKind]] = [(re.compile(r"^(Dépôt flatex|Versement de fonds)$"), ImportKind.DEPOSIT)]
+ACCOUNT_PATTERNS: list[tuple[re.Pattern[str], ImportKind]] = [
+    (re.compile(pattern), kind)
+    for pattern, kind in [
+        (r"^(Dépôt flatex|Versement de fonds)$", ImportKind.DEPOSIT),
+        (r"^(Retrait flatex|Retrait instantané SEPA)$", ImportKind.WITHDRAWAL),
+    ]
+]
 
 
 class DegiroStatementReader:

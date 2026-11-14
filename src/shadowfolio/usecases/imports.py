@@ -16,3 +16,5 @@ class Imports:
             match record.kind:
                 case ImportKind.DEPOSIT:
                     self._history.deposit(wallet_id, record.amount, record.timestamp)
+                case ImportKind.WITHDRAWAL:
+                    self._history.withdraw(wallet_id, record.amount, record.timestamp)

@@ -8,6 +8,7 @@ from enum import StrEnum
 
 class ImportKind(StrEnum):
     DEPOSIT = "deposit"  # money moved into the account from outside
+    WITHDRAWAL = "withdrawal"  # money moved out of the account
 
 
 @dataclass(frozen=True)
