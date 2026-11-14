@@ -32,26 +32,37 @@ class ImportKind(StrEnum):
 
 
 @dataclass(frozen=True)
+class TradeDetails:
+    """What a record that moves shares adds: a trade, or a corporate action's shares."""
+
+    quantity: Decimal  # positive
+    price: Decimal  # per share, in `price_currency`
+    price_currency: str
+    fees: Decimal  # every fee of the trade, in the record's currency
+
+
+@dataclass(frozen=True)
+class DividendDetails:
+    """What a dividend record adds, in the dividend's own currency, as the statement gives it."""
+
+    currency: str
+    gross: Decimal  # before tax
+    tax: Decimal  # withheld
+    fee: Decimal  # the broker's
+    payment_date: date
+
+
+@dataclass(frozen=True)
 class ImportRecord:
     """One operation read from a broker statement. Amounts are positive (the kind says which way they go), except
     for income, which can be either."""
 
     kind: ImportKind
     timestamp: datetime  # timezone-aware
+    # In `currency` (the account's): for a trade, its value before fees; for a dividend, what was credited.
     amount: Decimal
     currency: str
     description: str  # the statement's own wording, to recognise the row
-    # Trades only. `amount` is then the trade's value in `currency` (the account's), before fees.
-    isin: str | None = None
-    quantity: Decimal | None = None
-    price: Decimal | None = None  # per share, in `price_currency`
-    price_currency: str | None = None
-    fees: Decimal | None = None  # every fee of the trade, in `currency`
-    # Dividends (and cash for fractions): `amount` is then what was credited in `currency` (the account's); for
-    # dividends these are in the
-    # dividend's own currency: before tax, the tax withheld, and the broker's fee.
-    dividend_currency: str | None = None
-    gross: Decimal | None = None
-    tax: Decimal | None = None
-    dividend_fee: Decimal | None = None
-    payment_date: date | None = None
+    isin: str | None = None  # the security, for records about one
+    trade: TradeDetails | None = None  # records that move shares
+    dividend: DividendDetails | None = None  # dividends

@@ -11,7 +11,7 @@ from decimal import Decimal
 from uuid import UUID
 
 from shadowfolio.domain.errors import DomainError
-from shadowfolio.domain.imports import ImportKind, ImportRecord
+from shadowfolio.domain.imports import ImportKind, ImportRecord, TradeDetails
 from shadowfolio.domain.money import Currency
 from shadowfolio.domain.wallet import Wallet
 from shadowfolio.ports.wallet_repository import WalletRepository
@@ -102,16 +102,12 @@ class Imports:
                 return changes.deposit(wallet, amount, at), None
             case ImportKind.WITHDRAWAL:
                 return changes.withdraw(wallet, amount, at), None
-            case ImportKind.BUY | ImportKind.SELL | ImportKind.IPO_SUBSCRIPTION if ticker:
-                return self._trade(wallet, record, ticker)
-            case ImportKind.DIVIDEND if ticker:
-                assert record.dividend_currency is not None and record.gross is not None and record.payment_date is not None
-                tax, fee = record.tax or Decimal(0), record.dividend_fee or Decimal(0)
-                paid = record.payment_date
-                return changes.record_dividend(wallet, at, ticker, record.dividend_currency, record.gross, tax, fee, amount, paid), None
-            case ImportKind.SPIN_OFF if ticker:
-                assert record.quantity is not None
-                return changes.record_shares_received(wallet, at, ticker, record.quantity), None
+            case ImportKind.BUY | ImportKind.SELL | ImportKind.IPO_SUBSCRIPTION if ticker and record.trade:
+                return self._trade(wallet, record, ticker, record.trade)
+            case ImportKind.DIVIDEND if ticker and (d := record.dividend):
+                return changes.record_dividend(wallet, at, ticker, d.currency, d.gross, d.tax, d.fee, amount, d.payment_date), None
+            case ImportKind.SPIN_OFF if ticker and record.trade:
+                return changes.record_shares_received(wallet, at, ticker, record.trade.quantity), None
             case ImportKind.CASH_IN_LIEU if ticker:
                 return changes.record_income(wallet, at, amount, f"Cash for a fraction of a share of {ticker}"), None
             case ImportKind.TAX_REFUND if ticker:
@@ -126,33 +122,34 @@ class Imports:
                 return changes.record_income(wallet, at, amount, record.description), None
             case ImportKind.UNKNOWN:
                 return wallet, "unknown row"
+            case ImportKind.BUY | ImportKind.SELL | ImportKind.IPO_SUBSCRIPTION | ImportKind.DIVIDEND | ImportKind.SPIN_OFF:
+                return wallet, "incomplete record"  # a reader bug: a trade without its details, or a dividend without its own
         # Nothing to record: money moving inside the broker, the cash lines of a trade, an action's notice, or a split
         # (the wallet applies splits from market data).
         return wallet, None
 
-    def _trade(self, wallet: Wallet, record: ImportRecord, ticker: str) -> tuple[Wallet, str | None]:
-        assert record.quantity is not None and record.price is not None and record.price_currency is not None
-        if record.price_currency not in SUPPORTED_CURRENCIES:
-            return wallet, f"prices in {record.price_currency} are not supported"
+    def _trade(self, wallet: Wallet, record: ImportRecord, ticker: str, trade: TradeDetails) -> tuple[Wallet, str | None]:
+        if trade.price_currency not in SUPPORTED_CURRENCIES:
+            return wallet, f"prices in {trade.price_currency} are not supported"
         record_trade = self._changes.record_sell if record.kind is ImportKind.SELL else self._changes.record_buy
-        trade = record_trade(
+        changed = record_trade(
             wallet,
             ticker,
-            record.quantity,
+            trade.quantity,
             record.timestamp,
-            price=record.price,
-            price_currency=Currency(record.price_currency),
+            price=trade.price,
+            price_currency=Currency(trade.price_currency),
             settled_amount=record.amount,
-            fees=record.fees or Decimal(0),
+            fees=trade.fees,
         )
-        return trade, None
+        return changed, None
 
 
 def _nothing_to_record(record: ImportRecord) -> bool:
     """Whether the record changes nothing in the wallet: a spin-off giving no whole share, or 0.00 of cash (a
     quarter's interest, a refund's share of a cent)."""
     if record.kind is ImportKind.SPIN_OFF:
-        return not record.quantity
+        return record.trade is not None and not record.trade.quantity
     return record.kind in CASH_KINDS and record.amount == 0
 
 
@@ -167,4 +164,4 @@ def _same_ticker_isin_changes(records: list[ImportRecord], tickers: Mapping[str,
 
 
 def _isin_change_key(record: ImportRecord) -> tuple[datetime, Decimal | None]:
-    return record.timestamp, record.quantity
+    return record.timestamp, record.trade.quantity if record.trade else None

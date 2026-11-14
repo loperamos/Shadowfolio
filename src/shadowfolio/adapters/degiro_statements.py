@@ -25,7 +25,7 @@ from enum import Enum, auto
 from itertools import combinations, groupby
 from zoneinfo import ZoneInfo
 
-from shadowfolio.domain.imports import ImportKind, ImportRecord
+from shadowfolio.domain.imports import DividendDetails, ImportKind, ImportRecord, TradeDetails
 from shadowfolio.domain.money import to_cents
 
 TIMEZONE = ZoneInfo("Europe/Paris")
@@ -215,10 +215,7 @@ def _trade_record(row: _Row, kind: ImportKind) -> ImportRecord:
         currency=ACCOUNT_CURRENCY,
         description=row.product,
         isin=row.isin,
-        quantity=abs(row.quantity),
-        price=row.price,
-        price_currency=row.price_currency,
-        fees=row.fees,
+        trade=TradeDetails(abs(row.quantity), row.price, row.price_currency, row.fees),
     )
 
 
@@ -271,15 +268,9 @@ def _as_announced(row: _Row, notice: _Row) -> ImportRecord:
     kind = ANNOUNCED_KINDS[notice.type]
     if kind is not ImportKind.IPO_SUBSCRIPTION or not row.quantity:
         return _trade_record(row, kind)
-    paid = abs(notice.amount)
-    return replace(
-        _trade_record(row, kind),
-        timestamp=notice.timestamp,
-        amount=paid,
-        price=paid / abs(row.quantity),
-        price_currency=ACCOUNT_CURRENCY,
-        fees=Decimal(0),
-    )
+    paid, quantity = abs(notice.amount), abs(row.quantity)
+    trade = TradeDetails(quantity, paid / quantity, ACCOUNT_CURRENCY, Decimal(0))
+    return replace(_trade_record(row, kind), timestamp=notice.timestamp, amount=paid, trade=trade)
 
 
 # Step 2c: cash waiting in another currency ----------------------------------------------------------------------
@@ -444,11 +435,7 @@ def _settled_record(item: _Waiting, amount: Decimal) -> ImportRecord:
         currency=ACCOUNT_CURRENCY,
         description=row.product,
         isin=row.isin,
-        dividend_currency=row.currency,
-        gross=item.amount,
-        tax=item.tax,
-        dividend_fee=item.fee,
-        payment_date=_date(row.value_date),
+        dividend=DividendDetails(row.currency, item.amount, item.tax, item.fee, _date(row.value_date)),
     )
 
 

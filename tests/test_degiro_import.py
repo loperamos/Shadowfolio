@@ -18,7 +18,7 @@ from shadowfolio.adapters.in_memory_fx_rates import InMemoryFxRates
 from shadowfolio.adapters.in_memory_price_data import InMemoryPriceData
 from shadowfolio.adapters.in_memory_wallet_repository import InMemoryWalletRepository
 from shadowfolio.domain.corporate_actions import DividendEvent, SplitEvent
-from shadowfolio.domain.imports import ImportKind, ImportRecord
+from shadowfolio.domain.imports import DividendDetails, ImportKind, ImportRecord, TradeDetails
 from shadowfolio.domain.money import Currency, FxRate
 from shadowfolio.domain.operations import Dividend, Fee, ImportedDividend, Income, SharesReceived
 from shadowfolio.domain.wallet import Wallet
@@ -157,14 +157,13 @@ def test_a_buy_adds_the_shares_and_takes_its_cost_and_fees_from_the_cash() -> No
     imported = import_degiro(transactions=[NVIDIA_BUY], account=[*NVIDIA_BUY_CASH, DEPOSIT_1000], tickers=NVIDIA_TICKER)
 
     buy = next(record for record in imported.records if record.kind is ImportKind.BUY)
-    assert (buy.timestamp, buy.isin, buy.quantity, buy.price, buy.price_currency) == (
+    assert (buy.timestamp, buy.isin, buy.amount, buy.currency) == (
         datetime(2024, 6, 24, 14, 26, tzinfo=UTC),
         "US67066G1040",
-        Decimal(8),
-        Decimal("121.81"),
-        "USD",
+        Decimal("905.40"),
+        "EUR",
     )
-    assert (buy.amount, buy.currency, buy.fees) == (Decimal("905.40"), "EUR", Decimal("4.28"))
+    assert buy.trade == TradeDetails(quantity=Decimal(8), price=Decimal("121.81"), price_currency="USD", fees=Decimal("4.28"))
     assert [record.kind for record in imported.records].count(ImportKind.TRADE_SETTLEMENT) == len(NVIDIA_BUY_CASH)
     assert imported.wallet.holdings == {"NVDA": Decimal(8)}
     assert imported.wallet.cash == Decimal("90.32")  # 1000 - 905.40 - 4.28
@@ -221,11 +220,9 @@ def test_a_dividend_with_its_tax_fee_and_conversion_is_one_dividend_credited_in_
         currency="EUR",
         description="NVIDIA CORPORATION",
         isin="US67066G1040",
-        dividend_currency="USD",
-        gross=Decimal("9.50"),
-        tax=Decimal("1.43"),
-        dividend_fee=Decimal("0.81"),
-        payment_date=date(2026, 10, 1),
+        dividend=DividendDetails(
+            currency="USD", gross=Decimal("9.50"), tax=Decimal("1.43"), fee=Decimal("0.81"), payment_date=date(2026, 10, 1)
+        ),
     )
     assert imported.report.not_imported == []
     [dividend] = [op for op in imported.wallet.operations if isinstance(op, ImportedDividend)]
