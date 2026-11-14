@@ -28,8 +28,8 @@ import {
 } from "../ui/format";
 import { DATE_INPUT_WIDTH, ICON_SIZE, TIME_INPUT_WIDTH } from "../ui/theme";
 
-// The kinds a person records; others (splits, dividends) are only added automatically from market data.
-type ManualOperationType = Exclude<OperationType, typeof OperationType.SPLIT | typeof OperationType.DIVIDEND>;
+// The kinds a person records and edits here; others come from market data (splits, dividends) or imports (fees).
+type ManualOperationType = Exclude<OperationType, typeof OperationType.SPLIT | typeof OperationType.DIVIDEND | typeof OperationType.FEE>;
 
 const OPERATION_LABELS: Record<ManualOperationType, string> = {
   [OperationType.BUY]: "Buy",
@@ -37,6 +37,10 @@ const OPERATION_LABELS: Record<ManualOperationType, string> = {
   [OperationType.DEPOSIT]: "Deposit",
   [OperationType.WITHDRAWAL]: "Withdrawal",
 };
+/** Whether this dialog can edit the operation: only the kinds a person records by hand. */
+export function isEditable(operation: OperationResponse): boolean {
+  return operation.type in OPERATION_LABELS;
+}
 const OPERATION_OPTIONS = Object.entries(OPERATION_LABELS).map(([value, label]) => ({ value, label }));
 const CURRENCIES = Object.values(Currency);
 // The MVP covers US stocks and ETFs, which are priced in dollars.

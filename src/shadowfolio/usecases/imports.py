@@ -43,6 +43,8 @@ class Imports:
                         report.not_imported.append(NotImported(record, f"no ticker for {record.isin}"))
                         continue
                     self._record_trade(wallet_id, record, ticker)
+                case ImportKind.FEE:
+                    self._history.record_fee(wallet_id, record.timestamp, record.amount, record.description)
                 case ImportKind.DIVIDEND:
                     ticker = tickers.get(record.isin or "")
                     if ticker is None:

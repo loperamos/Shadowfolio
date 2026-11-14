@@ -14,6 +14,7 @@ class ImportKind(StrEnum):
     # A cash-statement row that only pays for, or receives, a trade already read as a buy or sell.
     TRADE_SETTLEMENT = "trade_settlement"
     DIVIDEND = "dividend"
+    FEE = "fee"  # a charge not tied to one trade
     # Money moving between accounts that are all the investor's (a broker and its partner bank, a cash fund).
     INTERNAL_TRANSFER = "internal_transfer"
     UNKNOWN = "unknown"  # a row the reader does not recognise

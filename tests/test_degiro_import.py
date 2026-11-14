@@ -19,7 +19,7 @@ from shadowfolio.adapters.in_memory_wallet_repository import InMemoryWalletRepos
 from shadowfolio.domain.corporate_actions import DividendEvent
 from shadowfolio.domain.imports import ImportKind, ImportRecord
 from shadowfolio.domain.money import Currency, FxRate
-from shadowfolio.domain.operations import Dividend, ImportedDividend
+from shadowfolio.domain.operations import Dividend, Fee, ImportedDividend
 from shadowfolio.domain.wallet import Wallet
 from shadowfolio.usecases.history import History
 from shadowfolio.usecases.imports import ImportReport, Imports
@@ -292,3 +292,15 @@ def test_an_imported_dividend_replaces_the_one_credited_from_market_data() -> No
 
     assert [op for op in imported.wallet.operations if isinstance(op, Dividend)] == []
     assert imported.wallet.cash == Decimal("96.75")  # 90.32 after the buy, + 6.43 from DEGIRO's dividend only
+
+
+def test_an_exchange_connection_fee_is_a_fee_taken_from_the_cash() -> None:
+    description = "Frais de connexion aux places boursières 2026 (New York Stock Exchange - NSY)"
+    fee = f'23-02-2026,10:47,31-01-2026,,,{description},,EUR,"-2,50",EUR,"497,50",'
+
+    imported = import_degiro(transactions=[], account=[fee, DEPOSIT_500.replace("01-09-2026", "01-01-2026")])
+
+    assert imported.records[-1].kind is ImportKind.FEE
+    [taken] = [op for op in imported.wallet.operations if isinstance(op, Fee)]
+    assert (taken.amount, taken.description) == (Decimal("2.50"), description)
+    assert imported.wallet.cash == Decimal("497.50")

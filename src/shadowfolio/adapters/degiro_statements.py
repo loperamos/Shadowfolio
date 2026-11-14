@@ -36,6 +36,7 @@ ACCOUNT_PATTERNS: list[tuple[re.Pattern[str], ImportKind]] = [
         (r"^Processed Flatex Withdrawal$", ImportKind.INTERNAL_TRANSFER),
         (r"^(Degiro Cash Sweep Transfer|Virement (vers|depuis) votre Compte Espèces à la flatexDEGIRO Bank)", ImportKind.INTERNAL_TRANSFER),
         (r"^(Variation Fonds Monétaires|Conversion Fonds Monétaires finalisée)", ImportKind.INTERNAL_TRANSFER),
+        (r"^Frais de connexion aux places boursières", ImportKind.FEE),
     ]
 ]
 

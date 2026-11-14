@@ -13,6 +13,7 @@ from shadowfolio.domain.operations import (
     Buy,
     Deposit,
     Dividend,
+    Fee,
     ImportedDividend,
     Operation,
     OperationType,
@@ -50,7 +51,8 @@ CREATE TABLE IF NOT EXISTS operations (
     event_id TEXT,
     fx_rate TEXT,
     withholding TEXT,
-    gross TEXT
+    gross TEXT,
+    description TEXT
 );
 CREATE TABLE IF NOT EXISTS checked_periods (
     wallet_id TEXT NOT NULL REFERENCES wallets (id),
@@ -85,6 +87,7 @@ _ADDED_COLUMNS = {
         "fx_rate": "TEXT",
         "withholding": "TEXT",
         "gross": "TEXT",
+        "description": "TEXT",
     },
 }
 
@@ -130,7 +133,7 @@ class SqliteWalletRepository(WalletRepository):
                 return None
             operation_rows = conn.execute(
                 "SELECT id, type, timestamp, amount, fees, symbol, quantity, price, price_currency, price_source, "
-                "split_old_rate, split_new_rate, event_id, fx_rate, withholding, gross "
+                "split_old_rate, split_new_rate, event_id, fx_rate, withholding, gross, description "
                 "FROM operations WHERE wallet_id = ? ORDER BY timestamp, rowid",
                 (str(wallet_id),),
             ).fetchall()
@@ -176,8 +179,9 @@ def _insert_operations(conn: sqlite3.Connection, wallet: Wallet) -> None:
     # In timeline order, so equal timestamps read back in the same order (ORDER BY timestamp, rowid).
     conn.executemany(
         "INSERT INTO operations (id, wallet_id, type, timestamp, amount, fees, "
-        "symbol, quantity, price, price_currency, price_source, split_old_rate, split_new_rate, event_id, fx_rate, withholding, gross) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "symbol, quantity, price, price_currency, price_source, split_old_rate, split_new_rate, event_id, fx_rate, "
+        "withholding, gross, description) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         [_operation_to_row(wallet.id, op) for op in wallet.operations],
     )
 
@@ -224,7 +228,9 @@ def _dividend_from_row(row: tuple[str, ...]) -> RecordedDividend:
 
 def _operation_to_row(wallet_id: UUID, op: Operation) -> tuple[str | None, ...]:
     """One row per operation; columns that do not apply to its kind are NULL."""
-    symbol = quantity = price = price_currency = price_source = old_rate = new_rate = event_id = fx_rate = withholding = gross = None
+    symbol = quantity = price = price_currency = price_source = old_rate = new_rate = event_id = fx_rate = withholding = gross = (
+        description
+    ) = None
     match op:
         case Deposit() | Withdrawal():
             amount, fees = op.amount, Decimal(0)
@@ -244,6 +250,8 @@ def _operation_to_row(wallet_id: UUID, op: Operation) -> tuple[str | None, ...]:
             # From a statement, so no event: amount credited; fees, withholding and gross in the dividend's currency.
             amount, fees, withholding, gross = op.amount, op.fee, str(op.tax), str(op.gross)
             symbol, price_currency = op.symbol, op.currency
+        case Fee():
+            amount, fees, description = op.amount, Decimal(0), op.description
     return (
         str(op.id),
         str(wallet_id),
@@ -262,6 +270,7 @@ def _operation_to_row(wallet_id: UUID, op: Operation) -> tuple[str | None, ...]:
         fx_rate,
         withholding,
         gross,
+        description,
     )
 
 
@@ -283,6 +292,7 @@ def _operation_from_row(row: tuple[str | None, ...]) -> Operation:
         fx_rate,
         withholding,
         gross,
+        description,
     ) = row
     assert op_id and op_type and timestamp and amount and fees
     id_, at, value = UUID(op_id), datetime.fromisoformat(timestamp), Decimal(amount)
@@ -300,6 +310,9 @@ def _operation_from_row(row: tuple[str | None, ...]) -> Operation:
         case OperationType.SPLIT:
             assert symbol and old_rate and new_rate and event_id
             return Split(id_, at, symbol, Decimal(old_rate), Decimal(new_rate), event_id)
+        case OperationType.FEE:
+            assert description is not None
+            return Fee(id_, at, value, description)
         case OperationType.DIVIDEND if event_id is None:
             assert symbol and price_currency and gross and withholding
             return ImportedDividend(id_, at, symbol, price_currency, Decimal(gross), Decimal(withholding), Decimal(fees), value)

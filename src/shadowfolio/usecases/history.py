@@ -37,6 +37,15 @@ class History:
         self._repo.update(updated)
         return updated
 
+    def record_fee(self, wallet_id: UUID, timestamp: datetime, amount: Decimal, description: str) -> Wallet | None:
+        """Record a charge not tied to one trade, as the broker words it."""
+        wallet = self._repo.get(wallet_id)
+        if wallet is None:
+            return None
+        updated = wallet.pay_fee(uuid4(), self._at(timestamp), amount, description)
+        self._repo.update(updated)
+        return updated
+
     def record_dividend(
         self, wallet_id: UUID, timestamp: datetime, symbol: str, currency: str, gross: Decimal, tax: Decimal, fee: Decimal, amount: Decimal
     ) -> Wallet | None:

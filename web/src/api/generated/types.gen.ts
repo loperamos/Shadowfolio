@@ -299,6 +299,10 @@ export type OperationResponse = {
      * Withholding
      */
     withholding?: string | null;
+    /**
+     * Description
+     */
+    description?: string | null;
 };
 
 /**
@@ -310,7 +314,8 @@ export const OperationType = {
     BUY: 'buy',
     SELL: 'sell',
     SPLIT: 'split',
-    DIVIDEND: 'dividend'
+    DIVIDEND: 'dividend',
+    FEE: 'fee'
 } as const;
 
 /**

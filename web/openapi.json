@@ -1518,6 +1518,17 @@
               }
             ],
             "title": "Withholding"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
           }
         },
         "type": "object",
@@ -1538,7 +1549,8 @@
           "buy",
           "sell",
           "split",
-          "dividend"
+          "dividend",
+          "fee"
         ],
         "title": "OperationType"
       },
