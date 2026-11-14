@@ -1123,6 +1123,91 @@
           }
         }
       }
+    },
+    "/api/wallets/{wallet_id}/performance": {
+      "get": {
+        "summary": "Wallet Performance",
+        "description": "How the wallet did from `start` (default: its first operation) to `end` (default: today), next to SPY with the\nsame deposits: gain, and returns that ignore (time-weighted) or include (money-weighted) when money moved.",
+        "operationId": "wallet_performance",
+        "parameters": [
+          {
+            "name": "wallet_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Wallet Id"
+            }
+          },
+          {
+            "name": "start",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start"
+            }
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PerformanceComparisonResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Malformed request or broken business rule",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1891,6 +1976,124 @@
           "shares_received"
         ],
         "title": "OperationType"
+      },
+      "PerformanceComparisonResponse": {
+        "properties": {
+          "wallet": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PerformanceResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "benchmark_symbol": {
+            "type": "string",
+            "title": "Benchmark Symbol"
+          },
+          "benchmark": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PerformanceResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "wallet",
+          "benchmark_symbol",
+          "benchmark"
+        ],
+        "title": "PerformanceComparisonResponse",
+        "description": "How the wallet did over a period next to `benchmark_symbol` with the same deposits; null when nothing in the\nperiod could be valued."
+      },
+      "PerformanceResponse": {
+        "properties": {
+          "start_day": {
+            "type": "string",
+            "format": "date",
+            "title": "Start Day"
+          },
+          "end_day": {
+            "type": "string",
+            "format": "date",
+            "title": "End Day"
+          },
+          "start_value": {
+            "type": "string",
+            "title": "Start Value"
+          },
+          "end_value": {
+            "type": "string",
+            "title": "End Value"
+          },
+          "net_deposits": {
+            "type": "string",
+            "title": "Net Deposits"
+          },
+          "gain": {
+            "type": "string",
+            "title": "Gain"
+          },
+          "time_weighted_return": {
+            "type": "string",
+            "title": "Time Weighted Return"
+          },
+          "time_weighted_return_per_year": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time Weighted Return Per Year"
+          },
+          "money_weighted_return": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Money Weighted Return"
+          },
+          "money_weighted_return_per_year": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Money Weighted Return Per Year"
+          }
+        },
+        "type": "object",
+        "required": [
+          "start_day",
+          "end_day",
+          "start_value",
+          "end_value",
+          "net_deposits",
+          "gain",
+          "time_weighted_return",
+          "time_weighted_return_per_year",
+          "money_weighted_return",
+          "money_weighted_return_per_year"
+        ],
+        "title": "PerformanceResponse",
+        "description": "How a wallet or a benchmark did over a period (see domain.performance); returns in percent."
       },
       "PriceSource": {
         "type": "string",

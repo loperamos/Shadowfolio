@@ -422,6 +422,69 @@ export const OperationType = {
 export type OperationType = typeof OperationType[keyof typeof OperationType];
 
 /**
+ * PerformanceComparisonResponse
+ *
+ * How the wallet did over a period next to `benchmark_symbol` with the same deposits; null when nothing in the
+ * period could be valued.
+ */
+export type PerformanceComparisonResponse = {
+    wallet: PerformanceResponse | null;
+    /**
+     * Benchmark Symbol
+     */
+    benchmark_symbol: string;
+    benchmark: PerformanceResponse | null;
+};
+
+/**
+ * PerformanceResponse
+ *
+ * How a wallet or a benchmark did over a period (see domain.performance); returns in percent.
+ */
+export type PerformanceResponse = {
+    /**
+     * Start Day
+     */
+    start_day: string;
+    /**
+     * End Day
+     */
+    end_day: string;
+    /**
+     * Start Value
+     */
+    start_value: string;
+    /**
+     * End Value
+     */
+    end_value: string;
+    /**
+     * Net Deposits
+     */
+    net_deposits: string;
+    /**
+     * Gain
+     */
+    gain: string;
+    /**
+     * Time Weighted Return
+     */
+    time_weighted_return: string;
+    /**
+     * Time Weighted Return Per Year
+     */
+    time_weighted_return_per_year: string | null;
+    /**
+     * Money Weighted Return
+     */
+    money_weighted_return: string | null;
+    /**
+     * Money Weighted Return Per Year
+     */
+    money_weighted_return_per_year: string | null;
+};
+
+/**
  * PriceSource
  */
 export const PriceSource = { ENTERED: 'entered', MARKET: 'market' } as const;
@@ -1375,3 +1438,46 @@ export type BenchmarkDailyResponses = {
 };
 
 export type BenchmarkDailyResponse = BenchmarkDailyResponses[keyof BenchmarkDailyResponses];
+
+export type WalletPerformanceData = {
+    body?: never;
+    path: {
+        /**
+         * Wallet Id
+         */
+        wallet_id: string;
+    };
+    query?: {
+        /**
+         * Start
+         */
+        start?: string | null;
+        /**
+         * End
+         */
+        end?: string | null;
+    };
+    url: '/api/wallets/{wallet_id}/performance';
+};
+
+export type WalletPerformanceErrors = {
+    /**
+     * Not found
+     */
+    404: ErrorResponse;
+    /**
+     * Malformed request or broken business rule
+     */
+    422: ErrorResponse;
+};
+
+export type WalletPerformanceError = WalletPerformanceErrors[keyof WalletPerformanceErrors];
+
+export type WalletPerformanceResponses = {
+    /**
+     * Successful Response
+     */
+    200: PerformanceComparisonResponse;
+};
+
+export type WalletPerformanceResponse = WalletPerformanceResponses[keyof WalletPerformanceResponses];

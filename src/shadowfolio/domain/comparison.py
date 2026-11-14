@@ -20,6 +20,7 @@ from shadowfolio.domain.valuation import Quote
 class BenchmarkValue:
     day: date
     value: Decimal | None  # in the wallet's currency; None when the day has no close or rate
+    flow: Decimal = Decimal(0)  # money put in (positive) or taken out (negative) that day, in the wallet's currency
 
 
 @dataclass(frozen=True)
@@ -48,27 +49,30 @@ def benchmark_values(
     unpaid = sorted(((d.payable_date, d) for d in dividends if d.payable_date is not None), key=lambda paid: paid[0])
     values = []
     last_wallet_value: Decimal | None = None
+    last_price: Decimal | None = None  # of a share, in the wallet's currency
     for day in days:
         flow = flows.get(day, Decimal(0))
         if flow >= 0:
             cash += flow
         else:
-            kept = 1 - _withdrawn_share(-flow, wallet_values.get(day), last_wallet_value)
-            shares, cash = shares * kept, cash * kept
+            # What the withdrawal takes from the benchmark, at the last known price (its own flow, not the wallet's).
+            withdrawn = _withdrawn_share(-flow, wallet_values.get(day), last_wallet_value)
+            flow = -withdrawn * (shares * (last_price or Decimal(0)) + cash)
+            shares, cash = shares * (1 - withdrawn), cash * (1 - withdrawn)
         last_wallet_value = wallet_values.get(day, last_wallet_value)
         close, rate = closes.get(day), rates.get(day)
         if close is None or rate is None:
-            values.append(BenchmarkValue(day, None))
+            values.append(BenchmarkValue(day, None, flow))
         else:
             # Dividends paid by now, for the shares held before their ex-date (paid late on a day without a close).
             while unpaid and unpaid[0][0] <= day:
                 _, dividend = unpaid.pop(0)
                 before_ex = held.get(dividend.ex_date - timedelta(days=1), Decimal(0))
                 cash += before_ex * dividend.per_share * (1 - withholding_rate) * rate
-            price = close.price * rate
+            price = last_price = close.price * rate
             if cash > 0:
                 shares, cash = shares + cash / price, Decimal(0)
-            values.append(BenchmarkValue(day, to_cents(shares * price + cash)))
+            values.append(BenchmarkValue(day, to_cents(shares * price + cash), flow))
         held[day] = shares
     return tuple(values)
 
