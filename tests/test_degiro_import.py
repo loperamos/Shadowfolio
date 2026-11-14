@@ -174,3 +174,15 @@ def test_a_trade_in_a_security_without_a_known_ticker_is_reported() -> None:
         ("US67066G1040", "no ticker for US67066G1040")
     ]
     assert imported.wallet.holdings == {}
+
+
+def test_a_trade_in_euros_on_a_european_exchange() -> None:
+    # Tesla on Tradegate, in euros: no currency conversion, a flat 3.90 EUR fee.
+    tesla = "TESLA INC,US88160R1014"
+    buy = f'15-11-2024,14:39,{tesla},TDG,XGAT,5,"295,0500",EUR,"-1475,25",EUR,"-1475,25","1,0000","0,00","-3,90","-1479,15",order-3'
+    deposit = '01-11-2024,10:00,01-11-2024,,,Dépôt flatex,,EUR,"1500,00",EUR,"1500,00",'
+
+    imported = import_degiro(transactions=[buy], account=[deposit], tickers={"US88160R1014": "TSLA"})
+
+    assert imported.wallet.holdings == {"TSLA": Decimal(5)}
+    assert imported.wallet.cash == Decimal("20.85")  # 1500 - 1475.25 - 3.90
