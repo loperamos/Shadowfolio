@@ -95,7 +95,8 @@ function ChartBody({ state, range, currency, onSelect }: BodyProps) {
             onSelect={onSelect}
             series={[
               { name: "total", label: "Value", color: "teal.6" },
-              { name: "net_deposits", label: "Net deposits", color: "gray.6", dashed: true },
+              // Hidden at first: after taking out more than was put in, it is far below the value and squashes it.
+              { name: "net_deposits", label: "Net deposits", color: "gray.6", dashed: true, hidden: true },
             ]}
           />
           {/* Unvalued days are gaps in the line, never guesses; say why. */}
