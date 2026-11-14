@@ -2,7 +2,7 @@
 
 from uuid import UUID
 
-from shadowfolio.domain.imports import ImportRecord
+from shadowfolio.domain.imports import ImportKind, ImportRecord
 from shadowfolio.usecases.history import History
 
 
@@ -11,4 +11,8 @@ class Imports:
         self._history = history
 
     def apply(self, wallet_id: UUID, records: list[ImportRecord]) -> None:
-        """Record the records' operations in the wallet."""
+        """Record the records' operations in the wallet, in the order given."""
+        for record in records:
+            match record.kind:
+                case ImportKind.DEPOSIT:
+                    self._history.deposit(wallet_id, record.amount, record.timestamp)

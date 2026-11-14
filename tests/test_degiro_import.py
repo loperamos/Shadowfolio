@@ -7,13 +7,15 @@ the wallet holds after importing them.
 from datetime import UTC, datetime
 from decimal import Decimal
 
+import pytest
+
 from shadowfolio.adapters.degiro_statements import DegiroStatementReader
 from shadowfolio.adapters.fixed_clock import FixedClock
 from shadowfolio.adapters.in_memory_corporate_actions import InMemoryCorporateActions
 from shadowfolio.adapters.in_memory_fx_rates import InMemoryFxRates
 from shadowfolio.adapters.in_memory_price_data import InMemoryPriceData
 from shadowfolio.adapters.in_memory_wallet_repository import InMemoryWalletRepository
-from shadowfolio.domain.imports import ImportRecord
+from shadowfolio.domain.imports import ImportKind, ImportRecord
 from shadowfolio.domain.money import Currency
 from shadowfolio.domain.wallet import Wallet
 from shadowfolio.usecases.history import History
@@ -50,3 +52,12 @@ def test_exports_without_rows_import_nothing() -> None:
 
     assert records == []
     assert (wallet.cash, wallet.holdings, wallet.operations) == (Decimal(0), {}, ())
+
+
+@pytest.mark.parametrize("description", ["Dépôt flatex", "Versement de fonds"])
+def test_a_deposit_adds_its_amount_to_the_cash(description: str) -> None:
+    records, wallet = import_degiro(transactions=[], account=[f'01-06-2024,15:32,01-06-2024,,,{description},,EUR,"500,00",EUR,"500,00",'])
+
+    # DEGIRO writes Paris time: 15:32 in summer is 13:32 UTC.
+    assert records == [ImportRecord(ImportKind.DEPOSIT, datetime(2024, 6, 1, 13, 32, tzinfo=UTC), Decimal("500.00"), "EUR")]
+    assert wallet.cash == Decimal("500.00")
