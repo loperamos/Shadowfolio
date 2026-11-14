@@ -21,6 +21,8 @@ export const TABLE_MIN_WIDTH = rem(900);
 // Width of tooltips that hold a sentence, so they wrap into a readable block.
 export const TOOLTIP_WIDTH = rem(260);
 export const PERCENT_INPUT_WIDTH = rem(110); // up to 99.99 and the % sign
+// Width of a search field above a list: room for a name, without stretching across the page.
+export const SEARCH_INPUT_WIDTH = rem(260);
 
 // Height of time-series charts, in px.
 export const CHART_HEIGHT = 280;
