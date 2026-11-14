@@ -4,12 +4,15 @@ Runs against the in-memory fake by default; the ECB runs only with `pytest -m li
 """
 
 from collections.abc import Callable
-from datetime import date
+from datetime import UTC, date, datetime
 from decimal import Decimal
+from pathlib import Path
 
 import pytest
 
+from shadowfolio.adapters.cached_fx_rates import CachedFxRates
 from shadowfolio.adapters.ecb_fx_rates import EcbFxRates
+from shadowfolio.adapters.fixed_clock import FixedClock
 from shadowfolio.adapters.in_memory_fx_rates import InMemoryFxRates
 from shadowfolio.adapters.system_clock import SystemClock
 from shadowfolio.domain.money import Currency, FxRate
@@ -29,12 +32,21 @@ def _in_memory() -> FxRates:
     )
 
 
-ADAPTERS: dict[str, Callable[[], FxRates]] = {"in_memory": _in_memory, "ecb": lambda: EcbFxRates(SystemClock())}
+def _cached(cache_dir: Path) -> FxRates:
+    """The cache in front of the fake."""
+    return CachedFxRates(_in_memory(), "in_memory", cache_dir / "cache.sqlite", FixedClock(datetime(2026, 11, 13, tzinfo=UTC)))
 
 
-@pytest.fixture(params=["in_memory", pytest.param("ecb", marks=pytest.mark.live)])
-def fx_rates(request: pytest.FixtureRequest) -> FxRates:
-    return ADAPTERS[request.param]()
+ADAPTERS: dict[str, Callable[[Path], FxRates]] = {
+    "in_memory": lambda _: _in_memory(),
+    "cached": _cached,
+    "ecb": lambda _: EcbFxRates(SystemClock()),
+}
+
+
+@pytest.fixture(params=["in_memory", "cached", pytest.param("ecb", marks=pytest.mark.live)])
+def fx_rates(request: pytest.FixtureRequest, tmp_path: Path) -> FxRates:
+    return ADAPTERS[request.param](tmp_path)
 
 
 def test_rate_between_supported_currencies(fx_rates: FxRates) -> None:
