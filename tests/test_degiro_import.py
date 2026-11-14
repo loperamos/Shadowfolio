@@ -5,7 +5,7 @@ the wallet holds after importing them.
 """
 
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 
 import pytest
@@ -16,9 +16,10 @@ from shadowfolio.adapters.in_memory_corporate_actions import InMemoryCorporateAc
 from shadowfolio.adapters.in_memory_fx_rates import InMemoryFxRates
 from shadowfolio.adapters.in_memory_price_data import InMemoryPriceData
 from shadowfolio.adapters.in_memory_wallet_repository import InMemoryWalletRepository
+from shadowfolio.domain.corporate_actions import DividendEvent
 from shadowfolio.domain.imports import ImportKind, ImportRecord
-from shadowfolio.domain.money import Currency
-from shadowfolio.domain.operations import ImportedDividend
+from shadowfolio.domain.money import Currency, FxRate
+from shadowfolio.domain.operations import Dividend, ImportedDividend
 from shadowfolio.domain.wallet import Wallet
 from shadowfolio.usecases.history import History
 from shadowfolio.usecases.imports import ImportReport, Imports
@@ -43,13 +44,21 @@ class Imported:
     wallet: Wallet
 
 
-def import_degiro(transactions: list[str], account: list[str], tickers: dict[str, str] | None = None) -> Imported:
+def import_degiro(
+    transactions: list[str],
+    account: list[str],
+    tickers: dict[str, str] | None = None,
+    market_dividends: tuple[DividendEvent, ...] = (),
+    fx_rates: tuple[FxRate, ...] = (),
+) -> Imported:
     """Read the exports with these rows (newest first, as DEGIRO lists them) and import them into a new EUR wallet.
 
-    `tickers` maps each security's ISIN to its ticker, which DEGIRO's exports do not give.
+    `tickers` maps each security's ISIN to its ticker, which DEGIRO's exports do not give. `market_dividends` and
+    `fx_rates` are what market data knows (the wallet credits dividends from it automatically).
     """
-    repo, clock, fx_rates = InMemoryWalletRepository(), FixedClock(NOW), InMemoryFxRates()
-    history = History(repo, clock, InMemoryPriceData(), fx_rates, Sync(repo, clock, InMemoryCorporateActions(), fx_rates))
+    repo, clock, rates = InMemoryWalletRepository(), FixedClock(NOW), InMemoryFxRates(*fx_rates)
+    sync = Sync(repo, clock, InMemoryCorporateActions(*market_dividends), rates)
+    history = History(repo, clock, InMemoryPriceData(), rates, sync)
     wallets = Wallets(repo, clock)
     wallet = wallets.create("owner", "DEGIRO", Currency.EUR, Decimal(0))
 
@@ -266,3 +275,20 @@ def test_a_dividend_in_hong_kong_dollars_without_tax() -> None:
         Decimal("2.88"),
         Decimal("3.09"),
     )
+
+
+def test_an_imported_dividend_replaces_the_one_credited_from_market_data() -> None:
+    # Market data knows NVIDIA's dividend paid on 1 October; DEGIRO books it the next day, with its real tax and fee.
+    paid = DividendEvent("NVDA", date(2026, 9, 11), date(2026, 10, 1), Decimal("0.01"), Currency.USD, "nvda-2026-10")
+    rate = FxRate(Currency.USD, Currency.EUR, Decimal("0.90"), date(2026, 10, 1))
+
+    imported = import_degiro(
+        transactions=[NVIDIA_BUY],
+        account=[*NVIDIA_DIVIDEND, DEPOSIT_1000],
+        tickers=NVIDIA_TICKER,
+        market_dividends=(paid,),
+        fx_rates=(rate,),
+    )
+
+    assert [op for op in imported.wallet.operations if isinstance(op, Dividend)] == []
+    assert imported.wallet.cash == Decimal("96.75")  # 90.32 after the buy, + 6.43 from DEGIRO's dividend only

@@ -2,7 +2,7 @@
 
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field, replace
-from datetime import UTC, datetime, time
+from datetime import UTC, date, datetime, time, timedelta
 from decimal import Decimal
 from typing import Self
 from uuid import UUID, uuid5
@@ -23,6 +23,9 @@ from shadowfolio.domain.errors import (
 from shadowfolio.domain.ledger import Ledger, build_ledger
 from shadowfolio.domain.money import Currency, to_cents
 from shadowfolio.domain.operations import Buy, Deposit, Dividend, ImportedDividend, Operation, PriceSource, Sell, Split, Trade, Withdrawal
+
+# How long after a dividend's payment date a broker may book it.
+DIVIDEND_BOOKING_DELAY = timedelta(days=7)
 
 
 @dataclass(frozen=True)
@@ -249,6 +252,8 @@ class Wallet:
             event = recorded.event
             if event.payable_date is None:  # known, but when its cash arrived is not: see uncredited_dividends
                 continue
+            if _imported(base, event.symbol, event.payable_date):  # the broker's own figures win
+                continue
             shares = _shares_before_ex(base, event)
             if shares <= 0:
                 continue
@@ -328,3 +333,14 @@ def _shares_before_ex(base: Iterable[Operation], event: DividendEvent) -> Decima
     """Shares of the dividend's symbol held when its ex-date started: those are the ones that qualify."""
     ex_start = datetime.combine(event.ex_date, time(), tzinfo=UTC)
     return _holdings(op for op in base if op.timestamp < ex_start).get(event.symbol, Decimal(0))
+
+
+def _imported(base: Iterable[Operation], symbol: str, payable_date: date) -> bool:
+    """Whether a broker statement already reports this dividend: one of `symbol` booked within a few days of its
+    payment date (brokers book it on that day or a few days later)."""
+    return any(
+        isinstance(op, ImportedDividend)
+        and op.symbol == symbol
+        and timedelta(0) <= op.timestamp.date() - payable_date <= DIVIDEND_BOOKING_DELAY
+        for op in base
+    )
