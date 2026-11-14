@@ -105,6 +105,17 @@ def test_holdings_are_valued_at_latest_prices_and_converted_into_the_wallet_curr
     assert (valuation["cost"], valuation["gain"], valuation["gain_percent"]) == ("2388.83", "139.48", "5.84")
 
 
+def test_values_in_the_wallets_own_currency_are_rounded_to_cents_too(client: TestClient, prices: InMemoryPriceData) -> None:
+    wallet_id = wallet_holding(client, {**TSLA_BUY, "price": "100.00"})  # cash left: 3000 - 503.90 = 2496.10 EUR
+    prices.set("TSLA", Quote(Decimal("244.695"), Currency.EUR, QUOTE_TIME, previous_close=Decimal("244.0003")))
+
+    valuation = client.get(f"/api/wallets/{wallet_id}/valuation").json()
+
+    # 5 x 244.695 = 1223.475, and 5 x 0.6947 = 3.4735: amounts in the wallet's currency are in cents, as converted ones.
+    assert [(h["value_in_wallet_currency"], h["day_change"]) for h in valuation["holdings"]] == [("1223.48", "3.47")]
+    assert valuation["total"] == "3719.58"  # 2496.10 + 1223.48
+
+
 def test_day_change_is_the_price_move_since_the_previous_close(
     client: TestClient, prices: InMemoryPriceData, fx_rates: InMemoryFxRates
 ) -> None:
