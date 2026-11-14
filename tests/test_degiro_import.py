@@ -822,3 +822,16 @@ def test_two_isin_changes_in_the_same_minute_are_paired_by_their_shares() -> Non
 
     assert imported.report.imported
     assert imported.wallet.holdings == {"0700.HK": Decimal(12), "3690.HK": Decimal(1)}
+
+
+def test_a_spin_off_giving_no_whole_share_needs_no_ticker() -> None:
+    # Kyndryl's spin-off gave 0 shares: nothing to record, so the import must not ask for KD's ticker.
+    kyndryl = '"KYNDRYL HOLDINGS, INC.",US50155Q1004'
+    spin_off = f'04-11-2021,00:00,{kyndryl},NSY,,0,"0,0000",USD,"0,00",USD,"0,00","1,1738","0,00",,"0,00",'
+    notice = (
+        f'04-11-2021,13:55,04-11-2021,{kyndryl},"Spin-off: Achat 0 Kyndryl Holdings, Inc.@0 USD (US50155Q1004)",,USD,"0,00",USD,"0,00",'
+    )
+
+    imported = import_degiro(transactions=[spin_off], account=[notice])
+
+    assert imported.report.imported

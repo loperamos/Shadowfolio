@@ -35,6 +35,15 @@ class ImportReport:
 
 
 SUPPORTED_CURRENCIES = {currency.value for currency in Currency}
+# Records that are only cash; one of 0.00 records nothing.
+CASH_KINDS = {
+    ImportKind.FEE,
+    ImportKind.INCOME,
+    ImportKind.CASH_IN_LIEU,
+    ImportKind.TAX_REFUND,
+    ImportKind.TAX_CHARGED,
+    ImportKind.DIVIDEND_REVERSED,
+}
 # Records about a security, which need its ticker.
 SECURITY_KINDS = {
     ImportKind.BUY,
@@ -83,6 +92,8 @@ class Imports:
     def _apply(self, wallet: Wallet, record: ImportRecord, tickers: Mapping[str, str]) -> tuple[Wallet, str | None]:
         """The wallet with one record's operation, if it has one; and the reason it is left out, if it is."""
         changes, at, amount = self._changes, record.timestamp, record.amount
+        if _nothing_to_record(record):
+            return wallet, None
         ticker = tickers.get(record.isin) if record.isin else None
         if record.kind in SECURITY_KINDS and ticker is None:
             return wallet, f"no ticker for {record.isin}"
@@ -98,25 +109,25 @@ class Imports:
                 tax, fee = record.tax or Decimal(0), record.dividend_fee or Decimal(0)
                 paid = record.payment_date
                 return changes.record_dividend(wallet, at, ticker, record.dividend_currency, record.gross, tax, fee, amount, paid), None
-            case ImportKind.SPIN_OFF if ticker and record.quantity:
+            case ImportKind.SPIN_OFF if ticker:
+                assert record.quantity is not None
                 return changes.record_shares_received(wallet, at, ticker, record.quantity), None
-            case ImportKind.CASH_IN_LIEU if ticker and amount:
+            case ImportKind.CASH_IN_LIEU if ticker:
                 return changes.record_income(wallet, at, amount, f"Cash for a fraction of a share of {ticker}"), None
-            case ImportKind.TAX_REFUND if ticker and amount:
+            case ImportKind.TAX_REFUND if ticker:
                 return changes.record_income(wallet, at, amount, f"Dividend tax refunded on {ticker}"), None
-            case ImportKind.DIVIDEND_REVERSED if ticker and amount:
+            case ImportKind.DIVIDEND_REVERSED if ticker:
                 return changes.record_income(wallet, at, -amount, f"Dividend of {ticker} reversed"), None
-            case ImportKind.TAX_CHARGED if ticker and amount:
+            case ImportKind.TAX_CHARGED if ticker:
                 return changes.record_fee(wallet, at, amount, f"Dividend tax charged later on {ticker}"), None
-            case ImportKind.FEE if amount:
+            case ImportKind.FEE:
                 return changes.record_fee(wallet, at, amount, record.description), None
-            case ImportKind.INCOME if amount != 0:
+            case ImportKind.INCOME:
                 return changes.record_income(wallet, at, amount, record.description), None
             case ImportKind.UNKNOWN:
                 return wallet, "unknown row"
-        # Nothing to record: an amount of 0.00 (interest, a refund's share), a spin-off giving no whole share, money
-        # moving inside the broker, the cash lines of a trade, an action's notice, or a split (the wallet applies
-        # splits from market data).
+        # Nothing to record: money moving inside the broker, the cash lines of a trade, an action's notice, or a split
+        # (the wallet applies splits from market data).
         return wallet, None
 
     def _trade(self, wallet: Wallet, record: ImportRecord, ticker: str) -> tuple[Wallet, str | None]:
@@ -135,6 +146,14 @@ class Imports:
             fees=record.fees or Decimal(0),
         )
         return trade, None
+
+
+def _nothing_to_record(record: ImportRecord) -> bool:
+    """Whether the record changes nothing in the wallet: a spin-off giving no whole share, or 0.00 of cash (a
+    quarter's interest, a refund's share of a cent)."""
+    if record.kind is ImportKind.SPIN_OFF:
+        return not record.quantity
+    return record.kind in CASH_KINDS and record.amount == 0
 
 
 def _same_ticker_isin_changes(records: list[ImportRecord], tickers: Mapping[str, str]) -> set[tuple[datetime, Decimal | None]]:
