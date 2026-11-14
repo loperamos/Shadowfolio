@@ -11,12 +11,14 @@ import { TimeSeriesChart } from "../ui/TimeSeriesChart";
 import { DATE_INPUT_FORMAT, parseDateInput } from "../ui/format";
 import { CHART_HEIGHT, DATE_INPUT_WIDTH, ICON_SIZE } from "../ui/theme";
 import { type DayRange, describeRange, inRange, isEverything, Period } from "./period";
+import { type BenchmarkState, useBenchmark } from "./useBenchmark";
 import { useDailyValues } from "./useDailyValues";
 
 // The chart's lines, by the key of their values in each point.
 enum Line {
   VALUE = "total",
   NET_DEPOSITS = "net_deposits",
+  BENCHMARK = "benchmark",
 }
 
 // Net deposits is hidden at first: after taking out more than was put in, it is far below the value and squashes it.
@@ -63,6 +65,7 @@ type ChartProps = {
 /** The wallet's value over time against the money put in, over a period chosen here (which the page also follows). */
 function WalletValueChartView({ walletId, currency, refreshKey, period, range, onChoose, lines, onLinesChange }: ChartProps) {
   const state = useDailyValues(walletId, refreshKey);
+  const benchmark = useBenchmark(walletId, refreshKey);
   const backwards = range.start !== null && range.end !== null && range.start > range.end;
   return (
     <div>
@@ -83,6 +86,7 @@ function WalletValueChartView({ walletId, currency, refreshKey, period, range, o
       </Group>
       <ChartBody
         state={state}
+        benchmark={benchmark}
         range={range}
         currency={currency}
         onSelect={(start, end) => onChoose({ start, end })}
@@ -132,6 +136,7 @@ export const WalletValueChart = memo(
 
 type BodyProps = {
   state: ReturnType<typeof useDailyValues>;
+  benchmark: BenchmarkState;
   range: DayRange;
   currency: string;
   onSelect: (start: string, end: string) => void;
@@ -139,7 +144,7 @@ type BodyProps = {
   onLinesChange: (lines: string[]) => void;
 };
 
-function ChartBody({ state, range, currency, onSelect, lines, onLinesChange }: BodyProps) {
+function ChartBody({ state, benchmark, range, currency, onSelect, lines, onLinesChange }: BodyProps) {
   switch (state.status) {
     case "loading":
       return <Skeleton h={CHART_HEIGHT} />;
@@ -159,19 +164,28 @@ function ChartBody({ state, range, currency, onSelect, lines, onLinesChange }: B
       }
       const unvalued = shown.filter((value) => value.missing.length > 0);
       const missing = [...new Set(unvalued.flatMap((value) => value.missing))];
+      // The benchmark comes on its own; until then (or if it fails) its line has no points.
+      const benchmarkValues = new Map(benchmark.status === "loaded" ? benchmark.benchmark.values.map((v) => [v.day, v.value]) : []);
+      const benchmarkLabel = `${benchmark.status === "loaded" ? benchmark.benchmark.symbol : "Benchmark"} with the same deposits`;
       return (
         <>
           <TimeSeriesChart
-            points={shown.map(toPoint)}
+            points={shown.map((value) => toPoint(value, benchmarkValues.get(value.day)))}
             currency={currency}
             onSelect={onSelect}
             series={[
               { name: Line.VALUE, label: "Value", color: "teal.6" },
               { name: Line.NET_DEPOSITS, label: "Net deposits", color: "gray.6", dashed: true },
+              { name: Line.BENCHMARK, label: benchmarkLabel, color: "indigo.6" },
             ]}
             shown={lines}
             onShownChange={onLinesChange}
           />
+          {lines.includes(Line.BENCHMARK) && benchmark.status === "error" && (
+            <Text c="dimmed" size="sm" mt="xs">
+              {benchmarkLabel} unavailable: {benchmark.message}
+            </Text>
+          )}
           {/* Unvalued days are gaps in the line, never guesses; say why. */}
           {unvalued.length > 0 && (
             <Text c="dimmed" size="sm" mt="xs">
@@ -185,6 +199,11 @@ function ChartBody({ state, range, currency, onSelect, lines, onLinesChange }: B
 }
 
 // For drawing only: the chart needs numbers. Amounts stay exact strings everywhere else.
-function toPoint(value: DailyValueResponse) {
-  return { day: value.day, [Line.VALUE]: value.total == null ? null : Number(value.total), [Line.NET_DEPOSITS]: Number(value.net_deposits) };
+function toPoint(value: DailyValueResponse, benchmark: string | null | undefined) {
+  return {
+    day: value.day,
+    [Line.VALUE]: value.total == null ? null : Number(value.total),
+    [Line.NET_DEPOSITS]: Number(value.net_deposits),
+    [Line.BENCHMARK]: benchmark == null ? null : Number(benchmark),
+  };
 }
