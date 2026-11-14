@@ -90,10 +90,15 @@ class Wallet:
         """Shares held per symbol. Symbols sold out entirely are left out."""
         return _replay(self.operations)
 
-    def copy(self, wallet_id: UUID, name: str, new_operation_id: Callable[[], UUID]) -> Self:
+    def copy(self, wallet_id: UUID, name: str, new_operation_id: Callable[[], UUID], before: datetime | None = None) -> Self:
         """A new wallet with the same owner, currency and history. Every operation gets a new id,
-        so the copy's history can change independently."""
-        operations = tuple(replace(op, id=new_operation_id()) for op in self.operations if not isinstance(op, Dividend))
+        so the copy's history can change independently.
+
+        With `before`, the history up to then ("what if"): what the owner did from then on is left out, while splits
+        still happen, and dividends are worked out again from what the copy holds.
+        """
+        kept = (op for op in self.operations if before is None or op.timestamp < before or isinstance(op, Split))
+        operations = tuple(replace(op, id=new_operation_id()) for op in kept if not isinstance(op, Dividend))
         return replace(self, id=wallet_id, name=name)._settled(operations)
 
     def rename(self, name: str) -> Self:

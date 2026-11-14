@@ -63,6 +63,10 @@ export type CopyWalletRequest = {
      * Name
      */
     name: string;
+    /**
+     * Before
+     */
+    before?: string | null;
 };
 
 /**

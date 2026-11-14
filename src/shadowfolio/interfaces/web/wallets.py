@@ -33,7 +33,7 @@ def wallets_router(wallets: Wallets) -> APIRouter:
     @router.post("/wallets/{wallet_id}/copies", status_code=201, responses=NOT_FOUND | INVALID)
     def copy_wallet(wallet_id: UUID, request: CopyWalletRequest) -> WalletResponse:
         try:
-            copy = wallets.copy(wallet_id, request.name)
+            copy = wallets.copy(wallet_id, request.name, request.before)
         except DomainError as error:
             raise rule_violation(error) from error
         if copy is None:

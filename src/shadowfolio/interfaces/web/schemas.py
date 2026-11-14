@@ -43,6 +43,8 @@ class UpdateWalletRequest(BaseModel):
 
 class CopyWalletRequest(BaseModel):
     name: str
+    # Copy only the history before this time ("what if"); the whole history when left out.
+    before: AwareDatetime | None = None
 
 
 class CashMovementRequest(BaseModel):

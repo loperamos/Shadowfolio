@@ -1201,6 +1201,18 @@
           "name": {
             "type": "string",
             "title": "Name"
+          },
+          "before": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Before"
           }
         },
         "type": "object",

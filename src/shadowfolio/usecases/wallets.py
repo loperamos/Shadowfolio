@@ -1,5 +1,6 @@
 """Wallet use cases: creating, changing settings (name, withholding tax), copying, deleting and reading wallets."""
 
+from datetime import datetime
 from decimal import Decimal
 from uuid import UUID, uuid4
 
@@ -39,12 +40,13 @@ class Wallets:
         self._repo.update(updated)
         return updated
 
-    def copy(self, wallet_id: UUID, name: str) -> Wallet | None:
-        """A new wallet with the same currency and history under another name. Returns None if the wallet does not exist."""
+    def copy(self, wallet_id: UUID, name: str, before: datetime | None = None) -> Wallet | None:
+        """A new wallet with the same currency and history under another name, or its history up to `before`
+        (see Wallet.copy). Returns None if the wallet does not exist."""
         wallet = self._repo.get(wallet_id)
         if wallet is None:
             return None
-        copy = wallet.copy(uuid4(), name, uuid4)
+        copy = wallet.copy(uuid4(), name, uuid4, before)
         self._repo.add(copy)
         return copy
 
