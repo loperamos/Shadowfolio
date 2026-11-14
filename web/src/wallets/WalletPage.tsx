@@ -10,6 +10,8 @@ import { EditableTitle } from "../ui/EditableTitle";
 import { GainText } from "../ui/GainText";
 import { Money } from "../ui/Money";
 import { dateInputValueOf, formatDate, formatDateTime, shortDecimal, todayAsInputValue } from "../ui/format";
+import { SortableTh } from "../ui/SortableTh";
+import { sorted, SortOrder, useSort } from "../ui/sorting";
 import { ICON_SIZE, TABLE_MIN_WIDTH } from "../ui/theme";
 import { DeleteOperationModal } from "./DeleteOperationModal";
 import { OperationActionsMenu } from "./OperationActionsMenu";
@@ -28,6 +30,17 @@ import { describeRange, inRange, isEverything, Period, periodSearch, usePeriod }
 import { WalletDayChange, WalletGain, WalletValue } from "./WalletValue";
 
 const NOT_FOUND_STATUS = 404;
+
+// Columns the holdings can be sorted by; by default, largest value first, as in most brokers' portfolio views.
+enum HoldingColumn {
+  SYMBOL = "symbol",
+  SHARES = "shares",
+  COST = "cost",
+  VALUE = "value",
+  TODAY = "today",
+  GAIN = "gain",
+}
+const HOLDINGS_DEFAULT_SORT = { key: HoldingColumn.VALUE, order: SortOrder.DESCENDING };
 // Exchange rates are shown to this many decimals in tooltips; the valuation uses the exact rate.
 const RATE_DECIMALS = 4;
 
@@ -164,8 +177,14 @@ function WalletDetails({ wallet, operations, version, onEditOperation, onDeleteO
   const effective = operations.filter((op) => op.had_effect !== false);
   const { period, range, choose, params } = usePeriod(todayAsInputValue());
   const shownOperations = effective.filter((op) => inRange(dateInputValueOf(op.timestamp), range));
-  const holdings = Object.entries(wallet.holdings);
   const valuation = useWalletValuation(wallet.id, version);
+  const [holdingsSort, sortHoldings] = useSort(Object.values(HoldingColumn), HOLDINGS_DEFAULT_SORT);
+  const holdings = sorted(Object.entries(wallet.holdings), holdingSortValue(holdingsSort.key, wallet, valuation), holdingsSort.order);
+  const holdingTh = (column: HoldingColumn, label: string, firstOrder = SortOrder.DESCENDING, align: "left" | "right" = "right") => (
+    <SortableTh column={column} sort={holdingsSort} onSort={sortHoldings} firstOrder={firstOrder} align={align}>
+      {label}
+    </SortableTh>
+  );
   return (
     <Stack gap="xl">
       <Group gap="xl">
@@ -219,13 +238,14 @@ function WalletDetails({ wallet, operations, version, onEditOperation, onDeleteO
           <Table striped>
             <Table.Thead>
               <Table.Tr>
-                <Table.Th>Symbol</Table.Th>
-                <Table.Th ta="right">Shares</Table.Th>
-                <Table.Th ta="right">Cost</Table.Th>
+                {holdingTh(HoldingColumn.SYMBOL, "Symbol", SortOrder.ASCENDING, "left")}
+                {holdingTh(HoldingColumn.SHARES, "Shares")}
+                {holdingTh(HoldingColumn.COST, "Cost")}
+                {/* Prices are in each listing's currency, so they are not compared. */}
                 <Table.Th ta="right">Price</Table.Th>
-                <Table.Th ta="right">Value</Table.Th>
-                <Table.Th ta="right">Today</Table.Th>
-                <Table.Th ta="right">Gain</Table.Th>
+                {holdingTh(HoldingColumn.VALUE, "Value")}
+                {holdingTh(HoldingColumn.TODAY, "Today")}
+                {holdingTh(HoldingColumn.GAIN, "Gain")}
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
@@ -317,6 +337,27 @@ function WalletDetails({ wallet, operations, version, onEditOperation, onDeleteO
       </div>
     </Stack>
   );
+}
+
+/** What a holding (symbol and shares) is sorted by in `column`; null while its valuation is not there. */
+function holdingSortValue(column: HoldingColumn, wallet: WalletResponse, valuation: ValuationState) {
+  return ([symbol, quantity]: [string, string]): number | string | null => {
+    const holding = valuation.status === "loaded" ? valuation.valuation.holdings.find((h) => h.symbol === symbol) : undefined;
+    switch (column) {
+      case HoldingColumn.SYMBOL:
+        return symbol;
+      case HoldingColumn.SHARES:
+        return Number(quantity);
+      case HoldingColumn.COST:
+        return Number(wallet.cost_basis[symbol]);
+      case HoldingColumn.VALUE:
+        return holding ? Number(holding.value_in_wallet_currency) : null;
+      case HoldingColumn.TODAY:
+        return holding?.day_change != null ? Number(holding.day_change) : null;
+      case HoldingColumn.GAIN:
+        return holding ? Number(holding.gain) : null;
+    }
+  };
 }
 
 /** The holding's latest price, its value in the wallet's currency, today's change and its gain, once the valuation has loaded. */
