@@ -9,6 +9,7 @@ from enum import StrEnum
 class ImportKind(StrEnum):
     DEPOSIT = "deposit"  # money moved into the account from outside
     WITHDRAWAL = "withdrawal"  # money moved out of the account
+    UNKNOWN = "unknown"  # a row the reader does not recognise
 
 
 @dataclass(frozen=True)
@@ -19,3 +20,4 @@ class ImportRecord:
     timestamp: datetime  # timezone-aware
     amount: Decimal
     currency: str
+    description: str  # the statement's own wording, to recognise the row

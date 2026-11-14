@@ -28,8 +28,7 @@ ACCOUNT_PATTERNS: list[tuple[re.Pattern[str], ImportKind]] = [
 class DegiroStatementReader:
     def read(self, transactions: str, account: str) -> list[ImportRecord]:
         """The records in the two exports, each given as its full text (header first), oldest first."""
-        records = [record for cells in _rows(account) if (record := _account_record(cells)) is not None]
-        return sorted(records, key=lambda record: record.timestamp)
+        return sorted((_account_record(cells) for cells in _rows(account)), key=lambda record: record.timestamp)
 
 
 def _rows(text: str) -> list[list[str]]:
@@ -37,12 +36,10 @@ def _rows(text: str) -> list[list[str]]:
     return [cells for cells in csv.reader(text.splitlines()[1:]) if cells]
 
 
-def _account_record(cells: list[str]) -> ImportRecord | None:
+def _account_record(cells: list[str]) -> ImportRecord:
     date, time, _value_date, _product, _isin, description, _fx, currency, amount = cells[:9]
-    kind = next((kind for pattern, kind in ACCOUNT_PATTERNS if pattern.search(description)), None)
-    if kind is None:
-        return None
-    return ImportRecord(kind, _timestamp(date, time), abs(_number(amount)), currency)
+    kind = next((kind for pattern, kind in ACCOUNT_PATTERNS if pattern.search(description)), ImportKind.UNKNOWN)
+    return ImportRecord(kind, _timestamp(date, time), abs(_number(amount)), currency, description)
 
 
 def _timestamp(date: str, time: str) -> datetime:
