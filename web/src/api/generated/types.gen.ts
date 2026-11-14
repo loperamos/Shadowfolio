@@ -481,6 +481,10 @@ export type OrderResponse = {
      */
     reason: string;
     /**
+     * Limit Price
+     */
+    limit_price: string | null;
+    /**
      * Placed At
      */
     placed_at: string;
@@ -599,7 +603,8 @@ export type PerformanceResponse = {
 /**
  * PlaceOrderRequest
  *
- * A market order, placed now: it fills at the first price after it (see domain.orders).
+ * An order placed now: at market, it fills at the first price after it; with a limit price, on the first later
+ * minute that reaches it (see domain.orders).
  */
 export type PlaceOrderRequest = {
     side: OrderSide;
@@ -615,6 +620,10 @@ export type PlaceOrderRequest = {
      * Reason
      */
     reason?: string;
+    /**
+     * Limit Price
+     */
+    limit_price?: number | string | null;
 };
 
 /**

@@ -15,10 +15,10 @@ def orders_router(orders: Orders) -> APIRouter:
 
     @router.post("/wallets/{wallet_id}/orders", status_code=201, responses=NOT_FOUND | INVALID)
     def place_order(wallet_id: UUID, request: PlaceOrderRequest) -> OrderResponse:
-        """Place a market order now: it fills at the first price after it, so one placed while the market is closed
-        waits for the next open."""
+        """Place an order now. At market it fills at the first price after it, so one placed while the market is closed
+        waits for the next open; with a limit price, on the first later minute that reaches it."""
         try:
-            placed = orders.place(wallet_id, request.side, request.symbol, request.quantity, request.reason)
+            placed = orders.place(wallet_id, request.side, request.symbol, request.quantity, request.reason, request.limit_price)
         except DomainError as error:
             raise rule_violation(error) from error
         if placed is None:

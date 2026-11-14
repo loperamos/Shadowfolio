@@ -183,7 +183,7 @@ def test_shares_received_round_trip(make_repository: RepositoryFactory) -> None:
 
 
 def test_orders_round_trip_in_the_order_they_were_placed(make_repository: RepositoryFactory) -> None:
-    open_order = Order(uuid4(), OrderSide.BUY, "NVDA", Decimal(8), T1, reason="Breaking out")
+    open_order = Order(uuid4(), OrderSide.BUY, "NVDA", Decimal(8), T1, reason="Breaking out", limit_price=Decimal("120.50"))
     rejected = Order(uuid4(), OrderSide.SELL, "AAPL", Decimal(1), T1).rejected(T2, "would hold -1 AAPL")
     wallet = a_wallet().place_order(open_order).place_order(rejected)
     repository = make_repository()

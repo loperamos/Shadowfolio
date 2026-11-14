@@ -73,6 +73,7 @@ CREATE TABLE IF NOT EXISTS orders (
     quantity TEXT NOT NULL,
     placed_at TEXT NOT NULL,
     reason TEXT NOT NULL,
+    limit_price TEXT,
     status TEXT NOT NULL,
     closed_at TEXT,
     rejection TEXT
@@ -164,7 +165,7 @@ class SqliteWalletRepository(WalletRepository):
                 (str(wallet_id),),
             ).fetchall()
             order_rows = conn.execute(
-                "SELECT id, side, symbol, quantity, placed_at, reason, status, closed_at, rejection FROM orders "
+                "SELECT id, side, symbol, quantity, placed_at, reason, limit_price, status, closed_at, rejection FROM orders "
                 "WHERE wallet_id = ? ORDER BY rowid",
                 (str(wallet_id),),
             ).fetchall()
@@ -223,8 +224,8 @@ def _insert_checked_periods(conn: sqlite3.Connection, wallet: Wallet) -> None:
 def _insert_orders(conn: sqlite3.Connection, wallet: Wallet) -> None:
     # In the order they were placed, so they read back in it (ORDER BY rowid).
     conn.executemany(
-        "INSERT INTO orders (id, wallet_id, side, symbol, quantity, placed_at, reason, status, closed_at, rejection) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO orders (id, wallet_id, side, symbol, quantity, placed_at, reason, limit_price, status, closed_at, rejection) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         [
             (
                 str(order.id),
@@ -234,6 +235,7 @@ def _insert_orders(conn: sqlite3.Connection, wallet: Wallet) -> None:
                 str(order.quantity),
                 order.placed_at.isoformat(),
                 order.reason,
+                None if order.limit_price is None else str(order.limit_price),
                 order.status.value,
                 None if order.closed_at is None else order.closed_at.isoformat(),
                 order.rejection,
@@ -244,7 +246,7 @@ def _insert_orders(conn: sqlite3.Connection, wallet: Wallet) -> None:
 
 
 def _order_from_row(row: tuple[str, ...]) -> Order:
-    order_id, side, symbol, quantity, placed_at, reason, status, closed_at, rejection = row
+    order_id, side, symbol, quantity, placed_at, reason, limit_price, status, closed_at, rejection = row
     return Order(
         id=UUID(order_id),
         side=OrderSide(side),
@@ -252,6 +254,7 @@ def _order_from_row(row: tuple[str, ...]) -> Order:
         quantity=Decimal(quantity),
         placed_at=datetime.fromisoformat(placed_at),
         reason=reason,
+        limit_price=None if limit_price is None else Decimal(limit_price),
         status=OrderStatus(status),
         closed_at=None if closed_at is None else datetime.fromisoformat(closed_at),
         rejection=rejection,

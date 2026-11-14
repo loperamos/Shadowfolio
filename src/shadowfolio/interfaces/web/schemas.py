@@ -382,12 +382,14 @@ class PerformanceResponse(BaseModel):
 
 
 class PlaceOrderRequest(BaseModel):
-    """A market order, placed now: it fills at the first price after it (see domain.orders)."""
+    """An order placed now: at market, it fills at the first price after it; with a limit price, on the first later
+    minute that reaches it (see domain.orders)."""
 
     side: OrderSide
     symbol: str = Field(min_length=1)
     quantity: Decimal
     reason: str = ""  # why it is placed, kept as a decision log
+    limit_price: Decimal | None = None  # the most a buy pays or the least a sell takes, in the symbol's currency
 
 
 class OrderResponse(BaseModel):
@@ -396,6 +398,7 @@ class OrderResponse(BaseModel):
     symbol: str
     quantity: Decimal
     reason: str
+    limit_price: Decimal | None  # null for a market order
     placed_at: AwareDatetime
     status: OrderStatus
     closed_at: AwareDatetime | None  # when it filled (the price's time), was cancelled or rejected
@@ -412,6 +415,7 @@ class OrderResponse(BaseModel):
             symbol=order.symbol,
             quantity=order.quantity,
             reason=order.reason,
+            limit_price=order.limit_price,
             placed_at=order.placed_at,
             status=order.status,
             closed_at=order.closed_at,

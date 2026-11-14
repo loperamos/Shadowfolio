@@ -14,6 +14,7 @@ from urllib.parse import quote
 import httpx2
 
 from shadowfolio.adapters.daily import last_on_or_before
+from shadowfolio.domain.market import MinuteBar
 from shadowfolio.domain.money import Currency
 from shadowfolio.domain.valuation import Quote
 from shadowfolio.ports.price_data import PriceData, PriceDataUnavailableError
@@ -59,6 +60,12 @@ class AlpacaPriceData(PriceData):
     def price_at(self, symbol: str, at: datetime) -> Quote | None:
         try:
             return self._price_at(symbol, at)
+        except httpx2.HTTPError as error:
+            raise PriceDataUnavailableError(f"Alpaca: {error}") from error
+
+    def minute_bars(self, symbol: str, start: datetime, end: datetime) -> list[MinuteBar]:
+        try:
+            return self._minute_bars(symbol, start, end)
         except httpx2.HTTPError as error:
             raise PriceDataUnavailableError(f"Alpaca: {error}") from error
 
@@ -113,6 +120,33 @@ class AlpacaPriceData(PriceData):
         if not bars:
             return None
         return Quote(price=Decimal(bars[0]["o"]), currency=Currency.USD, as_of=datetime.fromisoformat(bars[0]["t"]))
+
+    def _minute_bars(self, symbol: str, start: datetime, end: datetime) -> list[MinuteBar]:
+        """Every one-minute bar from `start` to `end`, page by page. Raw prices (not adjusted for later splits)."""
+        params: dict[str, str | int] = {
+            "timeframe": "1Min",
+            "start": _rfc3339(start),
+            "end": _rfc3339(end),
+            "limit": PAGE_LIMIT,
+            "sort": "asc",
+            "adjustment": "raw",
+            "feed": FEED,
+        }
+        bars: list[MinuteBar] = []
+        while True:
+            response = self._client.get(f"/v2/stocks/{quote(symbol, safe='')}/bars", params=params)
+            if _unknown_symbol(response):
+                return []
+            response.raise_for_status()
+            page = json.loads(response.text, parse_float=Decimal)
+            for bar in page.get("bars") or []:
+                bars.append(
+                    MinuteBar(datetime.fromisoformat(bar["t"]), Decimal(bar["o"]), Decimal(bar["h"]), Decimal(bar["l"]), Currency.USD)
+                )
+            token = page.get("next_page_token")
+            if not token:
+                return bars
+            params["page_token"] = token
 
     def _close_on(self, symbol: str, day: date) -> Quote | None:
         """The close of the last daily bar on or before `day`. Daily bars start at midnight New York time, so every bar of

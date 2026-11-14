@@ -7,7 +7,7 @@ switch to (e.g. Marketdata.app) must pass this same contract.
 
 import os
 from collections.abc import Callable
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 
@@ -18,6 +18,7 @@ from shadowfolio.adapters.alpaca_price_data import AlpacaConfig, AlpacaPriceData
 from shadowfolio.adapters.cached_price_data import CachedPriceData
 from shadowfolio.adapters.fixed_clock import FixedClock
 from shadowfolio.adapters.in_memory_price_data import InMemoryPriceData
+from shadowfolio.domain.market import MinuteBar
 from shadowfolio.domain.money import Currency
 from shadowfolio.domain.valuation import Quote
 from shadowfolio.ports.price_data import PriceData
@@ -37,7 +38,7 @@ def _in_memory() -> PriceData:
     prices = InMemoryPriceData(
         {KNOWN_SYMBOL: Quote(Decimal("135.50"), Currency.USD, datetime(2026, 3, 2, 21, 0, tzinfo=UTC), Decimal("133.04"))}
     )
-    prices.add_bar(KNOWN_SYMBOL, Quote(Decimal("122.005"), Currency.USD, TRADING_MINUTE))
+    prices.add_minute_bar(KNOWN_SYMBOL, MinuteBar(TRADING_MINUTE, Decimal("122.005"), Decimal("122.10"), Decimal("121.90"), Currency.USD))
     prices.add_close(KNOWN_SYMBOL, Quote(Decimal("123.54"), Currency.USD, datetime(2024, 6, 28, 4, 0, tzinfo=UTC)))
     return prices
 
@@ -91,6 +92,19 @@ def test_historical_price_is_at_or_after_the_requested_time(prices: PriceData) -
 
 def test_unknown_symbol_has_no_historical_price(prices: PriceData) -> None:
     assert prices.price_at(UNKNOWN_SYMBOL, TRADING_MINUTE) is None
+
+
+def test_minute_bars_in_a_period_have_their_prices_in_range(prices: PriceData) -> None:
+    bars = prices.minute_bars(KNOWN_SYMBOL, TRADING_MINUTE, TRADING_MINUTE + timedelta(minutes=2))
+
+    assert bars
+    assert all(TRADING_MINUTE <= bar.as_of <= TRADING_MINUTE + timedelta(minutes=2) for bar in bars)
+    assert [bar.as_of for bar in bars] == sorted(bar.as_of for bar in bars)
+    assert all(bar.low <= bar.open <= bar.high and bar.currency is Currency.USD for bar in bars)
+
+
+def test_unknown_symbol_has_no_minute_bars(prices: PriceData) -> None:
+    assert prices.minute_bars(UNKNOWN_SYMBOL, TRADING_MINUTE, TRADING_MINUTE + timedelta(minutes=2)) == []
 
 
 def test_close_on_a_closed_day_is_the_last_trading_days(prices: PriceData) -> None:

@@ -220,8 +220,8 @@ export const listOrders = <ThrowOnError extends boolean = false>(options: Option
 /**
  * Place Order
  *
- * Place a market order now: it fills at the first price after it, so one placed while the market is closed
- * waits for the next open.
+ * Place an order now. At market it fills at the first price after it, so one placed while the market is closed
+ * waits for the next open; with a limit price, on the first later minute that reaches it.
  */
 export const placeOrder = <ThrowOnError extends boolean = false>(options: Options<PlaceOrderData, ThrowOnError>): RequestResult<PlaceOrderResponses, PlaceOrderErrors, ThrowOnError> => (options.client ?? client).post<PlaceOrderResponses, PlaceOrderErrors, ThrowOnError>({
     url: '/api/wallets/{wallet_id}/orders',
