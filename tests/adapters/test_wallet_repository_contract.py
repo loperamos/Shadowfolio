@@ -154,5 +154,32 @@ def test_dividends_without_a_payment_date_round_trip(make_repository: Repository
     assert stored is not None and stored.uncredited_dividends == (event,)
 
 
+def test_imported_dividends_round_trip(make_repository: RepositoryFactory) -> None:
+    wallet = a_wallet().record_dividend(
+        uuid4(), T2, "NVDA", "USD", Decimal("9.50"), Decimal("1.43"), Decimal("0.81"), Decimal("6.43"), T2.date()
+    )
+    make_repository().add(wallet)
+
+    assert make_repository().get(wallet.id) == wallet
+
+
+def test_fees_and_income_round_trip(make_repository: RepositoryFactory) -> None:
+    wallet = (
+        a_wallet()
+        .pay_fee(uuid4(), T2, Decimal("2.50"), "Exchange connection fee 2026 (NYSE)")
+        .record_income(uuid4(), T2, Decimal("-0.01"), "Interest charged")
+    )
+    make_repository().add(wallet)
+
+    assert make_repository().get(wallet.id) == wallet
+
+
+def test_shares_received_round_trip(make_repository: RepositoryFactory) -> None:
+    wallet = a_wallet().receive_shares(uuid4(), T2, "NVDA", Decimal(1), Decimal(0))
+    make_repository().add(wallet)
+
+    assert make_repository().get(wallet.id) == wallet
+
+
 def test_unknown_wallet_is_none(make_repository: RepositoryFactory) -> None:
     assert make_repository().get(uuid4()) is None

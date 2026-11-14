@@ -950,6 +950,128 @@
           }
         }
       }
+    },
+    "/api/wallets/{wallet_id}/imports/degiro/preview": {
+      "post": {
+        "summary": "Preview Degiro Import",
+        "description": "What importing DEGIRO's Transactions and Account exports would do to the wallet. Saves nothing.",
+        "operationId": "preview_degiro_import",
+        "parameters": [
+          {
+            "name": "wallet_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Wallet Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StatementRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Malformed request or broken business rule",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/wallets/{wallet_id}/imports/degiro": {
+      "post": {
+        "summary": "Import Degiro",
+        "description": "Import DEGIRO's Transactions and Account exports into the wallet, if every record goes in.",
+        "operationId": "import_degiro",
+        "parameters": [
+          {
+            "name": "wallet_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Wallet Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StatementRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Malformed request or broken business rule",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1400,6 +1522,79 @@
         ],
         "title": "HoldingValueResponse"
       },
+      "ImportProblemResponse": {
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "title": "Date"
+          },
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          }
+        },
+        "type": "object",
+        "required": [
+          "date",
+          "kind",
+          "description",
+          "reason"
+        ],
+        "title": "ImportProblemResponse"
+      },
+      "ImportResponse": {
+        "properties": {
+          "records": {
+            "type": "integer",
+            "title": "Records"
+          },
+          "can_import": {
+            "type": "boolean",
+            "title": "Can Import"
+          },
+          "imported": {
+            "type": "boolean",
+            "title": "Imported"
+          },
+          "problems": {
+            "items": {
+              "$ref": "#/components/schemas/ImportProblemResponse"
+            },
+            "type": "array",
+            "title": "Problems"
+          },
+          "cash": {
+            "type": "string",
+            "title": "Cash"
+          },
+          "holdings": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Holdings"
+          }
+        },
+        "type": "object",
+        "required": [
+          "records",
+          "can_import",
+          "imported",
+          "problems",
+          "cash",
+          "holdings"
+        ],
+        "title": "ImportResponse"
+      },
       "OperationResponse": {
         "properties": {
           "id": {
@@ -1540,6 +1735,17 @@
               }
             ],
             "title": "Withholding"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
           }
         },
         "type": "object",
@@ -1560,7 +1766,10 @@
           "buy",
           "sell",
           "split",
-          "dividend"
+          "dividend",
+          "fee",
+          "income",
+          "shares_received"
         ],
         "title": "OperationType"
       },
@@ -1698,6 +1907,25 @@
           "type"
         ],
         "title": "SellEdit"
+      },
+      "StatementRequest": {
+        "properties": {
+          "transactions": {
+            "type": "string",
+            "title": "Transactions"
+          },
+          "account": {
+            "type": "string",
+            "title": "Account"
+          }
+        },
+        "type": "object",
+        "required": [
+          "transactions",
+          "account"
+        ],
+        "title": "StatementRequest",
+        "description": "A broker's two exports, as the files' text."
       },
       "SyncSummaryResponse": {
         "properties": {

@@ -6,7 +6,7 @@ fees are always positive, as on a statement; the kind decides the sign.
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from enum import StrEnum
 from typing import ClassVar
@@ -22,6 +22,9 @@ class OperationType(StrEnum):
     SELL = "sell"
     SPLIT = "split"
     DIVIDEND = "dividend"
+    FEE = "fee"
+    INCOME = "income"
+    SHARES_RECEIVED = "shares_received"
 
 
 class PriceSource(StrEnum):
@@ -200,6 +203,103 @@ class Dividend(BaseOperation):
         return True
 
 
+@dataclass(frozen=True)
+class ImportedDividend(BaseOperation):
+    """A cash dividend as a broker statement reports it: `gross` in `currency`, less the `tax` withheld and the
+    broker's `fee` (both in `currency`), credited as `amount` in the wallet's currency after conversion, for the
+    payment of `payment_date`. `currency` is kept as printed, as it may be one wallets do not use (e.g. HKD)."""
+
+    type: ClassVar[OperationType] = OperationType.DIVIDEND
+
+    symbol: str
+    currency: str
+    gross: Decimal
+    tax: Decimal
+    fee: Decimal
+    amount: Decimal
+    payment_date: date  # the company's payment date, as the statement gives it (booking can be a day or two later)
+
+    @property
+    def cash_delta(self) -> Decimal:
+        return self.amount
+
+    @property
+    def holding_change(self) -> tuple[str, Decimal] | None:
+        return None
+
+    @property
+    def automatic(self) -> bool:
+        return False
+
+
+@dataclass(frozen=True)
+class Fee(BaseOperation):
+    """A charge not tied to one trade (e.g. a yearly exchange connection fee), taken from the cash."""
+
+    type: ClassVar[OperationType] = OperationType.FEE
+
+    amount: Decimal
+    description: str  # as the broker words it
+
+    @property
+    def cash_delta(self) -> Decimal:
+        return -self.amount
+
+    @property
+    def holding_change(self) -> tuple[str, Decimal] | None:
+        return None
+
+    @property
+    def automatic(self) -> bool:
+        return False
+
+
+@dataclass(frozen=True)
+class Income(BaseOperation):
+    """Cash the account earns besides dividends and sales: interest, compensations, promotions. Negative for interest
+    charged (e.g. negative rates on cash)."""
+
+    type: ClassVar[OperationType] = OperationType.INCOME
+
+    amount: Decimal  # signed
+    description: str  # as the broker words it
+
+    @property
+    def cash_delta(self) -> Decimal:
+        return self.amount
+
+    @property
+    def holding_change(self) -> tuple[str, Decimal] | None:
+        return None
+
+    @property
+    def automatic(self) -> bool:
+        return False
+
+
+@dataclass(frozen=True)
+class SharesReceived(BaseOperation):
+    """Shares received without buying them, e.g. in a spin-off; `cost` is what they count as having cost (often 0)."""
+
+    type: ClassVar[OperationType] = OperationType.SHARES_RECEIVED
+
+    symbol: str
+    quantity: Decimal
+    cost: Decimal
+
+    @property
+    def cash_delta(self) -> Decimal:
+        return Decimal(0)
+
+    @property
+    def holding_change(self) -> tuple[str, Decimal] | None:
+        return self.symbol, self.quantity
+
+    @property
+    def automatic(self) -> bool:
+        return False
+
+
 # Every concrete kind. Code that handles each kind matches on this, so mypy reports a kind
 # that is not handled.
-Operation = Deposit | Withdrawal | Buy | Sell | Split | Dividend
+Operation = Deposit | Withdrawal | Buy | Sell | Split | Dividend | ImportedDividend | Fee | Income | SharesReceived

@@ -7,14 +7,18 @@ from fastapi import FastAPI
 
 from shadowfolio.adapters.alpaca_corporate_actions import AlpacaCorporateActions
 from shadowfolio.adapters.alpaca_price_data import AlpacaConfig, AlpacaPriceData
+from shadowfolio.adapters.degiro_statements import DegiroStatementReader
 from shadowfolio.adapters.ecb_fx_rates import EcbFxRates
+from shadowfolio.adapters.openfigi_security_lookup import OpenFigiSecurityLookup
 from shadowfolio.adapters.sqlite_wallet_repository import SqliteWalletRepository
 from shadowfolio.adapters.system_clock import SystemClock
 from shadowfolio.interfaces.web.app import create_app
 from shadowfolio.usecases.history import History
+from shadowfolio.usecases.imports import Imports
 from shadowfolio.usecases.market import Market
 from shadowfolio.usecases.sync import Sync
 from shadowfolio.usecases.valuation import Valuation
+from shadowfolio.usecases.wallet_changes import WalletChanges
 from shadowfolio.usecases.wallets import Wallets
 
 
@@ -36,4 +40,5 @@ def build_local_app(config: LocalConfig) -> FastAPI:
         valuation=Valuation(wallet_repository, clock, prices, fx_rates),
         market=Market(prices),
         sync=sync,
+        imports=Imports(wallet_repository, WalletChanges(clock, prices, fx_rates, sync), OpenFigiSecurityLookup(), DegiroStatementReader()),
     )

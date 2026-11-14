@@ -1,5 +1,5 @@
 import { ActionIcon, Menu } from "@mantine/core";
-import { IconCopy, IconDots, IconPencil, IconSettings, IconTrash } from "@tabler/icons-react";
+import { IconCopy, IconDots, IconFileImport, IconPencil, IconSettings, IconTrash } from "@tabler/icons-react";
 
 import type { WalletResponse } from "../api/generated";
 import { ICON_SIZE } from "../ui/theme";
@@ -8,12 +8,13 @@ type Props = {
   wallet: WalletResponse;
   onRename: (wallet: WalletResponse) => void;
   onSettings: (wallet: WalletResponse) => void;
+  onImport: (wallet: WalletResponse) => void;
   onDuplicate: (wallet: WalletResponse) => void;
   onDelete: (wallets: WalletResponse[]) => void;
 };
 
 /** The ⋯ menu with a wallet's actions, the same in the wallet list and on the wallet's page. */
-export function WalletActionsMenu({ wallet, onRename, onSettings, onDuplicate, onDelete }: Props) {
+export function WalletActionsMenu({ wallet, onRename, onSettings, onImport, onDuplicate, onDelete }: Props) {
   return (
     <Menu position="bottom-end">
       <Menu.Target>
@@ -27,6 +28,9 @@ export function WalletActionsMenu({ wallet, onRename, onSettings, onDuplicate, o
         </Menu.Item>
         <Menu.Item leftSection={<IconSettings size={ICON_SIZE} />} onClick={() => onSettings(wallet)}>
           Settings
+        </Menu.Item>
+        <Menu.Item leftSection={<IconFileImport size={ICON_SIZE} />} onClick={() => onImport(wallet)}>
+          Import from DEGIRO
         </Menu.Item>
         <Menu.Item leftSection={<IconCopy size={ICON_SIZE} />} onClick={() => onDuplicate(wallet)}>
           Duplicate

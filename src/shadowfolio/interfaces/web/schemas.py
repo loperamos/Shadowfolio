@@ -8,9 +8,24 @@ from uuid import UUID
 from pydantic import AwareDatetime, BaseModel, Field
 
 from shadowfolio.domain.money import Currency
-from shadowfolio.domain.operations import Buy, Deposit, Dividend, Operation, OperationType, PriceSource, Sell, Split, Withdrawal
+from shadowfolio.domain.operations import (
+    Buy,
+    Deposit,
+    Dividend,
+    Fee,
+    ImportedDividend,
+    Income,
+    Operation,
+    OperationType,
+    PriceSource,
+    Sell,
+    SharesReceived,
+    Split,
+    Withdrawal,
+)
 from shadowfolio.domain.valuation import DailyValue, WalletValuation
 from shadowfolio.domain.wallet import Wallet
+from shadowfolio.usecases.imports import ImportReport
 
 
 class CreateWalletRequest(BaseModel):
@@ -163,6 +178,7 @@ class OperationResponse(BaseModel):
     # Dividends only, in the wallet's currency: before tax, and the tax withheld (amount is what was credited).
     gross: Decimal | None = None
     withholding: Decimal | None = None
+    description: str | None = None  # fees and income only: the broker's wording
 
     @classmethod
     def from_operation(cls, operation: Operation, had_effect: bool = True) -> "OperationResponse":
@@ -195,6 +211,36 @@ class OperationResponse(BaseModel):
                     split_new_rate=operation.new_rate,
                     automatic=True,
                     had_effect=had_effect,
+                )
+            case SharesReceived():
+                # amount: what the shares count as having cost.
+                return cls(
+                    id=operation.id,
+                    type=operation.type,
+                    timestamp=operation.timestamp,
+                    amount=operation.cost,
+                    fees=Decimal(0),
+                    symbol=operation.symbol,
+                    quantity=operation.quantity,
+                )
+            case Fee() | Income():
+                return cls(
+                    id=operation.id,
+                    type=operation.type,
+                    timestamp=operation.timestamp,
+                    amount=operation.amount,
+                    fees=Decimal(0),
+                    description=operation.description,
+                )
+            case ImportedDividend():
+                # From a broker statement: amount is what was credited, fees the broker's fee and the tax, in its currency.
+                return cls(
+                    id=operation.id,
+                    type=operation.type,
+                    timestamp=operation.timestamp,
+                    amount=operation.amount,
+                    fees=Decimal(0),
+                    symbol=operation.symbol,
                 )
             case Dividend():
                 # quantity: the shares that qualified; price: the amount per share, in its currency; amount: credited (net).
@@ -310,6 +356,47 @@ class DailyValueResponse(BaseModel):
             total=value.cash + holdings_value,
             net_deposits=value.net_deposits,
             missing=[],
+        )
+
+
+class StatementRequest(BaseModel):
+    """A broker's two exports, as the files' text."""
+
+    transactions: str  # trades
+    account: str  # cash movements
+
+
+class ImportProblemResponse(BaseModel):
+    date: date
+    kind: str  # what the row was read as
+    description: str  # the statement's wording
+    reason: str  # why it was not imported
+
+
+class ImportResponse(BaseModel):
+    records: int  # read from the statement
+    can_import: bool  # every record goes in
+    imported: bool  # saved: only on an import (not a preview) that can import
+    problems: list[ImportProblemResponse]
+    cash: Decimal  # in the wallet after the import, in its currency
+    holdings: dict[str, Decimal]  # after the import
+
+    @classmethod
+    def from_report(cls, report: ImportReport) -> "ImportResponse":
+        assert report.wallet is not None
+        problems = [
+            ImportProblemResponse(
+                date=p.record.timestamp.date(), kind=p.record.kind.value, description=p.record.description, reason=p.reason
+            )
+            for p in report.not_imported
+        ]
+        return cls(
+            records=report.records,
+            can_import=report.imported,
+            imported=report.saved,
+            problems=problems,
+            cash=report.wallet.cash,
+            holdings=report.wallet.holdings,
         )
 
 

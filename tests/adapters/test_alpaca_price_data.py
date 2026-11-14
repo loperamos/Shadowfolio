@@ -134,6 +134,19 @@ def test_unknown_symbol_is_none(status: int) -> None:
     assert adapter_answering(status, '{"message": "not found"}').latest_price("ZZZZ") is None
 
 
+def test_a_symbol_alpaca_finds_invalid_has_no_prices() -> None:
+    # Alpaca answers 400 for a symbol it cannot read (e.g. a non-US listing's 9MD.XGAT): no prices, not an outage.
+    adapter = adapter_answering(400, '{"message":"invalid symbol: 9MD.XGAT"}')
+
+    assert adapter.closes_between("9MD.XGAT", date(2023, 1, 2), date(2023, 1, 3)) == {}
+    assert adapter.latest_price("9MD.XGAT") is None
+
+
+def test_another_bad_request_still_means_prices_are_unavailable() -> None:
+    with pytest.raises(PriceDataUnavailableError):
+        adapter_answering(400, '{"message":"invalid timeframe"}').latest_price("NVDA")
+
+
 @pytest.mark.parametrize("fetch", ["latest", "historical", "close"])
 def test_other_errors_mean_prices_are_unavailable(fetch: str) -> None:
     adapter = adapter_answering(500, "oops")

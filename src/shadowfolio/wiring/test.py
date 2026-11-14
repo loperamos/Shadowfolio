@@ -4,20 +4,25 @@ from datetime import UTC, datetime
 
 from fastapi import FastAPI
 
+from shadowfolio.adapters.degiro_statements import DegiroStatementReader
 from shadowfolio.adapters.fixed_clock import FixedClock
 from shadowfolio.adapters.in_memory_corporate_actions import InMemoryCorporateActions
 from shadowfolio.adapters.in_memory_fx_rates import InMemoryFxRates
 from shadowfolio.adapters.in_memory_price_data import InMemoryPriceData
+from shadowfolio.adapters.in_memory_security_lookup import InMemorySecurityLookup
 from shadowfolio.adapters.in_memory_wallet_repository import InMemoryWalletRepository
 from shadowfolio.interfaces.web.app import create_app
 from shadowfolio.ports.clock import Clock
 from shadowfolio.ports.corporate_actions import CorporateActions
 from shadowfolio.ports.fx_rates import FxRates
 from shadowfolio.ports.price_data import PriceData
+from shadowfolio.ports.security_lookup import SecurityLookup
 from shadowfolio.usecases.history import History
+from shadowfolio.usecases.imports import Imports
 from shadowfolio.usecases.market import Market
 from shadowfolio.usecases.sync import Sync
 from shadowfolio.usecases.valuation import Valuation
+from shadowfolio.usecases.wallet_changes import WalletChanges
 from shadowfolio.usecases.wallets import Wallets
 
 DEFAULT_NOW = datetime(2026, 1, 5, 15, 0, tzinfo=UTC)
@@ -29,6 +34,7 @@ def build_test_app(
     fx_rates: FxRates | None = None,
     corporate_actions: CorporateActions | None = None,
     wallet_repository: InMemoryWalletRepository | None = None,
+    security_lookup: SecurityLookup | None = None,
 ) -> FastAPI:
     """Pass fakes to control them (or to prepare stored data); otherwise "now" is DEFAULT_NOW, storage is empty and there
     are no prices, rates or corporate actions."""
@@ -44,4 +50,10 @@ def build_test_app(
         valuation=Valuation(wallet_repository, clock, prices, fx_rates),
         market=Market(prices),
         sync=sync,
+        imports=Imports(
+            wallet_repository,
+            WalletChanges(clock, prices, fx_rates, sync),
+            security_lookup or InMemorySecurityLookup({}),
+            DegiroStatementReader(),
+        ),
     )

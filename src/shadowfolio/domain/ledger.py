@@ -9,7 +9,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from decimal import Decimal
 
-from shadowfolio.domain.operations import Buy, Operation, Sell, Split
+from shadowfolio.domain.operations import Buy, Operation, Sell, SharesReceived, Split
 
 
 @dataclass(frozen=True)
@@ -52,6 +52,8 @@ def build_ledger(timeline: Iterable[Operation]) -> Ledger:
             case Sell():
                 cost_sold = _close_oldest(lots[op.trade.symbol], op.trade.quantity)
                 realized += op.settled_amount - op.fees - cost_sold
+            case SharesReceived():
+                lots.setdefault(op.symbol, []).append(Lot(op.quantity, op.cost))
             case Split():
                 # More (or fewer) shares, for the same total cost.
                 factor = op.new_rate / op.old_rate

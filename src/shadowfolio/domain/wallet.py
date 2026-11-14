@@ -2,7 +2,7 @@
 
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field, replace
-from datetime import UTC, datetime, time
+from datetime import UTC, date, datetime, time, timedelta
 from decimal import Decimal
 from typing import Self
 from uuid import UUID, uuid5
@@ -22,7 +22,24 @@ from shadowfolio.domain.errors import (
 )
 from shadowfolio.domain.ledger import Ledger, build_ledger
 from shadowfolio.domain.money import Currency, to_cents
-from shadowfolio.domain.operations import Buy, Deposit, Dividend, Operation, PriceSource, Sell, Split, Trade, Withdrawal
+from shadowfolio.domain.operations import (
+    Buy,
+    Deposit,
+    Dividend,
+    Fee,
+    ImportedDividend,
+    Income,
+    Operation,
+    PriceSource,
+    Sell,
+    SharesReceived,
+    Split,
+    Trade,
+    Withdrawal,
+)
+
+# How far apart two sources' payment dates for the same dividend can be.
+PAYMENT_DATE_TOLERANCE = timedelta(days=7)
 
 
 @dataclass(frozen=True)
@@ -92,6 +109,40 @@ class Wallet:
     def withdraw(self, operation_id: UUID, amount: Decimal, at: datetime, replacing: UUID | None = None) -> Self:
         _require_positive(amount, "amount")
         return self._with(Withdrawal(operation_id, at, amount), replacing)
+
+    def pay_fee(self, operation_id: UUID, at: datetime, amount: Decimal, description: str) -> Self:
+        _require_positive(amount, "amount")
+        return self._with(Fee(operation_id, at, amount, description))
+
+    def record_income(self, operation_id: UUID, at: datetime, amount: Decimal, description: str) -> Self:
+        """Interest, a compensation or other income; negative for interest charged."""
+        if amount == 0:
+            raise InvalidAmountError("amount must not be zero")
+        return self._with(Income(operation_id, at, amount, description))
+
+    def receive_shares(self, operation_id: UUID, at: datetime, symbol: str, quantity: Decimal, cost: Decimal) -> Self:
+        """Shares received without buying them, e.g. in a spin-off. Like a trade, needs the symbol's splits checked."""
+        _require_positive(quantity, "quantity")
+        if cost < 0:
+            raise InvalidAmountError("cost must not be negative")
+        self._require_checked(symbol, at)
+        return self._with(SharesReceived(operation_id, at, symbol, quantity, cost))
+
+    def record_dividend(
+        self,
+        operation_id: UUID,
+        at: datetime,
+        symbol: str,
+        currency: str,
+        gross: Decimal,
+        tax: Decimal,
+        fee: Decimal,
+        amount: Decimal,
+        payment_date: date,
+    ) -> Self:
+        """A dividend as a broker statement reports it (see ImportedDividend); `amount` is what the wallet received."""
+        _require_positive(amount, "amount")
+        return self._with(ImportedDividend(operation_id, at, symbol, currency, gross, tax, fee, amount, payment_date))
 
     def buy(
         self,
@@ -181,10 +232,14 @@ class Wallet:
                 raise MissingSettledAmountError(f"price is in {trade.price_currency}; settled amount in {self.currency} needed")
             settled_amount = trade.quantity * trade.price
         _require_positive(settled_amount, "settled amount")
-        period = self.checked.get(trade.symbol)
-        if period is None or not period.covers(at.date()):
-            raise CorporateActionsNotCheckedError(f"splits of {trade.symbol} have not been checked for {at.date().isoformat()}")
+        self._require_checked(trade.symbol, at)
         return self._with(kind(operation_id, at, trade, settled_amount, fees), replacing)
+
+    def _require_checked(self, symbol: str, at: datetime) -> None:
+        """Shares of `symbol` can only change on a day whose splits are known, so they are counted right."""
+        period = self.checked.get(symbol)
+        if period is None or not period.covers(at.date()):
+            raise CorporateActionsNotCheckedError(f"splits of {symbol} have not been checked for {at.date().isoformat()}")
 
     def _with(self, operation: Operation, replacing: UUID | None = None) -> Self:
         """Insert the operation at its timestamp, in place of `replacing` if given, and check the whole timeline.
@@ -205,7 +260,9 @@ class Wallet:
         """The wallet with `operations`, minus the automatic operations, checked period and dividend events of every
         symbol that has no trades left, so it looks as if it never touched it. They are fetched again if the symbol
         is traded again."""
-        traded = {op.trade.symbol for op in operations if isinstance(op, Buy | Sell)}
+        traded = {op.symbol for op in operations if isinstance(op, SharesReceived)} | {
+            op.trade.symbol for op in operations if isinstance(op, Buy | Sell)
+        }
         kept = tuple(op for op in operations if not (isinstance(op, Split) and op.symbol not in traded))
         pruned = replace(
             self,
@@ -241,6 +298,8 @@ class Wallet:
         for recorded in self.dividend_events:
             event = recorded.event
             if event.payable_date is None:  # known, but when its cash arrived is not: see uncredited_dividends
+                continue
+            if _imported(base, event.symbol, event.payable_date):  # the broker's own figures win, for that payment
                 continue
             shares = _shares_before_ex(base, event)
             if shares <= 0:
@@ -321,3 +380,12 @@ def _shares_before_ex(base: Iterable[Operation], event: DividendEvent) -> Decima
     """Shares of the dividend's symbol held when its ex-date started: those are the ones that qualify."""
     ex_start = datetime.combine(event.ex_date, time(), tzinfo=UTC)
     return _holdings(op for op in base if op.timestamp < ex_start).get(event.symbol, Decimal(0))
+
+
+def _imported(base: Iterable[Operation], symbol: str, payable_date: date) -> bool:
+    """Whether a broker statement already reports this dividend: one of `symbol` for about the same payment date
+    (sources can differ by a few days, e.g. a weekend; a company pays at most one dividend in that time)."""
+    return any(
+        isinstance(op, ImportedDividend) and op.symbol == symbol and abs(op.payment_date - payable_date) <= PAYMENT_DATE_TOLERANCE
+        for op in base
+    )

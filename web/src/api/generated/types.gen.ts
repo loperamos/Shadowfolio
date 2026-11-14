@@ -241,6 +241,60 @@ export type HoldingValueResponse = {
 };
 
 /**
+ * ImportProblemResponse
+ */
+export type ImportProblemResponse = {
+    /**
+     * Date
+     */
+    date: string;
+    /**
+     * Kind
+     */
+    kind: string;
+    /**
+     * Description
+     */
+    description: string;
+    /**
+     * Reason
+     */
+    reason: string;
+};
+
+/**
+ * ImportResponse
+ */
+export type ImportResponse = {
+    /**
+     * Records
+     */
+    records: number;
+    /**
+     * Can Import
+     */
+    can_import: boolean;
+    /**
+     * Imported
+     */
+    imported: boolean;
+    /**
+     * Problems
+     */
+    problems: Array<ImportProblemResponse>;
+    /**
+     * Cash
+     */
+    cash: string;
+    /**
+     * Holdings
+     */
+    holdings: {
+        [key: string]: string;
+    };
+};
+
+/**
  * OperationResponse
  */
 export type OperationResponse = {
@@ -303,6 +357,10 @@ export type OperationResponse = {
      * Withholding
      */
     withholding?: string | null;
+    /**
+     * Description
+     */
+    description?: string | null;
 };
 
 /**
@@ -314,7 +372,10 @@ export const OperationType = {
     BUY: 'buy',
     SELL: 'sell',
     SPLIT: 'split',
-    DIVIDEND: 'dividend'
+    DIVIDEND: 'dividend',
+    FEE: 'fee',
+    INCOME: 'income',
+    SHARES_RECEIVED: 'shares_received'
 } as const;
 
 /**
@@ -388,6 +449,22 @@ export type SellEdit = {
      * Type
      */
     type: 'sell';
+};
+
+/**
+ * StatementRequest
+ *
+ * A broker's two exports, as the files' text.
+ */
+export type StatementRequest = {
+    /**
+     * Transactions
+     */
+    transactions: string;
+    /**
+     * Account
+     */
+    account: string;
 };
 
 /**
@@ -1158,3 +1235,71 @@ export type SyncAllWalletsResponses = {
 };
 
 export type SyncAllWalletsResponse = SyncAllWalletsResponses[keyof SyncAllWalletsResponses];
+
+export type PreviewDegiroImportData = {
+    body: StatementRequest;
+    path: {
+        /**
+         * Wallet Id
+         */
+        wallet_id: string;
+    };
+    query?: never;
+    url: '/api/wallets/{wallet_id}/imports/degiro/preview';
+};
+
+export type PreviewDegiroImportErrors = {
+    /**
+     * Not found
+     */
+    404: ErrorResponse;
+    /**
+     * Malformed request or broken business rule
+     */
+    422: ErrorResponse;
+};
+
+export type PreviewDegiroImportError = PreviewDegiroImportErrors[keyof PreviewDegiroImportErrors];
+
+export type PreviewDegiroImportResponses = {
+    /**
+     * Successful Response
+     */
+    200: ImportResponse;
+};
+
+export type PreviewDegiroImportResponse = PreviewDegiroImportResponses[keyof PreviewDegiroImportResponses];
+
+export type ImportDegiroData = {
+    body: StatementRequest;
+    path: {
+        /**
+         * Wallet Id
+         */
+        wallet_id: string;
+    };
+    query?: never;
+    url: '/api/wallets/{wallet_id}/imports/degiro';
+};
+
+export type ImportDegiroErrors = {
+    /**
+     * Not found
+     */
+    404: ErrorResponse;
+    /**
+     * Malformed request or broken business rule
+     */
+    422: ErrorResponse;
+};
+
+export type ImportDegiroError = ImportDegiroErrors[keyof ImportDegiroErrors];
+
+export type ImportDegiroResponses = {
+    /**
+     * Successful Response
+     */
+    200: ImportResponse;
+};
+
+export type ImportDegiroResponse = ImportDegiroResponses[keyof ImportDegiroResponses];

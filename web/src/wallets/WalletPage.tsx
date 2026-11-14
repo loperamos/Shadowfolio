@@ -22,6 +22,7 @@ import { SplitsCheckNotice } from "./SplitsCheckNotice";
 import { UncreditedDividendsNotice } from "./UncreditedDividendsNotice";
 import { WalletActionsMenu } from "./WalletActionsMenu";
 import { WalletSettingsModal } from "./WalletSettingsModal";
+import { ImportStatementModal } from "./ImportStatementModal";
 import { WalletValueChart } from "./WalletValueChart";
 import { WalletDayChange, WalletGain, WalletValue } from "./WalletValue";
 
@@ -45,6 +46,7 @@ export function WalletPage() {
   const [version, setVersion] = useState(0);
   const [toDuplicate, setToDuplicate] = useState<WalletResponse | null>(null);
   const [toConfigure, setToConfigure] = useState<WalletResponse | null>(null);
+  const [toImportInto, setToImportInto] = useState<WalletResponse | null>(null);
   const [toDelete, setToDelete] = useState<WalletResponse[]>([]);
 
   useEffect(() => {
@@ -120,7 +122,7 @@ export function WalletPage() {
               <Button leftSection={<IconPlus size={ICON_SIZE} />} onClick={() => setOperationDialog({ operation: null })}>
                 Add operation
               </Button>
-              <WalletActionsMenu wallet={state.wallet} onRename={() => setEditingName(true)} onSettings={setToConfigure} onDuplicate={setToDuplicate} onDelete={setToDelete} />
+              <WalletActionsMenu wallet={state.wallet} onRename={() => setEditingName(true)} onSettings={setToConfigure} onImport={setToImportInto} onDuplicate={setToDuplicate} onDelete={setToDelete} />
             </Group>
           </Group>
           <SplitsCheckNotice wallet={state.wallet} />
@@ -142,6 +144,7 @@ export function WalletPage() {
           <DeleteOperationModal wallet={state.wallet} operation={operationToDelete} onClose={() => setOperationToDelete(null)} onDeleted={reload} />
           {/* Duplicating opens the copy; deleting goes back to the list. */}
           <WalletSettingsModal wallet={toConfigure} onClose={() => setToConfigure(null)} onSaved={reload} />
+          <ImportStatementModal wallet={toImportInto} onClose={() => setToImportInto(null)} onImported={reload} />
           <DuplicateWalletModal wallet={toDuplicate} onClose={() => setToDuplicate(null)} onDuplicated={(copy) => navigate(walletPath(copy.id))} />
           <DeleteWalletsModal wallets={toDelete} onClose={() => setToDelete([])} onDeleted={(allDeleted) => allDeleted && navigate(WALLETS_PATH)} />
         </>
@@ -291,8 +294,7 @@ function WalletDetails({ wallet, operations, version, onEditOperation, onDeleteO
                     {op.withholding != null && Number(op.withholding) !== 0 && <Money amount={op.withholding} currency={wallet.currency} />}
                   </Table.Td>
                   <Table.Td>
-                    {/* Automatic operations have no actions; they are marked in the Type column instead. */}
-                    {!op.automatic && <OperationActionsMenu operation={op} onEdit={onEditOperation} onDelete={onDeleteOperation} />}
+                    <OperationActionsMenu operation={op} onEdit={onEditOperation} onDelete={onDeleteOperation} />
                   </Table.Td>
                 </Table.Tr>
               ))}
