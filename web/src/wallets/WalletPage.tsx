@@ -10,6 +10,7 @@ import { EditableTitle } from "../ui/EditableTitle";
 import { GainText } from "../ui/GainText";
 import { Money } from "../ui/Money";
 import { dateInputValueOf, formatDate, formatDateTime, shortDecimal, todayAsInputValue } from "../ui/format";
+import { usePage } from "../ui/pagination";
 import { SortableTh } from "../ui/SortableTh";
 import { sorted, SortOrder, useSort } from "../ui/sorting";
 import { ICON_SIZE, TABLE_MIN_WIDTH } from "../ui/theme";
@@ -177,6 +178,8 @@ function WalletDetails({ wallet, operations, version, onEditOperation, onDeleteO
   const effective = operations.filter((op) => op.had_effect !== false);
   const { period, range, choose, params } = usePeriod(todayAsInputValue());
   const shownOperations = effective.filter((op) => inRange(dateInputValueOf(op.timestamp), range));
+  // Newest first, as in a statement; a page at a time.
+  const operationsPage = usePage([...shownOperations].reverse());
   const valuation = useWalletValuation(wallet.id, version);
   const [holdingsSort, sortHoldings] = useSort(Object.values(HoldingColumn), HOLDINGS_DEFAULT_SORT);
   const holdings = sorted(Object.entries(wallet.holdings), holdingSortValue(holdingsSort.key, wallet, valuation), holdingsSort.order);
@@ -296,8 +299,7 @@ function WalletDetails({ wallet, operations, version, onEditOperation, onDeleteO
               </Table.Tr>
             </Table.Thead>
             <Table.Tbody>
-              {/* Newest first, as in a statement. */}
-              {[...shownOperations].reverse().map((op) => (
+              {operationsPage.pageRows.map((op) => (
                 <Table.Tr key={op.id}>
                   {/* Automatic operations (splits, dividends) happen on a date, not at a time. */}
                   <Table.Td>{op.automatic ? formatDate(op.timestamp.slice(0, 10)) : formatDateTime(op.timestamp)}</Table.Td>
@@ -334,6 +336,7 @@ function WalletDetails({ wallet, operations, version, onEditOperation, onDeleteO
           </Table>
           </Table.ScrollContainer>
         )}
+        {operationsPage.links}
       </div>
     </Stack>
   );
