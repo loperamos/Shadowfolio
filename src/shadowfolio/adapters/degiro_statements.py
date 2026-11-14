@@ -224,6 +224,8 @@ def _account_records(rows: list[list[str]]) -> list[ImportRecord]:
                 waiting.setdefault(row.currency, []).append(_OpenCash(ImportKind.DIVIDEND, row))
             elif part is _Part.CASH_IN_LIEU:
                 waiting.setdefault(row.currency, []).append(_OpenCash(ImportKind.CASH_IN_LIEU, row))
+            elif part is _Part.TAX and row.amount > 0:  # tax paid back, weeks after the dividend
+                waiting.setdefault(row.currency, []).append(_OpenCash(ImportKind.TAX_REFUND, row))
             elif part is _Part.TAX and (dividend := _last_dividend(waiting, row.currency, row.isin)):
                 dividend.tax += abs(row.amount)
             elif part is _Part.FEE and (dividend := _last_dividend(waiting, row.currency)):
@@ -284,8 +286,8 @@ def _credited(items: list[_OpenCash], amount: Decimal, currency: str) -> list[Im
 
 
 def _cash_record(item: _OpenCash, amount: Decimal, currency: str) -> ImportRecord:
-    if item.kind is ImportKind.CASH_IN_LIEU:
-        return ImportRecord(ImportKind.CASH_IN_LIEU, item.row.timestamp, amount, currency, item.row.product, isin=item.row.isin)
+    if item.kind is not ImportKind.DIVIDEND:
+        return ImportRecord(item.kind, item.row.timestamp, amount, currency, item.row.product, isin=item.row.isin)
     return ImportRecord(
         kind=ImportKind.DIVIDEND,
         timestamp=item.row.timestamp,

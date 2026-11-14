@@ -513,3 +513,25 @@ def test_shares_subscribed_in_an_ipo_are_bought_at_the_subscription_price() -> N
     assert imported.wallet.holdings == {"SPCX": Decimal(2)}
     assert imported.wallet.ledger.positions["SPCX"].cost == Decimal("233.90")
     assert imported.wallet.cash == Decimal("266.10")
+
+
+def test_a_dividend_tax_refunded_later_is_income_credited_with_its_conversion() -> None:
+    # As in December 2021: a cent of tax refunded on two dividends of October, converted together the next day.
+    apple = "APPLE INC.,US0378331005"
+    account = [
+        '17-12-2021,07:37,16-12-2021,,,Operation de change - Crédit,,EUR,"0,01",EUR,"500,01",',
+        '17-12-2021,07:37,16-12-2021,,,Opération de change - Débit,"1,1341",USD,"-0,02",USD,"0,00",',
+        f'16-12-2021,14:41,22-10-2021,{NVIDIA},Impôts sur dividende,,USD,"0,01",USD,"0,02",',
+        f'16-12-2021,14:41,22-10-2021,{apple},Impôts sur dividende,,USD,"0,01",USD,"0,01",',
+        '01-12-2021,10:00,01-12-2021,,,Dépôt flatex,,EUR,"500,00",EUR,"500,00",',
+    ]
+
+    imported = import_degiro(transactions=[], account=account, tickers={**NVIDIA_TICKER, "US0378331005": "AAPL"})
+
+    assert [record.kind for record in imported.records[1:]] == [ImportKind.TAX_REFUND] * 2
+    assert imported.report.not_imported == []
+    # The cent cannot be split in two: one refund gets it, the other is 0.00 and records nothing.
+    [refund] = [op for op in imported.wallet.operations if isinstance(op, Income)]
+    assert refund.amount == Decimal("0.01")
+    assert refund.description in {"Dividend tax refunded on AAPL", "Dividend tax refunded on NVDA"}
+    assert imported.wallet.cash == Decimal("500.01")

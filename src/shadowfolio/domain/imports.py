@@ -18,6 +18,7 @@ class ImportKind(StrEnum):
     SPLIT = "split"  # a stock split's rows; the wallet applies splits from market data
     SPIN_OFF = "spin_off"  # shares received from a company splitting off part of its business
     CASH_IN_LIEU = "cash_in_lieu"  # cash paid instead of a fraction of a share
+    TAX_REFUND = "tax_refund"  # dividend tax paid back later
     IPO_SUBSCRIPTION = "ipo_subscription"  # shares subscribed in an IPO, at the offer price
     ISIN_CHANGE = "isin_change"  # a holding moved from one identifier to another: one record for each side
     # A cash-statement row announcing a corporate action whose shares the trades statement books.

@@ -30,6 +30,7 @@ SECURITY_KINDS = {
     ImportKind.DIVIDEND,
     ImportKind.SPIN_OFF,
     ImportKind.CASH_IN_LIEU,
+    ImportKind.TAX_REFUND,
 }
 
 
@@ -70,17 +71,20 @@ class Imports:
                 self._record_dividend(wallet_id, record, ticker)
             case ImportKind.SPIN_OFF if ticker and record.quantity:
                 self._history.record_shares_received(wallet_id, record.timestamp, ticker, record.quantity)
-            case ImportKind.CASH_IN_LIEU if ticker:
+            case ImportKind.CASH_IN_LIEU if ticker and record.amount:
                 description = f"Cash for a fraction of a share of {ticker}"
                 self._history.record_income(wallet_id, record.timestamp, record.amount, description)
+            case ImportKind.TAX_REFUND if ticker and record.amount:
+                self._history.record_income(wallet_id, record.timestamp, record.amount, f"Dividend tax refunded on {ticker}")
             case ImportKind.FEE:
                 self._history.record_fee(wallet_id, record.timestamp, record.amount, record.description)
             case ImportKind.INCOME if record.amount != 0:
                 self._history.record_income(wallet_id, record.timestamp, record.amount, record.description)
             case ImportKind.UNKNOWN:
                 return "unknown row"
-            # Nothing to record: interest of 0.00, a spin-off giving no whole share, money moving inside the broker,
-            # the cash lines of a trade, an action's notice, or a split (the wallet applies splits from market data).
+            # Nothing to record: an amount of 0.00 (interest, a refund's share), a spin-off giving no whole share, money
+            # moving inside the broker, the cash lines of a trade, an action's notice, or a split (the wallet applies
+            # splits from market data).
         return None
 
     def _record_trade(self, wallet_id: UUID, record: ImportRecord, ticker: str) -> None:
