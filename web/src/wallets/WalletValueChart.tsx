@@ -1,42 +1,25 @@
 import { Alert, Group, SegmentedControl, Skeleton, Text, Title } from "@mantine/core";
-import dayjs from "dayjs";
-import { useState } from "react";
 
 import type { DailyValueResponse } from "../api/generated";
 import { TimeSeriesChart } from "../ui/TimeSeriesChart";
 import { CHART_HEIGHT } from "../ui/theme";
+import { formatDate } from "../ui/format";
+import { Period, periodStart } from "./period";
 import { useDailyValues } from "./useDailyValues";
 
-// Periods to show, ending on the last day with a value, as on most brokers' and finance sites' charts.
-enum Range {
-  MONTH = "1M",
-  HALF_YEAR = "6M",
-  YEAR_TO_DATE = "YTD",
-  YEAR = "1Y",
-  ALL = "All",
-}
+type ChartProps = {
+  walletId: string;
+  currency: string;
+  refreshKey: number;
+  period: Period;
+  // The first day of the period (YYYY-MM-DD); null for everything.
+  start: string | null;
+  onPeriodChange: (period: Period) => void;
+};
 
-/** The first day shown for `range`, given the last day with a value (YYYY-MM-DD); null shows everything. */
-function rangeStart(range: Range, lastDay: string): string | null {
-  const last = dayjs(lastDay);
-  switch (range) {
-    case Range.MONTH:
-      return last.subtract(1, "month").format("YYYY-MM-DD");
-    case Range.HALF_YEAR:
-      return last.subtract(6, "month").format("YYYY-MM-DD");
-    case Range.YEAR_TO_DATE:
-      return last.startOf("year").format("YYYY-MM-DD");
-    case Range.YEAR:
-      return last.subtract(1, "year").format("YYYY-MM-DD");
-    case Range.ALL:
-      return null;
-  }
-}
-
-/** The wallet's value over time against the money put in, with a choice of period. */
-export function WalletValueChart({ walletId, currency, refreshKey }: { walletId: string; currency: string; refreshKey: number }) {
+/** The wallet's value over time against the money put in, over a period chosen here (which the page also follows). */
+export function WalletValueChart({ walletId, currency, refreshKey, period, start, onPeriodChange }: ChartProps) {
   const state = useDailyValues(walletId, refreshKey);
-  const [range, setRange] = useState(Range.ALL);
   return (
     <div>
       <Group justify="space-between" mb="sm">
@@ -44,18 +27,17 @@ export function WalletValueChart({ walletId, currency, refreshKey }: { walletId:
         <SegmentedControl
           size="xs"
           aria-label="Period"
-          data={Object.values(Range)}
-          value={range}
-          onChange={(value) => setRange(value as Range)}
-          disabled={state.status !== "loaded" || state.values.length === 0}
+          data={Object.values(Period)}
+          value={period}
+          onChange={(value) => onPeriodChange(value as Period)}
         />
       </Group>
-      <ChartBody state={state} range={range} currency={currency} />
+      <ChartBody state={state} start={start} currency={currency} />
     </div>
   );
 }
 
-function ChartBody({ state, range, currency }: { state: ReturnType<typeof useDailyValues>; range: Range; currency: string }) {
+function ChartBody({ state, start, currency }: { state: ReturnType<typeof useDailyValues>; start: string | null; currency: string }) {
   switch (state.status) {
     case "loading":
       return <Skeleton h={CHART_HEIGHT} />;
@@ -69,8 +51,10 @@ function ChartBody({ state, range, currency }: { state: ReturnType<typeof useDai
       if (state.values.length === 0) {
         return <Text c="dimmed">No history yet. Add an operation to see the wallet’s value over time.</Text>;
       }
-      const start = rangeStart(range, state.values[state.values.length - 1].day);
       const shown = start === null ? state.values : state.values.filter((value) => value.day >= start);
+      if (start !== null && shown.length === 0) {
+        return <Text c="dimmed">No history since {formatDate(start)}.</Text>;
+      }
       const unvalued = shown.filter((value) => value.missing.length > 0);
       const missing = [...new Set(unvalued.flatMap((value) => value.missing))];
       return (
