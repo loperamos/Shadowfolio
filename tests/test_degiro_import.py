@@ -387,3 +387,40 @@ def test_a_spin_off_that_gives_no_whole_share_records_nothing() -> None:
 
     assert imported.report.not_imported == []
     assert imported.wallet.operations == ()
+
+
+# The temporary Meituan line moved to a placeholder identifier, then became tradable Meituan shares: each move is
+# booked as a sale and a purchase of the same share at the same price, with no order ID.
+MEITUAN_ISIN_CHANGES = [
+    '27-03-2023,08:44,MEITUAN - NON TRADEABLE,RCC188527108,DEG,,-1,"17,0520",EUR,"17,05",EUR,"17,05","1,0000","0,00",,"17,05",',
+    '27-03-2023,08:44,MEITUAN,KYG596691041,TDG,,1,"17,0520",EUR,"-17,05",EUR,"-17,05","1,0000","0,00",,"-17,05",',
+]
+MEITUAN_ISIN_CHANGE_NOTICES = [
+    '27-03-2023,08:44,27-03-2023,MEITUAN - NON TRADEABLE,RCC188527108,"Changement ISIN: Vente 1 Meituan - Non tradeable@17,052 EUR '
+    '(RCC188527108)",,EUR,"17,05",EUR,"73,15",',
+    '27-03-2023,08:44,27-03-2023,MEITUAN,KYG596691041,"Changement ISIN: Achat 1 Meituan@17,052 EUR (KYG596691041)",,EUR,"-17,05",'
+    'EUR,"56,10",',
+]
+
+
+def test_an_isin_change_within_the_same_ticker_changes_nothing() -> None:
+    imported = import_degiro(
+        transactions=[*MEITUAN_ISIN_CHANGES, MEITUAN_SPIN_OFF, TENCENT_BUY],
+        account=[*MEITUAN_ISIN_CHANGE_NOTICES, MEITUAN_SPIN_OFF_NOTICE, DEPOSIT_600],
+        tickers={**TENCENT_TICKERS, "RCC188527108": "3690.HK"},
+    )
+
+    assert [record.kind for record in imported.records].count(ImportKind.ISIN_CHANGE) == 2
+    assert imported.report.not_imported == []
+    assert imported.wallet.holdings == {"0700.HK": Decimal(12), "3690.HK": Decimal(1)}
+    assert imported.wallet.cash == Decimal("56.10")
+
+
+def test_an_isin_change_to_another_ticker_is_reported() -> None:
+    imported = import_degiro(
+        transactions=[*MEITUAN_ISIN_CHANGES, MEITUAN_SPIN_OFF, TENCENT_BUY],
+        account=[*MEITUAN_ISIN_CHANGE_NOTICES, MEITUAN_SPIN_OFF_NOTICE, DEPOSIT_600],
+        tickers={**TENCENT_TICKERS, "RCC188527108": "MEITUAN-TEMP"},
+    )
+
+    assert {problem.reason for problem in imported.report.not_imported} == {"an ISIN change to another ticker is not imported yet"}

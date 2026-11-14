@@ -2,6 +2,7 @@
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
@@ -35,7 +36,12 @@ class Imports:
         `tickers` gives each security's ticker by ISIN, as statements often identify securities by ISIN only.
         """
         report = ImportReport()
+        unchanged = _same_ticker_isin_changes(records, tickers)
         for record in records:
+            if record.kind is ImportKind.ISIN_CHANGE:
+                if record.timestamp not in unchanged:
+                    report.not_imported.append(NotImported(record, "an ISIN change to another ticker is not imported yet"))
+                continue
             problem = self._apply(wallet_id, record, tickers)
             if problem is not None:
                 report.not_imported.append(NotImported(record, problem))
@@ -93,3 +99,13 @@ class Imports:
             record.dividend_fee or Decimal(0),
             record.amount,
         )
+
+
+def _same_ticker_isin_changes(records: list[ImportRecord], tickers: Mapping[str, str]) -> set[datetime]:
+    """When the ISIN changes recorded at each moment keep the holding under one known ticker, so the wallet sees no
+    change. (An ISIN change moves a holding between identifiers, one record for each side.)"""
+    sides: dict[datetime, set[str | None]] = {}
+    for record in records:
+        if record.kind is ImportKind.ISIN_CHANGE:
+            sides.setdefault(record.timestamp, set()).add(tickers.get(record.isin or ""))
+    return {moment for moment, tickers_seen in sides.items() if len(tickers_seen) == 1 and None not in tickers_seen}

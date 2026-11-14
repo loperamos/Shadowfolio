@@ -17,6 +17,7 @@ class ImportKind(StrEnum):
     FEE = "fee"  # a charge not tied to one trade
     SPLIT = "split"  # a stock split's rows; the wallet applies splits from market data
     SPIN_OFF = "spin_off"  # shares received from a company splitting off part of its business
+    ISIN_CHANGE = "isin_change"  # a holding moved from one identifier to another: one record for each side
     # A cash-statement row announcing a corporate action whose shares the trades statement books.
     CORPORATE_ACTION_NOTICE = "corporate_action_notice"
     INCOME = "income"  # interest, compensations; its amount is signed (negative for interest charged)

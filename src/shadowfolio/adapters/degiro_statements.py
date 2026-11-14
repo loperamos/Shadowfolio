@@ -38,14 +38,17 @@ ACCOUNT_PATTERNS: list[tuple[re.Pattern[str], ImportKind]] = [
         (r"^(Variation Fonds Monétaires|Conversion Fonds Monétaires finalisée)", ImportKind.INTERNAL_TRANSFER),
         (r"^Frais de connexion aux places boursières", ImportKind.FEE),
         (r"^Ajustement fractionnement:", ImportKind.SPLIT),
-        (r"^Spin-off:", ImportKind.CORPORATE_ACTION_NOTICE),
+        (r"^(Spin-off|Changement ISIN):", ImportKind.CORPORATE_ACTION_NOTICE),
         (r"^(Flatex Interest|Flatex Interest Income|Compensation Fonds Monétaires DEGIRO)$", ImportKind.INCOME),
     ]
 ]
 
 
 # Account rows announcing a corporate action, and what the Transactions rows of that security on that day are.
-ACTION_PATTERNS: list[tuple[re.Pattern[str], ImportKind]] = [(re.compile(r"^Spin-off:"), ImportKind.SPIN_OFF)]
+ACTION_PATTERNS: list[tuple[re.Pattern[str], ImportKind]] = [
+    (re.compile(r"^Spin-off:"), ImportKind.SPIN_OFF),
+    (re.compile(r"^Changement ISIN:"), ImportKind.ISIN_CHANGE),
+]
 
 
 class _Part(Enum):
