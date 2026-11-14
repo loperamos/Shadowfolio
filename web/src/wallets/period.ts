@@ -2,6 +2,8 @@ import dayjs from "dayjs";
 import { useSearchParams } from "react-router";
 
 import { formatDate } from "../ui/format";
+import { PAGE_PARAM } from "../ui/pagination";
+import { useUpdateQuery } from "../ui/url";
 
 // The period a wallet page shows (the value chart and the operations): a preset ending today, as on most brokers' and
 // finance sites' charts, or chosen dates. It is kept in the URL (?period=1Y, or ?from=2023-01-01&to=2023-12-31), so a
@@ -62,10 +64,10 @@ export function isEverything(range: DayRange): boolean {
   return range.start === null && range.end === null;
 }
 
-/** The URL query showing a preset period or chosen dates, keeping the rest of `current`. */
+/** The URL query showing a preset period or chosen dates, keeping the rest of `current` but its page: back to the first. */
 export function periodSearch(current: URLSearchParams, choice: Period | DayRange): URLSearchParams {
   const updated = new URLSearchParams(current);
-  [PERIOD_PARAM, FROM_PARAM, TO_PARAM].forEach((param) => updated.delete(param));
+  [PERIOD_PARAM, FROM_PARAM, TO_PARAM, PAGE_PARAM].forEach((param) => updated.delete(param));
   if (typeof choice === "string") {
     if (choice !== Period.ALL) {
       updated.set(PERIOD_PARAM, choice);
@@ -86,14 +88,14 @@ export function periodSearch(current: URLSearchParams, choice: Period | DayRange
  * an invalid date is ignored). `period` is null for chosen dates. `choose` changes it.
  */
 export function usePeriod(today: string) {
-  const [params, setParams] = useSearchParams();
+  const [params] = useSearchParams();
+  const updateQuery = useUpdateQuery();
   const from = day(params.get(FROM_PARAM));
   const to = day(params.get(TO_PARAM));
   const preset = Object.values(Period).find((known) => known === params.get(PERIOD_PARAM)) ?? Period.ALL;
   const period = from === null && to === null ? preset : null;
   const range = period === null ? { start: from, end: to } : periodRange(period, today);
-  // Replacing the history entry: Back leaves the page instead of stepping through periods.
-  const choose = (choice: Period | DayRange) => setParams((current) => periodSearch(current, choice), { replace: true });
+  const choose = (choice: Period | DayRange) => updateQuery((current) => periodSearch(current, choice));
   return { period, range, choose, params };
 }
 
