@@ -7,7 +7,7 @@ Working name. Drafted 2026-11-11 from the lessons of the first `investing-sandbo
 A hosted, subscription service where people test investing strategies against real market prices:
 
 1. **Simulated wallets.** Every operation, whether entered by hand, imported or placed by an agent, is priced from real market data. The fill rules are visible.
-2. **Import from any broker.** An LLM reads the user's statements and proposes operations. The app checks them, and the user confirms before anything is saved.
+2. **Import from any broker.** A reader per broker turns the user's exports into proposed operations; an LLM may cover brokers without their own reader. The app checks them, and the user confirms before anything is saved.
 3. **Bring your own agent.** Users connect their own LLMs or agents over MCP or the API to operate wallets and read market information. Agents stay external: the service exposes the API but does not run them.
 4. **Fair comparison.** Wallets, strategies and benchmarks such as SPY get the same deposits on the same dates. The app compares them on standard metrics.
 
@@ -34,7 +34,7 @@ A hosted, subscription service where people test investing strategies against re
 
 **User (web UI and HTTP API)**
 1. Create, rename, copy or delete a wallet, choosing its currency and starting cash.
-2. Import a broker statement: the LLM proposes operations, the app checks them, and the user confirms.
+2. Import a broker statement: the app reads it and proposes operations, checks them, and the user confirms.
 3. Add a past operation at a given time; the app checks or fills in its price.
 4. Place or cancel an order now.
 5. View a wallet: holdings, value over time, dividends and operations.
@@ -153,7 +153,7 @@ None found combines a user's real wallet, their own agents and fair comparison i
 ## Legal
 
 - Show a clear "not investment advice" disclaimer; the product is analysis and simulation.
-- GDPR: user financial data and uploaded statements must be protected. Tell users that statements are sent to an LLM provider for parsing.
+- GDPR: user financial data and uploaded statements must be protected. If an LLM reads a statement, tell users it is sent to an LLM provider.
 - Market-data display rights are covered under Data providers.
 
 ## MVP plan
@@ -178,7 +178,7 @@ Next, in order:
 7. Comparison: benchmarks with the same deposits, metrics, charts, hindsight label.
 8. MCP: tokens with owner and trading scopes, wallet grants, decision log.
 9. Licensed data provider: trial the shortlisted providers against the contract tests and pick one.
-10. LLM import: preview, checks, confirm.
+10. Import: more brokers and operation types, with an LLM reader for brokers without their own.
 11. Accounts, auth and hosting, then a public beta.
 
 No paid subscription is needed before the licensed-provider slice.
