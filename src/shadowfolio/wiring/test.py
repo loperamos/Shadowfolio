@@ -17,6 +17,7 @@ from shadowfolio.ports.corporate_actions import CorporateActions
 from shadowfolio.ports.fx_rates import FxRates
 from shadowfolio.ports.price_data import PriceData
 from shadowfolio.ports.security_lookup import SecurityLookup
+from shadowfolio.usecases.comparison import Comparison
 from shadowfolio.usecases.history import History
 from shadowfolio.usecases.imports import Imports
 from shadowfolio.usecases.market import Market
@@ -48,6 +49,7 @@ def build_test_app(
         wallets=Wallets(wallet_repository, clock),
         history=History(wallet_repository, clock, prices, fx_rates, sync),
         valuation=Valuation(wallet_repository, clock, prices, fx_rates),
+        comparison=Comparison(wallet_repository, clock, prices, fx_rates, corporate_actions),
         market=Market(prices),
         sync=sync,
         imports=Imports(

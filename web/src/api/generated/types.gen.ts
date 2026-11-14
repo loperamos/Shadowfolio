@@ -5,6 +5,36 @@ export type ClientOptions = {
 };
 
 /**
+ * BenchmarkResponse
+ *
+ * What the wallet's deposits and withdrawals would be worth in `symbol` instead, at the end of every day.
+ */
+export type BenchmarkResponse = {
+    /**
+     * Symbol
+     */
+    symbol: string;
+    /**
+     * Values
+     */
+    values: Array<BenchmarkValueResponse>;
+};
+
+/**
+ * BenchmarkValueResponse
+ */
+export type BenchmarkValueResponse = {
+    /**
+     * Day
+     */
+    day: string;
+    /**
+     * Value
+     */
+    value: string | null;
+};
+
+/**
  * BuyEdit
  */
 export type BuyEdit = {
@@ -1307,3 +1337,37 @@ export type ImportDegiroResponses = {
 };
 
 export type ImportDegiroResponse = ImportDegiroResponses[keyof ImportDegiroResponses];
+
+export type BenchmarkDailyData = {
+    body?: never;
+    path: {
+        /**
+         * Wallet Id
+         */
+        wallet_id: string;
+    };
+    query?: never;
+    url: '/api/wallets/{wallet_id}/benchmark/daily';
+};
+
+export type BenchmarkDailyErrors = {
+    /**
+     * Not found
+     */
+    404: ErrorResponse;
+    /**
+     * Malformed request or broken business rule
+     */
+    422: ErrorResponse;
+};
+
+export type BenchmarkDailyError = BenchmarkDailyErrors[keyof BenchmarkDailyErrors];
+
+export type BenchmarkDailyResponses = {
+    /**
+     * Successful Response
+     */
+    200: BenchmarkResponse;
+};
+
+export type BenchmarkDailyResponse = BenchmarkDailyResponses[keyof BenchmarkDailyResponses];

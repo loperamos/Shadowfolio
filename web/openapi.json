@@ -1072,10 +1072,109 @@
           }
         }
       }
+    },
+    "/api/wallets/{wallet_id}/benchmark/daily": {
+      "get": {
+        "summary": "Benchmark Daily",
+        "description": "What the wallet's deposits and withdrawals would be worth in SPY instead, at the end of every day from its\nfirst operation to today, with SPY's dividends reinvested after the wallet's withholding tax.",
+        "operationId": "benchmark_daily",
+        "parameters": [
+          {
+            "name": "wallet_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Wallet Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BenchmarkResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Malformed request or broken business rule",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "BenchmarkResponse": {
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "values": {
+            "items": {
+              "$ref": "#/components/schemas/BenchmarkValueResponse"
+            },
+            "type": "array",
+            "title": "Values"
+          }
+        },
+        "type": "object",
+        "required": [
+          "symbol",
+          "values"
+        ],
+        "title": "BenchmarkResponse",
+        "description": "What the wallet's deposits and withdrawals would be worth in `symbol` instead, at the end of every day."
+      },
+      "BenchmarkValueResponse": {
+        "properties": {
+          "day": {
+            "type": "string",
+            "format": "date",
+            "title": "Day"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "type": "object",
+        "required": [
+          "day",
+          "value"
+        ],
+        "title": "BenchmarkValueResponse"
+      },
       "BuyEdit": {
         "properties": {
           "symbol": {
