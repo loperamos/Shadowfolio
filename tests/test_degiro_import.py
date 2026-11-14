@@ -424,3 +424,60 @@ def test_an_isin_change_to_another_ticker_is_reported() -> None:
     )
 
     assert {problem.reason for problem in imported.report.not_imported} == {"an ISIN change to another ticker is not imported yet"}
+
+
+def test_cash_for_a_fraction_of_a_share_in_euros_is_income() -> None:
+    # Meituan paid in euros for the 0.2 share DEGIRO could not deliver.
+    cash = '14-04-2023,14:24,14-04-2023,MEITUAN,KYG596691041,Règlement espèces - Action,,EUR,"3,08",EUR,"503,08",'
+    deposit = '01-04-2023,10:00,01-04-2023,,,Dépôt flatex,,EUR,"500,00",EUR,"500,00",'
+
+    imported = import_degiro(transactions=[], account=[cash, deposit], tickers=TENCENT_TICKERS)
+
+    assert imported.records[-1].kind is ImportKind.CASH_IN_LIEU
+    assert [(op.amount, op.description) for op in imported.wallet.operations if isinstance(op, Income)] == [
+        (Decimal("3.08"), "Cash for a fraction of a share of 3690.HK")
+    ]
+    assert imported.wallet.cash == Decimal("503.08")
+
+
+def test_cash_for_a_fraction_in_dollars_is_credited_with_its_conversion() -> None:
+    # 5.63 USD for IBM shareholders' fraction of a Kyndryl share, converted the next day into 4.99 EUR.
+    ibm = "INTERNATIONAL BUSINESS MACHINES CORP,US4592001014"
+    account = [
+        '15-12-2021,07:35,14-12-2021,,,Operation de change - Crédit,,EUR,"4,99",EUR,"504,99",',
+        '15-12-2021,07:35,14-12-2021,,,Opération de change - Débit,"1,1270",USD,"-5,63",USD,"0,00",',
+        f'14-12-2021,09:55,09-12-2021,{ibm},Règlement espèces - Action,,USD,"5,63",USD,"5,63",',
+        '01-12-2021,10:00,01-12-2021,,,Dépôt flatex,,EUR,"500,00",EUR,"500,00",',
+    ]
+
+    imported = import_degiro(transactions=[], account=account, tickers={"US4592001014": "IBM"})
+
+    assert imported.report.not_imported == []
+    assert [(op.amount, op.description) for op in imported.wallet.operations if isinstance(op, Income)] == [
+        (Decimal("4.99"), "Cash for a fraction of a share of IBM")
+    ]
+    assert imported.wallet.cash == Decimal("504.99")
+
+
+def test_a_tax_listed_before_its_dividend_in_the_same_minute_still_belongs_to_it() -> None:
+    # As IBM's dividend of December 2021 appears: DEGIRO lists the tax below the dividend, i.e. booked first.
+    ibm = "INTERNATIONAL BUSINESS MACHINES CORP,US4592001014"
+    account = [
+        '14-12-2021,07:38,13-12-2021,,,Operation de change - Crédit,,EUR,"1,10",EUR,"501,10",',
+        '14-12-2021,07:38,13-12-2021,,,Opération de change - Débit,"1,1297",USD,"-1,25",USD,"0,00",',
+        '13-12-2021,07:46,10-12-2021,,,Frais d’opération sur titres,,USD,"-0,14",USD,"1,25",',
+        f'13-12-2021,07:46,10-12-2021,{ibm},Dividende,,USD,"1,64",USD,"1,39",',
+        f'13-12-2021,07:46,10-12-2021,{ibm},Impôts sur dividende,,USD,"-0,25",USD,"-0,25",',
+        '01-12-2021,10:00,01-12-2021,,,Dépôt flatex,,EUR,"500,00",EUR,"500,00",',
+    ]
+
+    imported = import_degiro(transactions=[], account=account, tickers={"US4592001014": "IBM"})
+
+    assert imported.report.not_imported == []
+    [dividend] = [op for op in imported.wallet.operations if isinstance(op, ImportedDividend)]
+    assert (dividend.gross, dividend.tax, dividend.fee, dividend.amount) == (
+        Decimal("1.64"),
+        Decimal("0.25"),
+        Decimal("0.14"),
+        Decimal("1.10"),
+    )

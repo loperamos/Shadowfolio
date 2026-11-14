@@ -17,6 +17,7 @@ class ImportKind(StrEnum):
     FEE = "fee"  # a charge not tied to one trade
     SPLIT = "split"  # a stock split's rows; the wallet applies splits from market data
     SPIN_OFF = "spin_off"  # shares received from a company splitting off part of its business
+    CASH_IN_LIEU = "cash_in_lieu"  # cash paid instead of a fraction of a share
     ISIN_CHANGE = "isin_change"  # a holding moved from one identifier to another: one record for each side
     # A cash-statement row announcing a corporate action whose shares the trades statement books.
     CORPORATE_ACTION_NOTICE = "corporate_action_notice"
@@ -42,7 +43,8 @@ class ImportRecord:
     price: Decimal | None = None  # per share, in `price_currency`
     price_currency: str | None = None
     fees: Decimal | None = None  # every fee of the trade, in `currency`
-    # Dividends only: `amount` is then what was credited in `currency` (the account's), and these are in the
+    # Dividends (and cash for fractions): `amount` is then what was credited in `currency` (the account's); for
+    # dividends these are in the
     # dividend's own currency: before tax, the tax withheld, and the broker's fee.
     dividend_currency: str | None = None
     gross: Decimal | None = None

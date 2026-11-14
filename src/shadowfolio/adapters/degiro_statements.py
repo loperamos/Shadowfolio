@@ -3,10 +3,10 @@
 A recipe rather than a model: columns are read by position and Account rows are recognised by their description.
 DEGIRO France writes times in Paris time and numbers with a decimal comma.
 
-A dividend in another currency takes several Account rows: the dividend, the tax withheld, DEGIRO's fee, and later a
-currency conversion (a debit in that currency and a credit in euros) that brings that currency's balance back to
-zero. They are read together as one dividend credited with the conversion's euros; dividends converted together
-share those euros in proportion to what each left after tax and fee.
+Cash paid in another currency (a dividend, with its tax withheld and DEGIRO's fee, or cash for a fraction of a share)
+waits in that currency until a conversion (a debit in it and a credit in euros) brings its balance back to zero. Its
+rows are read together as one record credited with the conversion's euros; items converted together share those
+euros in proportion to what each left after tax and fee. Cash paid in euros is credited at once.
 """
 
 import csv
@@ -52,18 +52,22 @@ ACTION_PATTERNS: list[tuple[re.Pattern[str], ImportKind]] = [
 
 
 class _Part(Enum):
-    """The Account rows that make up a dividend."""
+    """The Account rows of cash that may need converting: a dividend (with its tax and fee), cash for a fraction."""
 
     DIVIDEND = auto()
+    CASH_IN_LIEU = auto()
     TAX = auto()
     FEE = auto()
     CONVERSION = auto()
 
 
-DIVIDEND_PATTERNS: list[tuple[re.Pattern[str], _Part]] = [
+# Paid cash first, so a tax or fee booked in the same minute finds its dividend.
+PART_ORDER = [_Part.DIVIDEND, _Part.CASH_IN_LIEU, _Part.TAX, _Part.FEE, _Part.CONVERSION]
+CASH_PATTERNS: list[tuple[re.Pattern[str], _Part]] = [
     (re.compile(pattern), part)
     for pattern, part in [
         (r"^Dividende$", _Part.DIVIDEND),
+        (r"^Règlement espèces - Action$", _Part.CASH_IN_LIEU),
         (r"^Impôts sur dividende$", _Part.TAX),
         (r"^Frais d’opération sur titres$", _Part.FEE),
         (r"^Op[ée]ration de change - (Débit|Crédit)$", _Part.CONVERSION),
@@ -83,9 +87,11 @@ class _AccountRow:
 
 
 @dataclass
-class _OpenDividend:
-    """A dividend whose tax and fee may still follow, waiting for the conversion that credits it in euros."""
+class _OpenCash:
+    """Cash paid in a security's name (a dividend, whose tax and fee may still follow, or cash for a fraction),
+    waiting to be credited in euros."""
 
+    kind: ImportKind
     row: _AccountRow
     tax: Decimal = Decimal(0)
     fee: Decimal = Decimal(0)
@@ -171,17 +177,18 @@ def _account_records(rows: list[list[str]]) -> list[ImportRecord]:
     # Oldest first; rows of the same minute keep DEGIRO's order, which lists them newest first.
     account_rows = sorted(reversed([_account_row(cells) for cells in rows]), key=lambda row: row.timestamp)
     records: list[ImportRecord] = []
-    open_dividends: dict[str, list[_OpenDividend]] = {}
+    waiting: dict[str, list[_OpenCash]] = {}  # by currency
     for _, same_minute in groupby(account_rows, key=lambda row: row.timestamp):
-        minute = list(same_minute)
-        conversion = [row for row in minute if not row.order_id and _part(row) is _Part.CONVERSION]
+        minute = sorted(same_minute, key=_part_order)
         for row in minute:
             part = None if row.order_id else _part(row)
             if part is _Part.DIVIDEND:
-                open_dividends.setdefault(row.currency, []).append(_OpenDividend(row))
-            elif part is _Part.TAX and (dividend := _last(open_dividends, row.currency, row.isin)):
+                waiting.setdefault(row.currency, []).append(_OpenCash(ImportKind.DIVIDEND, row))
+            elif part is _Part.CASH_IN_LIEU:
+                waiting.setdefault(row.currency, []).append(_OpenCash(ImportKind.CASH_IN_LIEU, row))
+            elif part is _Part.TAX and (dividend := _last_dividend(waiting, row.currency, row.isin)):
                 dividend.tax += abs(row.amount)
-            elif part is _Part.FEE and (dividend := _last(open_dividends, row.currency)):
+            elif part is _Part.FEE and (dividend := _last_dividend(waiting, row.currency)):
                 dividend.fee += abs(row.amount)
             elif part is _Part.CONVERSION:
                 continue  # read as a pair below
@@ -189,9 +196,12 @@ def _account_records(rows: list[list[str]]) -> list[ImportRecord]:
                 records.append(_simple_record(row))
             else:
                 records.append(_unknown(row))
+        conversion = [row for row in minute if not row.order_id and _part(row) is _Part.CONVERSION]
         if conversion:
-            records += _converted(conversion, open_dividends)
-    records += [_unknown(dividend.row) for dividends in open_dividends.values() for dividend in dividends]
+            records += _converted(conversion, waiting)
+        in_euros = waiting.pop(ACCOUNT_CURRENCY, [])  # no conversion needed
+        records += _credited(in_euros, sum((item.net for item in in_euros), Decimal(0)), ACCOUNT_CURRENCY)
+    records += [_unknown(item.row) for items in waiting.values() for item in items]
     return records
 
 
@@ -201,41 +211,55 @@ def _account_row(cells: list[str]) -> _AccountRow:
 
 
 def _part(row: _AccountRow) -> _Part | None:
-    return next((part for pattern, part in DIVIDEND_PATTERNS if pattern.search(row.description)), None)
+    return next((part for pattern, part in CASH_PATTERNS if pattern.search(row.description)), None)
 
 
-def _last(open_dividends: dict[str, list[_OpenDividend]], currency: str, isin: str | None = None) -> _OpenDividend | None:
-    """The latest open dividend in this currency (and of this security, if given)."""
-    candidates = [d for d in open_dividends.get(currency, []) if isin is None or d.row.isin == isin]
+def _part_order(row: _AccountRow) -> int:
+    part = None if row.order_id else _part(row)
+    return PART_ORDER.index(part) if part else len(PART_ORDER)
+
+
+def _last_dividend(waiting: dict[str, list[_OpenCash]], currency: str, isin: str | None = None) -> _OpenCash | None:
+    """The latest dividend waiting in this currency (and of this security, if given)."""
+    candidates = [c for c in waiting.get(currency, []) if c.kind is ImportKind.DIVIDEND and (isin is None or c.row.isin == isin)]
     return candidates[-1] if candidates else None
 
 
-def _converted(conversion: list[_AccountRow], open_dividends: dict[str, list[_OpenDividend]]) -> list[ImportRecord]:
-    """The dividends a conversion credits: its debit is in their currency, its credit is what they bring in euros."""
+def _converted(conversion: list[_AccountRow], waiting: dict[str, list[_OpenCash]]) -> list[ImportRecord]:
+    """What a conversion credits: its debit is in the waiting cash's currency, its credit is that cash in euros."""
     debits = [row for row in conversion if row.amount < 0]
     credits = [row for row in conversion if row.amount > 0]
-    dividends = open_dividends.pop(debits[0].currency, []) if len(debits) == len(credits) == 1 else []
-    if not dividends:
+    items = waiting.pop(debits[0].currency, []) if len(debits) == len(credits) == 1 else []
+    if not items:
         return [_unknown(row) for row in conversion]
-    credit = credits[0]
-    total = sum((d.net for d in dividends), Decimal(0))
-    shares = [to_cents(credit.amount * d.net / total) for d in dividends[:-1]]
-    shares.append(credit.amount - sum(shares, Decimal(0)))  # the last takes what rounding left
-    return [
-        ImportRecord(
-            kind=ImportKind.DIVIDEND,
-            timestamp=d.row.timestamp,
-            amount=share,
-            currency=credit.currency,
-            description=d.row.product,
-            isin=d.row.isin,
-            dividend_currency=d.row.currency,
-            gross=d.row.amount,
-            tax=d.tax,
-            dividend_fee=d.fee,
-        )
-        for d, share in zip(dividends, shares, strict=True)
-    ]
+    return _credited(items, credits[0].amount, credits[0].currency)
+
+
+def _credited(items: list[_OpenCash], amount: Decimal, currency: str) -> list[ImportRecord]:
+    """The items as records sharing `amount` (in `currency`) in proportion to what each left after tax and fee."""
+    if not items:
+        return []
+    total = sum((item.net for item in items), Decimal(0))
+    shares = [to_cents(amount * item.net / total) for item in items[:-1]]
+    shares.append(amount - sum(shares, Decimal(0)))  # the last takes what rounding left
+    return [_cash_record(item, share, currency) for item, share in zip(items, shares, strict=True)]
+
+
+def _cash_record(item: _OpenCash, amount: Decimal, currency: str) -> ImportRecord:
+    if item.kind is ImportKind.CASH_IN_LIEU:
+        return ImportRecord(ImportKind.CASH_IN_LIEU, item.row.timestamp, amount, currency, item.row.product, isin=item.row.isin)
+    return ImportRecord(
+        kind=ImportKind.DIVIDEND,
+        timestamp=item.row.timestamp,
+        amount=amount,
+        currency=currency,
+        description=item.row.product,
+        isin=item.row.isin,
+        dividend_currency=item.row.currency,
+        gross=item.row.amount,
+        tax=item.tax,
+        dividend_fee=item.fee,
+    )
 
 
 def _simple_record(row: _AccountRow) -> ImportRecord:

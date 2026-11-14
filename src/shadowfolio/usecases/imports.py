@@ -23,7 +23,7 @@ class ImportReport:
 
 
 # Records about a security, which need its ticker.
-SECURITY_KINDS = {ImportKind.BUY, ImportKind.SELL, ImportKind.DIVIDEND, ImportKind.SPIN_OFF}
+SECURITY_KINDS = {ImportKind.BUY, ImportKind.SELL, ImportKind.DIVIDEND, ImportKind.SPIN_OFF, ImportKind.CASH_IN_LIEU}
 
 
 class Imports:
@@ -63,6 +63,9 @@ class Imports:
                 self._record_dividend(wallet_id, record, ticker)
             case ImportKind.SPIN_OFF if ticker and record.quantity:
                 self._history.record_shares_received(wallet_id, record.timestamp, ticker, record.quantity)
+            case ImportKind.CASH_IN_LIEU if ticker:
+                description = f"Cash for a fraction of a share of {ticker}"
+                self._history.record_income(wallet_id, record.timestamp, record.amount, description)
             case ImportKind.FEE:
                 self._history.record_fee(wallet_id, record.timestamp, record.amount, record.description)
             case ImportKind.INCOME if record.amount != 0:
