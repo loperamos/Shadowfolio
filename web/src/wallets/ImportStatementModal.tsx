@@ -15,6 +15,8 @@ type Props = {
 };
 
 const CSV = ".csv,text/csv";
+// Both files are needed before a preview: the fields say so while empty.
+const CHOOSE_FILE = "Choose its CSV file to preview";
 
 /** Import a DEGIRO statement: pick its two exports, preview what the wallet would become, then import. */
 export function ImportStatementModal({ wallet, onClose, onImported }: Props) {
@@ -71,8 +73,8 @@ function ImportForm({ wallet, onClose, onImported }: { wallet: WalletResponse; o
       <Text size="sm" c="dimmed">
         In DEGIRO, export the Transactions and the Account statement (CSV) for the whole period. Nothing is saved until you import.
       </Text>
-      <FileInput label="Transactions export" accept={CSV} leftSection={<IconFileTypeCsv size={ICON_SIZE} />} value={transactions} onChange={choose(setTransactions)} clearable />
-      <FileInput label="Account export" accept={CSV} leftSection={<IconFileTypeCsv size={ICON_SIZE} />} value={account} onChange={choose(setAccount)} clearable />
+      <FileInput label="Transactions export" accept={CSV} leftSection={<IconFileTypeCsv size={ICON_SIZE} />} value={transactions} onChange={choose(setTransactions)} placeholder={CHOOSE_FILE} clearable />
+      <FileInput label="Account export" accept={CSV} leftSection={<IconFileTypeCsv size={ICON_SIZE} />} value={account} onChange={choose(setAccount)} placeholder={CHOOSE_FILE} clearable />
       {error && <Alert color="red">{error}</Alert>}
       {preview && <Preview preview={preview} currency={wallet.currency} />}
       <Group justify="flex-end">
