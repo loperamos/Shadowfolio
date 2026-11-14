@@ -225,6 +225,7 @@ def test_a_dividend_with_its_tax_fee_and_conversion_is_one_dividend_credited_in_
         gross=Decimal("9.50"),
         tax=Decimal("1.43"),
         dividend_fee=Decimal("0.81"),
+        payment_date=date(2026, 10, 1),
     )
     assert imported.report.not_imported == []
     [dividend] = [op for op in imported.wallet.operations if isinstance(op, ImportedDividend)]
@@ -756,3 +757,46 @@ def test_importing_into_a_wallet_that_does_not_exist_imports_nothing() -> None:
     records = DegiroStatementReader().read(TRANSACTIONS_HEADER, "\n".join([ACCOUNT_HEADER, DEPOSIT_500]))
 
     assert Imports(repo, changes).apply(uuid4(), records, {}) is None
+
+
+def test_a_dividend_booked_just_after_midnight_still_replaces_the_automatic_one() -> None:
+    # Booked at 00:30 in Paris on its payment day, which is still the day before in UTC: matched by the payment date
+    # DEGIRO prints (the value date), not by when it was booked.
+    paid = DividendEvent("NVDA", date(2026, 9, 11), date(2026, 10, 1), Decimal("0.01"), Currency.USD, "nvda-2026-10")
+    rate = FxRate(Currency.USD, Currency.EUR, Decimal("0.90"), date(2026, 10, 1))
+    dividend = [
+        '02-10-2026,06:53,01-10-2026,,,Operation de change - Crédit,,EUR,"6,43",EUR,"96,75",',
+        '02-10-2026,06:53,01-10-2026,,,Opération de change - Débit,"1,1283",USD,"-7,26",USD,"0,00",',
+        f'01-10-2026,00:30,01-10-2026,{NVIDIA},Impôts sur dividende,,USD,"-1,43",USD,"7,26",',
+        f'01-10-2026,00:30,01-10-2026,{NVIDIA},Dividende,,USD,"8,69",USD,"8,69",',
+    ]
+
+    imported = import_degiro(
+        transactions=[NVIDIA_BUY], account=[*dividend, DEPOSIT_1000], tickers=NVIDIA_TICKER, corporate_actions=(paid,), fx_rates=(rate,)
+    )
+
+    assert [op for op in imported.wallet.operations if isinstance(op, Dividend)] == []
+    assert imported.wallet.cash == Decimal("96.75")
+
+
+def test_a_dividend_whose_value_date_is_before_the_market_data_payment_date_still_replaces_it() -> None:
+    # As IBM's dividend of September 2023: DEGIRO's value date is Saturday 9, market data says Monday 11.
+    ibm = "INTERNATIONAL BUSINESS MACHINES CORP,US4592001014"
+    paid = DividendEvent("IBM", date(2023, 8, 9), date(2023, 9, 11), Decimal("1.66"), Currency.USD, "ibm-2023-09")
+    rate = FxRate(Currency.USD, Currency.EUR, Decimal("0.93"), date(2023, 9, 11))
+    buy = f'01-06-2023,16:00,{ibm},NSY,XNYS,1,"130,0000",USD,"-130,00",USD,"-120,00","1,0833","-0,30","-0,50","-120,80",order-7'
+    account = [
+        '12-09-2023,07:00,11-09-2023,,,Operation de change - Crédit,,EUR,"1,15",EUR,"381,35",',
+        '12-09-2023,07:00,11-09-2023,,,Opération de change - Débit,"1,0700",USD,"-1,23",USD,"0,00",',
+        f'11-09-2023,07:40,09-09-2023,{ibm},Impôts sur dividende,,USD,"-0,25",USD,"1,23",',
+        '11-09-2023,07:41,09-09-2023,,,Frais d’opération sur titres,,USD,"-0,18",USD,"1,23",',
+        f'11-09-2023,07:40,09-09-2023,{ibm},Dividende,,USD,"1,66",USD,"1,66",',
+        '20-05-2023,10:00,20-05-2023,,,Dépôt flatex,,EUR,"500,00",EUR,"500,00",',
+    ]
+
+    imported = import_degiro(
+        transactions=[buy], account=account, tickers={"US4592001014": "IBM"}, corporate_actions=(paid,), fx_rates=(rate,)
+    )
+
+    assert [op for op in imported.wallet.operations if isinstance(op, Dividend)] == []
+    assert imported.wallet.cash == Decimal("380.35")  # 500 - 120.80 + 1.15

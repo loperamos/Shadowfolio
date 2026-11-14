@@ -6,7 +6,7 @@ fees are always positive, as on a statement; the kind decides the sign.
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from enum import StrEnum
 from typing import ClassVar
@@ -206,8 +206,8 @@ class Dividend(BaseOperation):
 @dataclass(frozen=True)
 class ImportedDividend(BaseOperation):
     """A cash dividend as a broker statement reports it: `gross` in `currency`, less the `tax` withheld and the
-    broker's `fee` (both in `currency`), credited as `amount` in the wallet's currency after conversion. `currency`
-    is kept as printed, as it may be one wallets do not use (e.g. HKD)."""
+    broker's `fee` (both in `currency`), credited as `amount` in the wallet's currency after conversion, for the
+    payment of `payment_date`. `currency` is kept as printed, as it may be one wallets do not use (e.g. HKD)."""
 
     type: ClassVar[OperationType] = OperationType.DIVIDEND
 
@@ -217,6 +217,7 @@ class ImportedDividend(BaseOperation):
     tax: Decimal
     fee: Decimal
     amount: Decimal
+    payment_date: date  # the company's payment date, as the statement gives it (booking can be a day or two later)
 
     @property
     def cash_delta(self) -> Decimal:

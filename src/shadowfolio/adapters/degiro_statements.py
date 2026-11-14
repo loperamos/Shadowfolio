@@ -19,7 +19,7 @@ import csv
 import re
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field, replace
-from datetime import datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from enum import Enum, auto
 from itertools import groupby
@@ -29,7 +29,8 @@ from shadowfolio.domain.imports import ImportKind, ImportRecord
 from shadowfolio.domain.money import to_cents
 
 TIMEZONE = ZoneInfo("Europe/Paris")
-DATE_TIME_FORMAT = "%d-%m-%Y %H:%M"
+DATE_FORMAT = "%d-%m-%Y"
+DATE_TIME_FORMAT = f"{DATE_FORMAT} %H:%M"
 # The account's own currency: the Transactions export gives each trade's value and fees in it.
 ACCOUNT_CURRENCY = "EUR"
 
@@ -435,6 +436,7 @@ def _settled_record(item: _Waiting, amount: Decimal) -> ImportRecord:
         gross=item.amount,
         tax=item.tax,
         dividend_fee=item.fee,
+        payment_date=_date(row.value_date),
     )
 
 
@@ -446,7 +448,14 @@ def _unknown(row: _Row) -> ImportRecord:
 
 
 def _timestamp(date: str, time: str) -> datetime:
-    return datetime.strptime(f"{date} {time}", DATE_TIME_FORMAT).replace(tzinfo=TIMEZONE)
+    """DEGIRO's Paris time, in UTC."""
+    return datetime.strptime(f"{date} {time}", DATE_TIME_FORMAT).replace(tzinfo=TIMEZONE).astimezone(UTC)
+
+
+def _date(text: str) -> date:
+    """A calendar date as DEGIRO prints it (DD-MM-YYYY)."""
+    day, month, year = (int(part) for part in text.split("-"))
+    return date(year, month, day)
 
 
 def _number(text: str) -> Decimal:

@@ -155,7 +155,9 @@ def test_dividends_without_a_payment_date_round_trip(make_repository: Repository
 
 
 def test_imported_dividends_round_trip(make_repository: RepositoryFactory) -> None:
-    wallet = a_wallet().record_dividend(uuid4(), T2, "NVDA", "USD", Decimal("9.50"), Decimal("1.43"), Decimal("0.81"), Decimal("6.43"))
+    wallet = a_wallet().record_dividend(
+        uuid4(), T2, "NVDA", "USD", Decimal("9.50"), Decimal("1.43"), Decimal("0.81"), Decimal("6.43"), T2.date()
+    )
     make_repository().add(wallet)
 
     assert make_repository().get(wallet.id) == wallet

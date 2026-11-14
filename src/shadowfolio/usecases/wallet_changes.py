@@ -5,7 +5,7 @@ saves them together. Recording a trade or received shares first applies the symb
 without a price is priced from market data.
 """
 
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from uuid import UUID, uuid4
 
@@ -47,11 +47,20 @@ class WalletChanges:
         return wallet.receive_shares(uuid4(), at, symbol, quantity, Decimal(0))
 
     def record_dividend(
-        self, wallet: Wallet, timestamp: datetime, symbol: str, currency: str, gross: Decimal, tax: Decimal, fee: Decimal, amount: Decimal
+        self,
+        wallet: Wallet,
+        timestamp: datetime,
+        symbol: str,
+        currency: str,
+        gross: Decimal,
+        tax: Decimal,
+        fee: Decimal,
+        amount: Decimal,
+        payment_date: date,
     ) -> Wallet:
-        """A dividend as a broker statement reports it: gross, tax and fee in its currency, and `amount`, what was
-        credited in the wallet's currency."""
-        return wallet.record_dividend(uuid4(), self._at(timestamp), symbol, currency, gross, tax, fee, amount)
+        """A dividend as a broker statement reports it: gross, tax and fee in its currency, `amount`, what was credited
+        in the wallet's currency, and the payment it is for."""
+        return wallet.record_dividend(uuid4(), self._at(timestamp), symbol, currency, gross, tax, fee, amount, payment_date)
 
     def record_buy(
         self,

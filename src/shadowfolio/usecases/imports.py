@@ -94,9 +94,10 @@ class Imports:
             case ImportKind.BUY | ImportKind.SELL | ImportKind.IPO_SUBSCRIPTION if ticker:
                 return self._trade(wallet, record, ticker)
             case ImportKind.DIVIDEND if ticker:
-                assert record.dividend_currency is not None and record.gross is not None
+                assert record.dividend_currency is not None and record.gross is not None and record.payment_date is not None
                 tax, fee = record.tax or Decimal(0), record.dividend_fee or Decimal(0)
-                return changes.record_dividend(wallet, at, ticker, record.dividend_currency, record.gross, tax, fee, amount), None
+                paid = record.payment_date
+                return changes.record_dividend(wallet, at, ticker, record.dividend_currency, record.gross, tax, fee, amount, paid), None
             case ImportKind.SPIN_OFF if ticker and record.quantity:
                 return changes.record_shares_received(wallet, at, ticker, record.quantity), None
             case ImportKind.CASH_IN_LIEU if ticker and amount:

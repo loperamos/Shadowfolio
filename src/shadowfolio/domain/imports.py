@@ -1,7 +1,7 @@
 """Import records: what a broker statement says happened, before it becomes a wallet's operations."""
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from enum import StrEnum
 
@@ -54,3 +54,4 @@ class ImportRecord:
     gross: Decimal | None = None
     tax: Decimal | None = None
     dividend_fee: Decimal | None = None
+    payment_date: date | None = None

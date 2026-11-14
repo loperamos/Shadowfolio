@@ -54,7 +54,8 @@ CREATE TABLE IF NOT EXISTS operations (
     fx_rate TEXT,
     withholding TEXT,
     gross TEXT,
-    description TEXT
+    description TEXT,
+    payment_date TEXT
 );
 CREATE TABLE IF NOT EXISTS checked_periods (
     wallet_id TEXT NOT NULL REFERENCES wallets (id),
@@ -90,6 +91,7 @@ _ADDED_COLUMNS = {
         "withholding": "TEXT",
         "gross": "TEXT",
         "description": "TEXT",
+        "payment_date": "TEXT",
     },
 }
 
@@ -135,7 +137,7 @@ class SqliteWalletRepository(WalletRepository):
                 return None
             operation_rows = conn.execute(
                 "SELECT id, type, timestamp, amount, fees, symbol, quantity, price, price_currency, price_source, "
-                "split_old_rate, split_new_rate, event_id, fx_rate, withholding, gross, description "
+                "split_old_rate, split_new_rate, event_id, fx_rate, withholding, gross, description, payment_date "
                 "FROM operations WHERE wallet_id = ? ORDER BY timestamp, rowid",
                 (str(wallet_id),),
             ).fetchall()
@@ -182,8 +184,8 @@ def _insert_operations(conn: sqlite3.Connection, wallet: Wallet) -> None:
     conn.executemany(
         "INSERT INTO operations (id, wallet_id, type, timestamp, amount, fees, "
         "symbol, quantity, price, price_currency, price_source, split_old_rate, split_new_rate, event_id, fx_rate, "
-        "withholding, gross, description) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        "withholding, gross, description, payment_date) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
         [_operation_to_row(wallet.id, op) for op in wallet.operations],
     )
 
@@ -230,9 +232,8 @@ def _dividend_from_row(row: tuple[str, ...]) -> RecordedDividend:
 
 def _operation_to_row(wallet_id: UUID, op: Operation) -> tuple[str | None, ...]:
     """One row per operation; columns that do not apply to its kind are NULL."""
-    symbol = quantity = price = price_currency = price_source = old_rate = new_rate = event_id = fx_rate = withholding = gross = (
-        description
-    ) = None
+    symbol = quantity = price = price_currency = price_source = old_rate = new_rate = event_id = fx_rate = None
+    withholding = gross = description = payment_date = None
     match op:
         case Deposit() | Withdrawal():
             amount, fees = op.amount, Decimal(0)
@@ -251,7 +252,7 @@ def _operation_to_row(wallet_id: UUID, op: Operation) -> tuple[str | None, ...]:
         case ImportedDividend():
             # From a statement, so no event: amount credited; fees, withholding and gross in the dividend's currency.
             amount, fees, withholding, gross = op.amount, op.fee, str(op.tax), str(op.gross)
-            symbol, price_currency = op.symbol, op.currency
+            symbol, price_currency, payment_date = op.symbol, op.currency, op.payment_date.isoformat()
         case Fee() | Income():
             amount, fees, description = op.amount, Decimal(0), op.description
         case SharesReceived():
@@ -275,6 +276,7 @@ def _operation_to_row(wallet_id: UUID, op: Operation) -> tuple[str | None, ...]:
         withholding,
         gross,
         description,
+        payment_date,
     )
 
 
@@ -297,6 +299,7 @@ def _operation_from_row(row: tuple[str | None, ...]) -> Operation:
         withholding,
         gross,
         description,
+        payment_date,
     ) = row
     assert op_id and op_type and timestamp and amount and fees
     id_, at, value = UUID(op_id), datetime.fromisoformat(timestamp), Decimal(amount)
@@ -324,8 +327,9 @@ def _operation_from_row(row: tuple[str | None, ...]) -> Operation:
             assert description is not None
             return Income(id_, at, value, description)
         case OperationType.DIVIDEND if event_id is None:
-            assert symbol and price_currency and gross and withholding
-            return ImportedDividend(id_, at, symbol, price_currency, Decimal(gross), Decimal(withholding), Decimal(fees), value)
+            assert symbol and price_currency and gross and withholding and payment_date
+            paid = date.fromisoformat(payment_date)
+            return ImportedDividend(id_, at, symbol, price_currency, Decimal(gross), Decimal(withholding), Decimal(fees), value, paid)
         case OperationType.DIVIDEND:
             assert symbol and quantity and price and price_currency and event_id
             rate = None if fx_rate is None else Decimal(fx_rate)

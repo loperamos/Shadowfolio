@@ -38,8 +38,8 @@ from shadowfolio.domain.operations import (
     Withdrawal,
 )
 
-# How long after a dividend's payment date a broker may book it.
-DIVIDEND_BOOKING_DELAY = timedelta(days=7)
+# How far apart two sources' payment dates for the same dividend can be.
+PAYMENT_DATE_TOLERANCE = timedelta(days=7)
 
 
 @dataclass(frozen=True)
@@ -131,11 +131,20 @@ class Wallet:
         return self._with(SharesReceived(operation_id, at, symbol, quantity, cost))
 
     def record_dividend(
-        self, operation_id: UUID, at: datetime, symbol: str, currency: str, gross: Decimal, tax: Decimal, fee: Decimal, amount: Decimal
+        self,
+        operation_id: UUID,
+        at: datetime,
+        symbol: str,
+        currency: str,
+        gross: Decimal,
+        tax: Decimal,
+        fee: Decimal,
+        amount: Decimal,
+        payment_date: date,
     ) -> Self:
         """A dividend as a broker statement reports it (see ImportedDividend); `amount` is what the wallet received."""
         _require_positive(amount, "amount")
-        return self._with(ImportedDividend(operation_id, at, symbol, currency, gross, tax, fee, amount))
+        return self._with(ImportedDividend(operation_id, at, symbol, currency, gross, tax, fee, amount, payment_date))
 
     def buy(
         self,
@@ -288,7 +297,7 @@ class Wallet:
             event = recorded.event
             if event.payable_date is None:  # known, but when its cash arrived is not: see uncredited_dividends
                 continue
-            if _imported(base, event.symbol, event.payable_date):  # the broker's own figures win
+            if _imported(base, event.symbol, event.payable_date):  # the broker's own figures win, for that payment
                 continue
             shares = _shares_before_ex(base, event)
             if shares <= 0:
@@ -372,11 +381,9 @@ def _shares_before_ex(base: Iterable[Operation], event: DividendEvent) -> Decima
 
 
 def _imported(base: Iterable[Operation], symbol: str, payable_date: date) -> bool:
-    """Whether a broker statement already reports this dividend: one of `symbol` booked within a few days of its
-    payment date (brokers book it on that day or a few days later)."""
+    """Whether a broker statement already reports this dividend: one of `symbol` for about the same payment date
+    (sources can differ by a few days, e.g. a weekend; a company pays at most one dividend in that time)."""
     return any(
-        isinstance(op, ImportedDividend)
-        and op.symbol == symbol
-        and timedelta(0) <= op.timestamp.date() - payable_date <= DIVIDEND_BOOKING_DELAY
+        isinstance(op, ImportedDividend) and op.symbol == symbol and abs(op.payment_date - payable_date) <= PAYMENT_DATE_TOLERANCE
         for op in base
     )
