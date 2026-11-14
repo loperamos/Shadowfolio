@@ -843,21 +843,6 @@ TWO_DIVIDENDS_WAITING = [
 TWO_TICKERS = {**NVIDIA_TICKER, "US94106L1098": "WM"}
 
 
-def test_a_conversion_can_settle_a_later_waiting_dividend_before_an_earlier_one() -> None:
-    account = [
-        '31-03-2024,07:00,30-03-2024,,,Operation de change - Crédit,,EUR,"0,90",EUR,"502,70",',
-        '31-03-2024,07:00,30-03-2024,,,Opération de change - Débit,"1,1000",USD,"-1,00",USD,"0,00",',
-        '30-03-2024,07:00,29-03-2024,,,Operation de change - Crédit,,EUR,"1,80",EUR,"501,80",',
-        '30-03-2024,07:00,29-03-2024,,,Opération de change - Débit,"1,1000",USD,"-2,00",USD,"1,00",',
-        *TWO_DIVIDENDS_WAITING,
-    ]
-
-    imported = import_degiro(transactions=[], account=account, tickers=TWO_TICKERS)
-
-    credited = {op.symbol: op.amount for op in imported.wallet.operations if isinstance(op, ImportedDividend)}
-    assert credited == {"WM": Decimal("1.80"), "NVDA": Decimal("0.90")}
-
-
 def test_a_conversion_matching_no_waiting_cash_is_reported_not_guessed() -> None:
     account = [
         '30-03-2024,07:00,29-03-2024,,,Operation de change - Crédit,,EUR,"2,25",EUR,"502,25",',

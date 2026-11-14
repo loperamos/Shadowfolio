@@ -22,7 +22,7 @@ from dataclasses import dataclass, field, replace
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from enum import Enum, auto
-from itertools import combinations, groupby
+from itertools import groupby
 from zoneinfo import ZoneInfo
 
 from shadowfolio.domain.imports import DividendDetails, ImportKind, ImportRecord, TradeDetails
@@ -110,9 +110,6 @@ ANNOUNCED_KINDS = {
     RowType.ISIN_CHANGE_NOTICE: ImportKind.ISIN_CHANGE,
     RowType.IPO_NOTICE: ImportKind.IPO_SUBSCRIPTION,
 }
-# A conversion that does not settle the oldest waiting items is matched against every combination of them, up to this
-# many items (more is unheard of: DEGIRO converts within a day or two).
-MAX_ITEMS_SEARCHED = 12
 # Rows of cash that may wait for a conversion, in the order read within a minute: paid cash first, so a tax or fee
 # booked in the same minute finds its dividend.
 WAITING_CASH_ORDER = [RowType.DIVIDEND, RowType.CASH_IN_LIEU, RowType.DIVIDEND_TAX, RowType.SECURITIES_FEE, RowType.CONVERSION]
@@ -393,18 +390,12 @@ def _converted(conversion: list[_Row], pockets: _Pockets) -> list[ImportRecord]:
 
 def _settled_by(items: list[_Waiting], converted: Decimal) -> list[_Waiting] | None:
     """The waiting items a conversion of `converted` (positive when it takes money out of that currency) settles: the
-    oldest ones adding up to exactly that (the usual case), or else the fewest, oldest ones that do; None if none do."""
+    oldest ones adding up to exactly that; None if they do not."""
     total = Decimal(0)
     for count, item in enumerate(items, start=1):
         total += item.net
         if total == converted:
             return items[:count]
-    if len(items) > MAX_ITEMS_SEARCHED:
-        return None
-    for size in range(1, len(items) + 1):
-        for chosen in combinations(items, size):  # in order: the oldest first
-            if sum((item.net for item in chosen), Decimal(0)) == converted:
-                return list(chosen)
     return None
 
 
