@@ -1,10 +1,20 @@
 import { Alert, Anchor, Breadcrumbs, Button, Group, Loader, Stack, Table, Text, Title, Tooltip } from "@mantine/core";
-import { IconPlus } from "@tabler/icons-react";
+import { IconArrowsExchange, IconPlus } from "@tabler/icons-react";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 
 import { apiErrorMessage } from "../api/errors";
-import { getWallet, listOperations, type OperationResponse, OperationType, PriceSource, updateWallet, type WalletResponse } from "../api/generated";
+import {
+  getWallet,
+  listOperations,
+  listOrders,
+  type OperationResponse,
+  OperationType,
+  type OrderResponse,
+  PriceSource,
+  updateWallet,
+  type WalletResponse,
+} from "../api/generated";
 import { walletPath, WALLETS_PATH } from "../routes";
 import { EditableTitle } from "../ui/EditableTitle";
 import { GainText } from "../ui/GainText";
@@ -27,6 +37,8 @@ import { WalletActionsMenu } from "./WalletActionsMenu";
 import { WalletSettingsModal } from "./WalletSettingsModal";
 import { ImportStatementModal } from "./ImportStatementModal";
 import { useBenchmarkChoice } from "./benchmarkChoice";
+import { PlaceOrderModal } from "./PlaceOrderModal";
+import { WalletOrders } from "./WalletOrders";
 import { WalletPerformance } from "./WalletPerformance";
 import { useChartLines, WalletValueChart } from "./WalletValueChart";
 import { OperationFilterFields } from "./OperationFilterFields";
@@ -49,7 +61,7 @@ const HOLDINGS_DEFAULT_SORT = { key: HoldingColumn.VALUE, order: SortOrder.DESCE
 // Exchange rates are shown to this many decimals in tooltips; the valuation uses the exact rate.
 const RATE_DECIMALS = 4;
 
-type Loaded = { wallet: WalletResponse; operations: OperationResponse[] };
+type Loaded = { wallet: WalletResponse; operations: OperationResponse[]; orders: OrderResponse[] };
 type State = { status: "loading" } | { status: "not-found" } | { status: "error"; message: string } | ({ status: "loaded" } & Loaded);
 
 /** One wallet: its cash, holdings and history. */
@@ -67,17 +79,20 @@ export function WalletPage() {
   const [toConfigure, setToConfigure] = useState<WalletResponse | null>(null);
   const [toImportInto, setToImportInto] = useState<WalletResponse | null>(null);
   const [toDelete, setToDelete] = useState<WalletResponse[]>([]);
+  const [placingOrder, setPlacingOrder] = useState(false);
 
   useEffect(() => {
     // Keep showing the wallet while it reloads; show the loader only when opening another one.
     setState((current) => (current.status === "loaded" && current.wallet.id === walletId ? current : { status: "loading" }));
     const path = { wallet_id: walletId };
-    Promise.all([getWallet({ path }), listOperations({ path })])
-      .then(([wallet, operations]) => {
+    // Orders first: reading them fills the due ones, so the wallet and its operations then include those trades.
+    listOrders({ path })
+      .then((orders) => Promise.all([orders, getWallet({ path }), listOperations({ path })]))
+      .then(([orders, wallet, operations]) => {
         if (wallet.response?.status === NOT_FOUND_STATUS) {
           setState({ status: "not-found" });
-        } else if (wallet.data && operations.data) {
-          setState({ status: "loaded", wallet: wallet.data, operations: operations.data });
+        } else if (wallet.data && operations.data && orders.data) {
+          setState({ status: "loaded", wallet: wallet.data, operations: operations.data, orders: orders.data });
         } else {
           setState({ status: "error", message: "Could not load the wallet." });
         }
@@ -138,7 +153,11 @@ export function WalletPage() {
               {state.wallet.hindsight && <HindsightBadge />}
             </Group>
             <Group gap="xs" wrap="nowrap">
-              <Button leftSection={<IconPlus size={ICON_SIZE} />} onClick={() => setOperationDialog({ operation: null })}>
+              {/* Now, at the next market price, versus something that already happened at a past time. */}
+              <Button leftSection={<IconArrowsExchange size={ICON_SIZE} />} onClick={() => setPlacingOrder(true)}>
+                Place order
+              </Button>
+              <Button variant="default" leftSection={<IconPlus size={ICON_SIZE} />} onClick={() => setOperationDialog({ operation: null })}>
                 Add operation
               </Button>
               <WalletActionsMenu wallet={state.wallet} onRename={() => setEditingName(true)} onSettings={setToConfigure} onImport={setToImportInto} onDuplicate={setToDuplicate} onDelete={setToDelete} />
@@ -149,7 +168,9 @@ export function WalletPage() {
           <WalletDetails
             wallet={state.wallet}
             operations={state.operations}
+            orders={state.orders}
             version={version}
+            onOrdersChanged={reload}
             onEditOperation={(operation) => setOperationDialog({ operation })}
             onDeleteOperation={setOperationToDelete}
           />
@@ -160,6 +181,7 @@ export function WalletPage() {
             onClose={() => setOperationDialog(null)}
             onSaved={reload}
           />
+          <PlaceOrderModal wallet={state.wallet} opened={placingOrder} onClose={() => setPlacingOrder(false)} onPlaced={reload} />
           <DeleteOperationModal wallet={state.wallet} operation={operationToDelete} onClose={() => setOperationToDelete(null)} onDeleted={reload} />
           {/* Duplicating opens the copy; deleting goes back to the list. */}
           <WalletSettingsModal wallet={toConfigure} onClose={() => setToConfigure(null)} onSaved={reload} />
@@ -173,11 +195,12 @@ export function WalletPage() {
 
 type DetailsProps = Loaded & {
   version: number;
+  onOrdersChanged: () => void;
   onEditOperation: (operation: OperationResponse) => void;
   onDeleteOperation: (operation: OperationResponse) => void;
 };
 
-function WalletDetails({ wallet, operations, version, onEditOperation, onDeleteOperation }: DetailsProps) {
+function WalletDetails({ wallet, operations, orders, version, onOrdersChanged, onEditOperation, onDeleteOperation }: DetailsProps) {
   // Splits that changed nothing (no shares held on their date) are left out: they only add noise.
   const effective = operations.filter((op) => op.had_effect !== false);
   const { period, range, choose, params } = usePeriod(todayAsInputValue());
@@ -296,6 +319,8 @@ function WalletDetails({ wallet, operations, version, onEditOperation, onDeleteO
           </Table.ScrollContainer>
         )}
       </div>
+
+      <WalletOrders wallet={wallet} orders={orders} onChanged={onOrdersChanged} />
 
       <div>
         <Group justify="space-between" align="flex-start" mb="sm">
