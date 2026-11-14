@@ -161,8 +161,12 @@ def test_imported_dividends_round_trip(make_repository: RepositoryFactory) -> No
     assert make_repository().get(wallet.id) == wallet
 
 
-def test_fees_round_trip(make_repository: RepositoryFactory) -> None:
-    wallet = a_wallet().pay_fee(uuid4(), T2, Decimal("2.50"), "Exchange connection fee 2026 (NYSE)")
+def test_fees_and_income_round_trip(make_repository: RepositoryFactory) -> None:
+    wallet = (
+        a_wallet()
+        .pay_fee(uuid4(), T2, Decimal("2.50"), "Exchange connection fee 2026 (NYSE)")
+        .record_income(uuid4(), T2, Decimal("-0.01"), "Interest charged")
+    )
     make_repository().add(wallet)
 
     assert make_repository().get(wallet.id) == wallet

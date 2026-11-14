@@ -15,6 +15,7 @@ class ImportKind(StrEnum):
     TRADE_SETTLEMENT = "trade_settlement"
     DIVIDEND = "dividend"
     FEE = "fee"  # a charge not tied to one trade
+    INCOME = "income"  # interest, compensations; its amount is signed (negative for interest charged)
     # Money moving between accounts that are all the investor's (a broker and its partner bank, a cash fund).
     INTERNAL_TRANSFER = "internal_transfer"
     UNKNOWN = "unknown"  # a row the reader does not recognise
@@ -22,7 +23,8 @@ class ImportKind(StrEnum):
 
 @dataclass(frozen=True)
 class ImportRecord:
-    """One operation read from a broker statement. Amounts are positive; the kind says which way they go."""
+    """One operation read from a broker statement. Amounts are positive (the kind says which way they go), except
+    for income, which can be either."""
 
     kind: ImportKind
     timestamp: datetime  # timezone-aware

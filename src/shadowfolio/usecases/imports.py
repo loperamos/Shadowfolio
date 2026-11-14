@@ -45,6 +45,10 @@ class Imports:
                     self._record_trade(wallet_id, record, ticker)
                 case ImportKind.FEE:
                     self._history.record_fee(wallet_id, record.timestamp, record.amount, record.description)
+                case ImportKind.INCOME if record.amount != 0:
+                    self._history.record_income(wallet_id, record.timestamp, record.amount, record.description)
+                case ImportKind.INCOME:
+                    pass  # e.g. a quarter's interest of 0.00: nothing to record
                 case ImportKind.DIVIDEND:
                     ticker = tickers.get(record.isin or "")
                     if ticker is None:

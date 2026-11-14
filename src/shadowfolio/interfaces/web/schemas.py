@@ -14,6 +14,7 @@ from shadowfolio.domain.operations import (
     Dividend,
     Fee,
     ImportedDividend,
+    Income,
     Operation,
     OperationType,
     PriceSource,
@@ -175,7 +176,7 @@ class OperationResponse(BaseModel):
     # Dividends only, in the wallet's currency: before tax, and the tax withheld (amount is what was credited).
     gross: Decimal | None = None
     withholding: Decimal | None = None
-    description: str | None = None  # fees only: the broker's wording
+    description: str | None = None  # fees and income only: the broker's wording
 
     @classmethod
     def from_operation(cls, operation: Operation, had_effect: bool = True) -> "OperationResponse":
@@ -209,7 +210,7 @@ class OperationResponse(BaseModel):
                     automatic=True,
                     had_effect=had_effect,
                 )
-            case Fee():
+            case Fee() | Income():
                 return cls(
                     id=operation.id,
                     type=operation.type,

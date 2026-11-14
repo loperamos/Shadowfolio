@@ -37,6 +37,7 @@ ACCOUNT_PATTERNS: list[tuple[re.Pattern[str], ImportKind]] = [
         (r"^(Degiro Cash Sweep Transfer|Virement (vers|depuis) votre Compte Espèces à la flatexDEGIRO Bank)", ImportKind.INTERNAL_TRANSFER),
         (r"^(Variation Fonds Monétaires|Conversion Fonds Monétaires finalisée)", ImportKind.INTERNAL_TRANSFER),
         (r"^Frais de connexion aux places boursières", ImportKind.FEE),
+        (r"^(Flatex Interest|Flatex Interest Income|Compensation Fonds Monétaires DEGIRO)$", ImportKind.INCOME),
     ]
 ]
 
@@ -193,7 +194,8 @@ def _simple_record(row: _AccountRow) -> ImportRecord:
         kind = ImportKind.TRADE_SETTLEMENT
     else:
         kind = next((kind for pattern, kind in ACCOUNT_PATTERNS if pattern.search(row.description)), ImportKind.UNKNOWN)
-    return ImportRecord(kind, row.timestamp, abs(row.amount), row.currency, row.description)
+    amount = row.amount if kind is ImportKind.INCOME else abs(row.amount)
+    return ImportRecord(kind, row.timestamp, amount, row.currency, row.description)
 
 
 def _unknown(row: _AccountRow) -> ImportRecord:

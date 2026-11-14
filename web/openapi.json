@@ -1550,7 +1550,8 @@
           "sell",
           "split",
           "dividend",
-          "fee"
+          "fee",
+          "income"
         ],
         "title": "OperationType"
       },

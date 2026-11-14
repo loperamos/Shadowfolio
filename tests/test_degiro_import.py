@@ -19,7 +19,7 @@ from shadowfolio.adapters.in_memory_wallet_repository import InMemoryWalletRepos
 from shadowfolio.domain.corporate_actions import DividendEvent
 from shadowfolio.domain.imports import ImportKind, ImportRecord
 from shadowfolio.domain.money import Currency, FxRate
-from shadowfolio.domain.operations import Dividend, Fee, ImportedDividend
+from shadowfolio.domain.operations import Dividend, Fee, ImportedDividend, Income
 from shadowfolio.domain.wallet import Wallet
 from shadowfolio.usecases.history import History
 from shadowfolio.usecases.imports import ImportReport, Imports
@@ -304,3 +304,19 @@ def test_an_exchange_connection_fee_is_a_fee_taken_from_the_cash() -> None:
     [taken] = [op for op in imported.wallet.operations if isinstance(op, Fee)]
     assert (taken.amount, taken.description) == (Decimal("2.50"), description)
     assert imported.wallet.cash == Decimal("497.50")
+
+
+def test_interest_and_compensations_are_income_and_charged_interest_is_negative() -> None:
+    account = [
+        '26-10-2026,00:30,26-10-2026,,,Compensation Fonds Monétaires DEGIRO,,EUR,"8,89",EUR,"508,88",',
+        '06-10-2026,06:52,30-09-2026,,,Flatex Interest Income,,EUR,"0,00",EUR,"499,99",',  # nothing paid: nothing recorded
+        '01-10-2022,07:41,30-09-2022,,,Flatex Interest,,EUR,"-0,01",EUR,"499,99",',
+        '01-09-2022,10:00,01-09-2022,,,Dépôt flatex,,EUR,"500,00",EUR,"500,00",',
+    ]
+
+    imported = import_degiro(transactions=[], account=account)
+
+    assert [record.kind for record in imported.records[1:]] == [ImportKind.INCOME] * 3
+    income = [(op.amount, op.description) for op in imported.wallet.operations if isinstance(op, Income)]
+    assert income == [(Decimal("-0.01"), "Flatex Interest"), (Decimal("8.89"), "Compensation Fonds Monétaires DEGIRO")]
+    assert imported.wallet.cash == Decimal("508.88")

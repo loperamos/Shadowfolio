@@ -315,7 +315,8 @@ export const OperationType = {
     SELL: 'sell',
     SPLIT: 'split',
     DIVIDEND: 'dividend',
-    FEE: 'fee'
+    FEE: 'fee',
+    INCOME: 'income'
 } as const;
 
 /**

@@ -28,6 +28,7 @@ from shadowfolio.domain.operations import (
     Dividend,
     Fee,
     ImportedDividend,
+    Income,
     Operation,
     PriceSource,
     Sell,
@@ -111,6 +112,12 @@ class Wallet:
     def pay_fee(self, operation_id: UUID, at: datetime, amount: Decimal, description: str) -> Self:
         _require_positive(amount, "amount")
         return self._with(Fee(operation_id, at, amount, description))
+
+    def record_income(self, operation_id: UUID, at: datetime, amount: Decimal, description: str) -> Self:
+        """Interest, a compensation or other income; negative for interest charged."""
+        if amount == 0:
+            raise InvalidAmountError("amount must not be zero")
+        return self._with(Income(operation_id, at, amount, description))
 
     def record_dividend(
         self, operation_id: UUID, at: datetime, symbol: str, currency: str, gross: Decimal, tax: Decimal, fee: Decimal, amount: Decimal

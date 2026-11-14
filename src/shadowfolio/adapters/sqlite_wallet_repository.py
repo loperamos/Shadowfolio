@@ -15,6 +15,7 @@ from shadowfolio.domain.operations import (
     Dividend,
     Fee,
     ImportedDividend,
+    Income,
     Operation,
     OperationType,
     PriceSource,
@@ -250,7 +251,7 @@ def _operation_to_row(wallet_id: UUID, op: Operation) -> tuple[str | None, ...]:
             # From a statement, so no event: amount credited; fees, withholding and gross in the dividend's currency.
             amount, fees, withholding, gross = op.amount, op.fee, str(op.tax), str(op.gross)
             symbol, price_currency = op.symbol, op.currency
-        case Fee():
+        case Fee() | Income():
             amount, fees, description = op.amount, Decimal(0), op.description
     return (
         str(op.id),
@@ -313,6 +314,9 @@ def _operation_from_row(row: tuple[str | None, ...]) -> Operation:
         case OperationType.FEE:
             assert description is not None
             return Fee(id_, at, value, description)
+        case OperationType.INCOME:
+            assert description is not None
+            return Income(id_, at, value, description)
         case OperationType.DIVIDEND if event_id is None:
             assert symbol and price_currency and gross and withholding
             return ImportedDividend(id_, at, symbol, price_currency, Decimal(gross), Decimal(withholding), Decimal(fees), value)

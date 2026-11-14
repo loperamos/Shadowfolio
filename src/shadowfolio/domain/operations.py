@@ -23,6 +23,7 @@ class OperationType(StrEnum):
     SPLIT = "split"
     DIVIDEND = "dividend"
     FEE = "fee"
+    INCOME = "income"
 
 
 class PriceSource(StrEnum):
@@ -251,6 +252,29 @@ class Fee(BaseOperation):
         return False
 
 
+@dataclass(frozen=True)
+class Income(BaseOperation):
+    """Cash the account earns besides dividends and sales: interest, compensations, promotions. Negative for interest
+    charged (e.g. negative rates on cash)."""
+
+    type: ClassVar[OperationType] = OperationType.INCOME
+
+    amount: Decimal  # signed
+    description: str  # as the broker words it
+
+    @property
+    def cash_delta(self) -> Decimal:
+        return self.amount
+
+    @property
+    def holding_change(self) -> tuple[str, Decimal] | None:
+        return None
+
+    @property
+    def automatic(self) -> bool:
+        return False
+
+
 # Every concrete kind. Code that handles each kind matches on this, so mypy reports a kind
 # that is not handled.
-Operation = Deposit | Withdrawal | Buy | Sell | Split | Dividend | ImportedDividend | Fee
+Operation = Deposit | Withdrawal | Buy | Sell | Split | Dividend | ImportedDividend | Fee | Income
