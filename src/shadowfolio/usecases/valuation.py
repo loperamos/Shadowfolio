@@ -7,7 +7,7 @@ from uuid import UUID
 from shadowfolio.domain.errors import FutureTimestampError, FxRateUnavailableError, InvalidPeriodError, PriceUnavailableError
 from shadowfolio.domain.money import Currency, FxRate
 from shadowfolio.domain.operations import Buy, Sell
-from shadowfolio.domain.valuation import DailyValue, Quote, WalletValuation, estimated_price, value_wallet
+from shadowfolio.domain.valuation import DailyValue, Quote, WalletValuation, estimated_price, holdings_value, value_wallet
 from shadowfolio.domain.wallet import Wallet
 from shadowfolio.ports.clock import Clock
 from shadowfolio.ports.fx_rates import FxRates, FxRatesUnavailableError
@@ -77,7 +77,8 @@ class Valuation:
         if end < start:
             raise InvalidPeriodError("the period must not end before it starts")
         days = [start + timedelta(days=offset) for offset in range((end - start).days + 1)]
-        states = [wallet.as_of(_end_of(day)) for day in days]
+        # Each day's state in one pass over the operations, rather than rebuilding the wallet for every day.
+        states = wallet.states_at([_end_of(day) for day in days])
         closes: dict[str, dict[date, Quote]] = {}
         for symbol in sorted({symbol for state in states for symbol in state.holdings}):
             try:
@@ -112,8 +113,8 @@ class Valuation:
             missing = [symbol for symbol in sorted(state.holdings) if symbol not in day_closes]
             currencies = sorted({close.currency for close in day_closes.values()} - {wallet.currency} - set(day_rates))
             missing += [f"{currency}→{wallet.currency}" for currency in currencies]
-            valuation = None if missing else value_wallet(state, day_closes, day_rates)
-            values.append(DailyValue(day, valuation, state.cash, state.net_deposits, tuple(missing), tuple(estimated)))
+            total = None if missing else state.cash + holdings_value(state.holdings, day_closes, day_rates, wallet.currency)
+            values.append(DailyValue(day, total, state.cash, state.net_deposits, tuple(missing), tuple(estimated)))
         return values
 
     def _value(

@@ -475,7 +475,7 @@ class DailyValueResponse(BaseModel):
 
     @classmethod
     def from_daily_value(cls, value: DailyValue) -> "DailyValueResponse":
-        if value.valuation is None:
+        if value.total is None:
             return cls(
                 day=value.day,
                 cash=value.cash,
@@ -485,7 +485,7 @@ class DailyValueResponse(BaseModel):
                 missing=list(value.missing),
                 estimated=list(value.estimated),
             )
-        holdings_value = _cents(value.valuation.total - value.valuation.cash)
+        holdings_value = _cents(value.total - value.cash)
         return cls(
             day=value.day,
             cash=value.cash,

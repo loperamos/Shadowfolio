@@ -87,8 +87,7 @@ class Comparison:
         benchmark = self._benchmark(wallet, daily, _normalized(symbol))
         wallet_points, previous_deposits = [], Decimal(0)
         for value in daily:
-            total = None if value.valuation is None else value.valuation.total
-            wallet_points.append(DayValue(value.day, total, value.net_deposits - previous_deposits))
+            wallet_points.append(DayValue(value.day, value.total, value.net_deposits - previous_deposits))
             previous_deposits = value.net_deposits
         benchmark_points = [DayValue(value.day, value.value, value.flow) for value in benchmark.values]
         first_day = daily[0].day if daily else self._clock.now().date()
@@ -124,7 +123,7 @@ class Comparison:
             dividends = self._corporate_actions.dividends(symbol, start, end)
         except CorporateActionsUnavailableError as error:
             raise CorporateActionsUnavailableNowError(f"could not fetch {symbol}'s dividends right now; try again later") from error
-        wallet_values = {value.day: value.valuation.total for value in daily if value.valuation is not None}
+        wallet_values = {value.day: value.total for value in daily if value.total is not None}
         return Benchmark(symbol, benchmark_values(days, flows, wallet_values, closes, rates, dividends, wallet.withholding_rate))
 
 
