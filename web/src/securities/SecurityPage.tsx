@@ -18,6 +18,7 @@ import { type ValuationState, useWalletValuations } from "../wallets/useWalletVa
 import { SecurityFundamentals } from "./SecurityFundamentals";
 import { SecurityNews } from "./SecurityNews";
 import { SecurityRanges } from "./SecurityRanges";
+import { SecurityStatistics } from "./SecurityStatistics";
 import { EXPLANATIONS } from "./explanations";
 import { useCalendar, useCloses, useQuote } from "./useSecurity";
 
@@ -131,6 +132,9 @@ function PriceChart({ symbol }: { symbol: string }) {
         ))}
       <Box mt="lg">
         <SecurityRanges symbol={symbol} start={range.start} end={range.end} currency={state.status === "loaded" ? (state.closes[0]?.currency ?? null) : null} />
+      </Box>
+      <Box mt="lg">
+        <SecurityStatistics symbol={symbol} start={range.start} end={range.end} />
       </Box>
     </div>
   );

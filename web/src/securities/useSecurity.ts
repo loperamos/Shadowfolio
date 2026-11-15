@@ -14,6 +14,8 @@ import {
   securityNews,
   securityRanges,
   type SecurityRangesResponse,
+  securityStatistics,
+  type SecurityStatisticsResponse,
 } from "../api/generated";
 
 const NOT_FOUND_STATUS = 404;
@@ -161,5 +163,27 @@ export function useCalendar(symbol: string): CalendarState {
       current = false;
     };
   }, [symbol]);
+  return state;
+}
+
+export type StatisticsState = { status: "loading" } | { status: "error"; message: string } | { status: "loaded"; statistics: SecurityStatisticsResponse };
+
+/** The trend, and over the period the volatility, deepest fall and beta. Loads on its own, so it never holds up the page. */
+export function useStatistics(symbol: string, start: string | null, end: string | null): StatisticsState {
+  const [state, setState] = useState<StatisticsState>({ status: "loading" });
+  useEffect(() => {
+    let current = true;
+    setState({ status: "loading" });
+    securityStatistics({ path: { symbol }, query: { start, end } })
+      .then(({ data, error }) => {
+        if (current) {
+          setState(data ? { status: "loaded", statistics: data } : { status: "error", message: apiErrorMessage(error) });
+        }
+      })
+      .catch(() => current && setState({ status: "error", message: "Could not reach the backend." }));
+    return () => {
+      current = false;
+    };
+  }, [symbol, start, end]);
   return state;
 }

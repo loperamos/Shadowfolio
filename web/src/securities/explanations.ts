@@ -49,6 +49,19 @@ export const EXPLANATIONS = {
     "The first day the shares trade without their next dividend: you receive it only if you own the shares before that day starts. " +
     "The price usually drops by about the dividend that morning, so buying just before it to collect the dividend gains nothing. The " +
     "dividend is paid later, on the payment date.",
+  trend:
+    "How much the price changed over the last 3, 6 and 12 months, whatever period is selected. Stocks that rose over the past months " +
+    "have tended to keep rising for a while (momentum), but far less since this became widely known: read it as where the price has " +
+    "been, not where it is going.",
+  volatility:
+    "How much the price swings from day to day over the selected period, scaled to a year. The market as a whole is usually around " +
+    "15–20%; single companies often 25–50%. Higher means a bumpier ride: larger falls are more likely along the way.",
+  maxDrawdown:
+    "The deepest fall from a high to a later low in the selected period: what someone who bought at the worst moment would have seen. " +
+    "It shows how painful holding it has been, which a return alone hides.",
+  beta:
+    "How much the price tends to move when the market (SPY) moves, over the selected period: 1 moves with it, 2 twice as much, 0.5 half, " +
+    "and near 0 or below barely or against it. It describes market risk; it has done little to explain which stocks earn more.",
   priceRange:
     "The lowest and highest closing price over the period you selected, with today's price as the dot. Near the top means it trades close " +
     "to its recent highs; near the bottom, close to its lows. It shows where the price is, not whether it is cheap.",
