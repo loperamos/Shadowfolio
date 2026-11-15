@@ -40,6 +40,7 @@ from shadowfolio.domain.operations import (
     Withdrawal,
 )
 from shadowfolio.domain.orders import Order
+from shadowfolio.domain.rules import Rules
 
 # How far apart two sources' payment dates for the same dividend can be.
 PAYMENT_DATE_TOLERANCE = timedelta(days=7)
@@ -68,6 +69,7 @@ class Wallet:
     # Share of each dividend withheld as tax (e.g. 0.15 for 15%), in [0, 1); 0 pays dividends gross.
     withholding_rate: Decimal = Decimal(0)
     orders: tuple[Order, ...] = ()  # in the order they were placed; a filled one's trade has its id
+    rules: Rules = Rules()  # the owner's limits for orders (see domain.rules)
 
     def __post_init__(self) -> None:
         if not self.name.strip():
@@ -116,6 +118,10 @@ class Wallet:
 
     def rename(self, name: str) -> Self:
         return replace(self, name=name)
+
+    def set_rules(self, rules: Rules) -> Self:
+        """Replace the wallet's rules; they apply to orders placed from now on."""
+        return replace(self, rules=rules)
 
     def set_withholding_rate(self, rate: Decimal) -> Self:
         """Change the tax withheld from dividends; every dividend is worked out again, and the whole timeline checked."""

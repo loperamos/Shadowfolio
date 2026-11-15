@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { BenchmarkDailyData, BenchmarkDailyErrors, BenchmarkDailyResponses, CancelOrderData, CancelOrderErrors, CancelOrderResponses, CopyWalletData, CopyWalletErrors, CopyWalletResponses, CreateWalletData, CreateWalletErrors, CreateWalletResponses, DailyClosesData, DailyClosesErrors, DailyClosesResponses, DailyValuationData, DailyValuationErrors, DailyValuationResponses, DeleteOperationData, DeleteOperationErrors, DeleteOperationResponses, DeleteWalletData, DeleteWalletErrors, DeleteWalletResponses, DepositData, DepositErrors, DepositResponses, EditOperationData, EditOperationErrors, EditOperationResponses, EstimateOrderData, EstimateOrderErrors, EstimateOrderResponses, FillAllOrdersData, FillAllOrdersResponses, GetWalletData, GetWalletErrors, GetWalletResponses, ImportDegiroData, ImportDegiroErrors, ImportDegiroResponses, LatestQuoteData, LatestQuoteErrors, LatestQuoteResponses, ListOperationsData, ListOperationsErrors, ListOperationsResponses, ListOrdersData, ListOrdersErrors, ListOrdersResponses, ListWalletsData, ListWalletsResponses, PlaceOrderData, PlaceOrderErrors, PlaceOrderResponses, PreviewDegiroImportData, PreviewDegiroImportErrors, PreviewDegiroImportResponses, RecordBuyData, RecordBuyErrors, RecordBuyResponses, RecordSellData, RecordSellErrors, RecordSellResponses, SecurityFundamentalsData, SecurityFundamentalsErrors, SecurityFundamentalsResponses, SecurityNewsData, SecurityNewsErrors, SecurityNewsResponses, SecurityRangesData, SecurityRangesErrors, SecurityRangesResponses, SyncAllWalletsData, SyncAllWalletsErrors, SyncAllWalletsResponses, UpdateWalletData, UpdateWalletErrors, UpdateWalletResponses, WalletPerformanceData, WalletPerformanceErrors, WalletPerformanceResponses, WalletValuationData, WalletValuationErrors, WalletValuationResponses, WithdrawData, WithdrawErrors, WithdrawResponses } from './types.gen';
+import type { BenchmarkDailyData, BenchmarkDailyErrors, BenchmarkDailyResponses, CancelOrderData, CancelOrderErrors, CancelOrderResponses, CopyWalletData, CopyWalletErrors, CopyWalletResponses, CreateWalletData, CreateWalletErrors, CreateWalletResponses, DailyClosesData, DailyClosesErrors, DailyClosesResponses, DailyValuationData, DailyValuationErrors, DailyValuationResponses, DeleteOperationData, DeleteOperationErrors, DeleteOperationResponses, DeleteWalletData, DeleteWalletErrors, DeleteWalletResponses, DepositData, DepositErrors, DepositResponses, EditOperationData, EditOperationErrors, EditOperationResponses, EstimateOrderData, EstimateOrderErrors, EstimateOrderResponses, FillAllOrdersData, FillAllOrdersResponses, GetWalletData, GetWalletErrors, GetWalletResponses, ImportDegiroData, ImportDegiroErrors, ImportDegiroResponses, LatestQuoteData, LatestQuoteErrors, LatestQuoteResponses, ListOperationsData, ListOperationsErrors, ListOperationsResponses, ListOrdersData, ListOrdersErrors, ListOrdersResponses, ListWalletsData, ListWalletsResponses, PlaceOrderData, PlaceOrderErrors, PlaceOrderResponses, PreviewDegiroImportData, PreviewDegiroImportErrors, PreviewDegiroImportResponses, RecordBuyData, RecordBuyErrors, RecordBuyResponses, RecordSellData, RecordSellErrors, RecordSellResponses, SecurityFundamentalsData, SecurityFundamentalsErrors, SecurityFundamentalsResponses, SecurityNewsData, SecurityNewsErrors, SecurityNewsResponses, SecurityRangesData, SecurityRangesErrors, SecurityRangesResponses, SetWalletRulesData, SetWalletRulesErrors, SetWalletRulesResponses, SyncAllWalletsData, SyncAllWalletsErrors, SyncAllWalletsResponses, UpdateWalletData, UpdateWalletErrors, UpdateWalletResponses, WalletPerformanceData, WalletPerformanceErrors, WalletPerformanceResponses, WalletValuationData, WalletValuationErrors, WalletValuationResponses, WithdrawData, WithdrawErrors, WithdrawResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -62,6 +62,20 @@ export const getWallet = <ThrowOnError extends boolean = false>(options: Options
  */
 export const updateWallet = <ThrowOnError extends boolean = false>(options: Options<UpdateWalletData, ThrowOnError>): RequestResult<UpdateWalletResponses, UpdateWalletErrors, ThrowOnError> => (options.client ?? client).patch<UpdateWalletResponses, UpdateWalletErrors, ThrowOnError>({
     url: '/api/wallets/{wallet_id}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Set Wallet Rules
+ *
+ * Replace the wallet's rules, checked when an order is placed: a buy that would break one is refused.
+ */
+export const setWalletRules = <ThrowOnError extends boolean = false>(options: Options<SetWalletRulesData, ThrowOnError>): RequestResult<SetWalletRulesResponses, SetWalletRulesErrors, ThrowOnError> => (options.client ?? client).put<SetWalletRulesResponses, SetWalletRulesErrors, ThrowOnError>({
+    url: '/api/wallets/{wallet_id}/rules',
     ...options,
     headers: {
         'Content-Type': 'application/json',

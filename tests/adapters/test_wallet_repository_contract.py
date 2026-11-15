@@ -17,6 +17,7 @@ from shadowfolio.domain.corporate_actions import CheckedPeriod, DividendEvent, R
 from shadowfolio.domain.money import Currency
 from shadowfolio.domain.operations import PriceSource, Trade
 from shadowfolio.domain.orders import Order, OrderSide
+from shadowfolio.domain.rules import Rules
 from shadowfolio.domain.wallet import Wallet
 from shadowfolio.ports.wallet_repository import WalletRepository
 
@@ -128,6 +129,17 @@ def test_a_split_round_trips(make_repository: RepositoryFactory) -> None:
     stored = make_repository().get(wallet.id)
     assert stored == wallet
     assert stored is not None and stored.holdings == {"NVDA": Decimal("80")}
+
+
+def test_rules_round_trip_and_change(make_repository: RepositoryFactory) -> None:
+    wallet = a_wallet().set_rules(Rules(max_position_weight=Decimal("0.2")))
+    make_repository().add(wallet)
+    assert make_repository().get(wallet.id) == wallet
+
+    changed = wallet.set_rules(Rules(min_cash_weight=Decimal("0.05")))
+    make_repository().update(changed)
+
+    assert make_repository().get(wallet.id) == changed
 
 
 def test_dividends_round_trip(make_repository: RepositoryFactory) -> None:

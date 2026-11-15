@@ -1,10 +1,11 @@
-"""Wallet use cases: creating, changing settings (name, withholding tax), copying, deleting and reading wallets."""
+"""Wallet use cases: creating, changing settings (name, withholding tax, rules), copying, deleting and reading wallets."""
 
 from datetime import datetime
 from decimal import Decimal
 from uuid import UUID, uuid4
 
 from shadowfolio.domain.money import Currency
+from shadowfolio.domain.rules import Rules
 from shadowfolio.domain.wallet import Wallet
 from shadowfolio.ports.clock import Clock
 from shadowfolio.ports.wallet_repository import WalletRepository
@@ -37,6 +38,15 @@ class Wallets:
             updated = updated.rename(name)
         if withholding_rate is not None:
             updated = updated.set_withholding_rate(withholding_rate)
+        self._repo.update(updated)
+        return updated
+
+    def set_rules(self, wallet_id: UUID, rules: Rules) -> Wallet | None:
+        """Replace the wallet's rules for orders. Returns None if the wallet does not exist."""
+        wallet = self._repo.get(wallet_id)
+        if wallet is None:
+            return None
+        updated = wallet.set_rules(rules)
         self._repo.update(updated)
         return updated
 

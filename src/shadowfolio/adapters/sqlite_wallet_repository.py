@@ -26,6 +26,7 @@ from shadowfolio.domain.operations import (
     Withdrawal,
 )
 from shadowfolio.domain.orders import Order, OrderSide, OrderStatus
+from shadowfolio.domain.rules import Rules
 from shadowfolio.domain.wallet import Wallet
 from shadowfolio.ports.wallet_repository import WalletRepository
 
@@ -35,7 +36,9 @@ CREATE TABLE IF NOT EXISTS wallets (
     owner_id TEXT NOT NULL,
     name TEXT NOT NULL,
     currency TEXT NOT NULL,
-    withholding_rate TEXT NOT NULL DEFAULT '0'
+    withholding_rate TEXT NOT NULL DEFAULT '0',
+    max_position_weight TEXT,
+    min_cash_weight TEXT
 );
 CREATE TABLE IF NOT EXISTS operations (
     id TEXT PRIMARY KEY,
@@ -95,7 +98,7 @@ CREATE TABLE IF NOT EXISTS dividend_events (
 # price_source existed were all typed in from a broker; split and dividend columns only apply to those, added later.
 # Wallets stored before withholding existed paid dividends gross.
 _ADDED_COLUMNS = {
-    "wallets": {"withholding_rate": "TEXT NOT NULL DEFAULT '0'"},
+    "wallets": {"withholding_rate": "TEXT NOT NULL DEFAULT '0'", "max_position_weight": "TEXT", "min_cash_weight": "TEXT"},
     "operations": {
         "price_source": "TEXT DEFAULT 'entered'",
         "split_old_rate": "TEXT",
@@ -121,8 +124,16 @@ class SqliteWalletRepository(WalletRepository):
     def add(self, wallet: Wallet) -> None:
         with closing(self._connect()) as conn, conn:
             conn.execute(
-                "INSERT INTO wallets (id, owner_id, name, currency, withholding_rate) VALUES (?, ?, ?, ?, ?)",
-                (str(wallet.id), wallet.owner_id, wallet.name, wallet.currency.value, str(wallet.withholding_rate)),
+                "INSERT INTO wallets (id, owner_id, name, currency, withholding_rate, max_position_weight, min_cash_weight) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (
+                    str(wallet.id),
+                    wallet.owner_id,
+                    wallet.name,
+                    wallet.currency.value,
+                    str(wallet.withholding_rate),
+                    *_rules_row(wallet.rules),
+                ),
             )
             _insert_operations(conn, wallet)
             _insert_checked_periods(conn, wallet)
@@ -132,8 +143,16 @@ class SqliteWalletRepository(WalletRepository):
     def update(self, wallet: Wallet) -> None:
         with closing(self._connect()) as conn, conn:
             conn.execute(
-                "UPDATE wallets SET owner_id = ?, name = ?, currency = ?, withholding_rate = ? WHERE id = ?",
-                (wallet.owner_id, wallet.name, wallet.currency.value, str(wallet.withholding_rate), str(wallet.id)),
+                "UPDATE wallets SET owner_id = ?, name = ?, currency = ?, withholding_rate = ?, max_position_weight = ?, "
+                "min_cash_weight = ? WHERE id = ?",
+                (
+                    wallet.owner_id,
+                    wallet.name,
+                    wallet.currency.value,
+                    str(wallet.withholding_rate),
+                    *_rules_row(wallet.rules),
+                    str(wallet.id),
+                ),
             )
             # Operations can be changed or removed, so they are replaced as a whole, in the same transaction.
             conn.execute("DELETE FROM operations WHERE wallet_id = ?", (str(wallet.id),))
@@ -148,7 +167,8 @@ class SqliteWalletRepository(WalletRepository):
     def get(self, wallet_id: UUID) -> Wallet | None:
         with closing(self._connect()) as conn:
             row = conn.execute(
-                "SELECT id, owner_id, name, currency, withholding_rate FROM wallets WHERE id = ?", (str(wallet_id),)
+                "SELECT id, owner_id, name, currency, withholding_rate, max_position_weight, min_cash_weight FROM wallets WHERE id = ?",
+                (str(wallet_id),),
             ).fetchone()
             if row is None:
                 return None
@@ -178,6 +198,7 @@ class SqliteWalletRepository(WalletRepository):
             checked={symbol: CheckedPeriod(date.fromisoformat(start), date.fromisoformat(end)) for symbol, start, end in period_rows},
             dividend_events=tuple(_dividend_from_row(row) for row in dividend_rows),
             withholding_rate=Decimal(row[4]),
+            rules=Rules(_optional_decimal(row[5]), _optional_decimal(row[6])),
             orders=tuple(_order_from_row(order) for order in order_rows),
         )
 
@@ -408,3 +429,15 @@ def _add_missing_columns(conn: sqlite3.Connection) -> None:
         for name, definition in columns.items():
             if name not in existing:
                 conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {definition}")
+
+
+def _rules_row(rules: Rules) -> tuple[str | None, str | None]:
+    return _optional_text(rules.max_position_weight), _optional_text(rules.min_cash_weight)
+
+
+def _optional_text(value: Decimal | None) -> str | None:
+    return None if value is None else str(value)
+
+
+def _optional_decimal(text: str | None) -> Decimal | None:
+    return None if text is None else Decimal(text)

@@ -272,6 +272,67 @@
         }
       }
     },
+    "/api/wallets/{wallet_id}/rules": {
+      "put": {
+        "summary": "Set Wallet Rules",
+        "description": "Replace the wallet's rules, checked when an order is placed: a buy that would break one is refused.",
+        "operationId": "set_wallet_rules",
+        "parameters": [
+          {
+            "name": "wallet_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Wallet Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RulesRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WalletResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Malformed request or broken business rule",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/wallets/{wallet_id}/operations": {
       "get": {
         "summary": "List Operations",
@@ -3309,6 +3370,77 @@
         ],
         "title": "QuoteResponse"
       },
+      "RulesRequest": {
+        "properties": {
+          "max_position_weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Position Weight"
+          },
+          "min_cash_weight": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Cash Weight"
+          }
+        },
+        "type": "object",
+        "required": [
+          "max_position_weight",
+          "min_cash_weight"
+        ],
+        "title": "RulesRequest",
+        "description": "The wallet's rules for orders, replaced as a whole: each a share of its whole value (0.2 for 20%), null for no\nlimit."
+      },
+      "RulesResponse": {
+        "properties": {
+          "max_position_weight": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Position Weight"
+          },
+          "min_cash_weight": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Cash Weight"
+          }
+        },
+        "type": "object",
+        "required": [
+          "max_position_weight",
+          "min_cash_weight"
+        ],
+        "title": "RulesResponse"
+      },
       "SecurityRangesResponse": {
         "properties": {
           "price": {
@@ -3926,6 +4058,9 @@
             },
             "type": "array",
             "title": "Uncredited Dividends"
+          },
+          "rules": {
+            "$ref": "#/components/schemas/RulesResponse"
           }
         },
         "type": "object",
@@ -3940,7 +4075,8 @@
           "realized_gain",
           "hindsight",
           "splits_checked_through",
-          "uncredited_dividends"
+          "uncredited_dividends",
+          "rules"
         ],
         "title": "WalletResponse"
       },
