@@ -87,3 +87,11 @@ class OperationNotFoundError(LookupError):
 
 class OrderNotFoundError(LookupError):
     """The wallet has no order with that id."""
+
+
+class InvalidRuleError(DomainError):
+    """A wallet's rule is outside what it can be (e.g. a share above 100%)."""
+
+
+class RuleBrokenError(DomainError):
+    """An order would break one of the wallet's rules."""

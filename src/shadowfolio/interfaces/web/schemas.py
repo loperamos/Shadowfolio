@@ -48,6 +48,19 @@ class UpdateWalletRequest(BaseModel):
     withholding_rate: Decimal | None = None  # share of each dividend withheld as tax, e.g. 0.15 for 15%
 
 
+class RulesRequest(BaseModel):
+    """The wallet's rules for orders, replaced as a whole: each a share of its whole value (0.2 for 20%), null for no
+    limit."""
+
+    max_position_weight: Decimal | None  # the most one holding may reach after a buy
+    min_cash_weight: Decimal | None  # what to keep in cash after a buy
+
+
+class RulesResponse(BaseModel):
+    max_position_weight: Decimal | None
+    min_cash_weight: Decimal | None
+
+
 class CopyWalletRequest(BaseModel):
     name: str
     # Copy only the history before this time ("what if"); the whole history when left out.
@@ -145,6 +158,7 @@ class WalletResponse(BaseModel):
     splits_checked_through: date | None
     # Dividends the wallet qualified for but that were not credited: the data provider has no payment date for them.
     uncredited_dividends: list[UncreditedDividendResponse]
+    rules: RulesResponse  # checked when an order is placed
 
     @classmethod
     def from_wallet(cls, wallet: Wallet) -> "WalletResponse":
@@ -160,6 +174,7 @@ class WalletResponse(BaseModel):
             realized_gain=_cents(ledger.realized_gain),
             hindsight=wallet.hindsight,
             splits_checked_through=_checked_through(wallet),
+            rules=RulesResponse(max_position_weight=wallet.rules.max_position_weight, min_cash_weight=wallet.rules.min_cash_weight),
             uncredited_dividends=[
                 UncreditedDividendResponse(symbol=e.symbol, ex_date=e.ex_date, per_share=e.per_share, currency=e.currency)
                 for e in wallet.uncredited_dividends

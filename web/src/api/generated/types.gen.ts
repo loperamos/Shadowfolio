@@ -842,6 +842,37 @@ export type QuoteResponse = {
 };
 
 /**
+ * RulesRequest
+ *
+ * The wallet's rules for orders, replaced as a whole: each a share of its whole value (0.2 for 20%), null for no
+ * limit.
+ */
+export type RulesRequest = {
+    /**
+     * Max Position Weight
+     */
+    max_position_weight: number | string | null;
+    /**
+     * Min Cash Weight
+     */
+    min_cash_weight: number | string | null;
+};
+
+/**
+ * RulesResponse
+ */
+export type RulesResponse = {
+    /**
+     * Max Position Weight
+     */
+    max_position_weight: string | null;
+    /**
+     * Min Cash Weight
+     */
+    min_cash_weight: string | null;
+};
+
+/**
  * SecurityRangesResponse
  *
  * Where the price and the P/E stand within their lows and highs over a period; null without them.
@@ -1172,6 +1203,7 @@ export type WalletResponse = {
      * Uncredited Dividends
      */
     uncredited_dividends: Array<UncreditedDividendResponse>;
+    rules: RulesResponse;
 };
 
 /**
@@ -1370,6 +1402,40 @@ export type UpdateWalletResponses = {
 };
 
 export type UpdateWalletResponse = UpdateWalletResponses[keyof UpdateWalletResponses];
+
+export type SetWalletRulesData = {
+    body: RulesRequest;
+    path: {
+        /**
+         * Wallet Id
+         */
+        wallet_id: string;
+    };
+    query?: never;
+    url: '/api/wallets/{wallet_id}/rules';
+};
+
+export type SetWalletRulesErrors = {
+    /**
+     * Not found
+     */
+    404: ErrorResponse;
+    /**
+     * Malformed request or broken business rule
+     */
+    422: ErrorResponse;
+};
+
+export type SetWalletRulesError = SetWalletRulesErrors[keyof SetWalletRulesErrors];
+
+export type SetWalletRulesResponses = {
+    /**
+     * Successful Response
+     */
+    200: WalletResponse;
+};
+
+export type SetWalletRulesResponse = SetWalletRulesResponses[keyof SetWalletRulesResponses];
 
 export type ListOperationsData = {
     body?: never;

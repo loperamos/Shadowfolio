@@ -18,12 +18,13 @@ from shadowfolio.domain.errors import (
 )
 from shadowfolio.domain.money import Currency, FxRate
 from shadowfolio.domain.orders import Order, OrderSide
-from shadowfolio.domain.valuation import Quote, order_amount, order_price
+from shadowfolio.domain.valuation import Quote, order_amount, order_price, reserved_for_orders
 from shadowfolio.domain.wallet import Wallet
 from shadowfolio.ports.clock import Clock
 from shadowfolio.ports.fx_rates import FxRates, FxRatesUnavailableError
 from shadowfolio.ports.price_data import PriceData, PriceDataUnavailableError
 from shadowfolio.ports.wallet_repository import WalletRepository
+from shadowfolio.usecases.valuation import Valuation
 from shadowfolio.usecases.wallet_changes import WalletChanges
 
 
@@ -48,6 +49,8 @@ class Orders:
         self._prices = prices
         self._fx_rates = fx_rates
         self._changes = changes
+        # The wallet's value now, for its rules.
+        self._valuation = Valuation(repo, clock, prices, fx_rates)
 
     def estimate(
         self, wallet_id: UUID, side: OrderSide, symbol: str, quantity: Decimal, limit_price: Decimal | None = None
@@ -59,12 +62,32 @@ class Orders:
         if wallet is None:
             return None
         order = Order(uuid4(), side, symbol.strip().upper(), quantity, self._clock.now(), limit_price=limit_price)
+        quote, rate = self._latest(wallet, order.symbol)
+        return OrderEstimate(order_price(order, quote), quote.currency, rate, order_amount(order, quote, rate))
+
+    def _check_rules(self, wallet: Wallet, order: Order) -> None:
+        """Raise RuleBrokenError if the buy would break one of the wallet's rules once it and the open buys before it
+        fill, each at its estimate: the open buys of the same symbol count towards the holding."""
+        valuation = self._valuation.current(wallet.id)
+        assert valuation is not None
+        if valuation.buying_power is None:
+            raise PriceUnavailableError("could not price the open buys to check the wallet's rules; try again later")
+        quote, rate = self._latest(wallet, order.symbol)
+        amount = order_amount(order, quote, rate)
+        same_symbol = [open_order for open_order in wallet.orders if open_order.symbol == order.symbol]
+        reserved = reserved_for_orders(same_symbol, {order.symbol: quote}, {quote.currency: rate} if rate else {}, wallet.currency)
+        assert reserved is not None  # the symbol's quote and rate are both given
+        held = next((h.value_in_wallet_currency for h in valuation.holdings if h.symbol == order.symbol), Decimal(0))
+        wallet.rules.check_buy(order.symbol, valuation.total, held + reserved + amount, valuation.buying_power - amount)
+
+    def _latest(self, wallet: Wallet, symbol: str) -> tuple[Quote, FxRate | None]:
+        """The symbol's latest price, and the latest rate into the wallet's currency (None when the same)."""
         try:
-            quote = self._prices.latest_prices([order.symbol]).get(order.symbol)
+            quote = self._prices.latest_prices([symbol]).get(symbol)
         except PriceDataUnavailableError as error:
-            raise PriceUnavailableError(f"could not fetch the price of {order.symbol} right now; try again later") from error
+            raise PriceUnavailableError(f"could not fetch the price of {symbol} right now; try again later") from error
         if quote is None:
-            raise PriceUnavailableError(f"no price for {order.symbol}")
+            raise PriceUnavailableError(f"no price for {symbol}")
         rate = None
         if quote.currency is not wallet.currency:
             try:
@@ -75,7 +98,7 @@ class Orders:
                 ) from error
             if rate is None:
                 raise FxRateUnavailableError(f"no {quote.currency}→{wallet.currency} rate")
-        return OrderEstimate(order_price(order, quote), quote.currency, rate, order_amount(order, quote, rate))
+        return quote, rate
 
     def place(
         self, wallet_id: UUID, side: OrderSide, symbol: str, quantity: Decimal, reason: str = "", limit_price: Decimal | None = None
@@ -86,6 +109,8 @@ class Orders:
         if wallet is None:
             return None
         order = Order(uuid4(), side, symbol.strip().upper(), quantity, self._clock.now(), reason.strip(), limit_price)
+        if order.side is OrderSide.BUY and wallet.rules.any:
+            self._check_rules(wallet, order)
         updated = wallet.place_order(order)
         self._repo.update(updated)
         return updated, order

@@ -5,11 +5,13 @@ from uuid import UUID
 from fastapi import APIRouter, Response
 
 from shadowfolio.domain.errors import DomainError
+from shadowfolio.domain.rules import Rules
 from shadowfolio.interfaces.web.errors import INVALID, NOT_FOUND, rule_violation, wallet_not_found
 from shadowfolio.interfaces.web.schemas import (
     CopyWalletRequest,
     CreateWalletRequest,
     OperationResponse,
+    RulesRequest,
     UpdateWalletRequest,
     WalletResponse,
 )
@@ -44,6 +46,17 @@ def wallets_router(wallets: Wallets) -> APIRouter:
     def update_wallet(wallet_id: UUID, request: UpdateWalletRequest) -> WalletResponse:
         try:
             wallet = wallets.update(wallet_id, request.name, request.withholding_rate)
+        except DomainError as error:
+            raise rule_violation(error) from error
+        if wallet is None:
+            raise wallet_not_found()
+        return WalletResponse.from_wallet(wallet)
+
+    @router.put("/wallets/{wallet_id}/rules", responses=NOT_FOUND | INVALID)
+    def set_wallet_rules(wallet_id: UUID, request: RulesRequest) -> WalletResponse:
+        """Replace the wallet's rules, checked when an order is placed: a buy that would break one is refused."""
+        try:
+            wallet = wallets.set_rules(wallet_id, Rules(request.max_position_weight, request.min_cash_weight))
         except DomainError as error:
             raise rule_violation(error) from error
         if wallet is None:
