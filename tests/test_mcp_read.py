@@ -112,3 +112,17 @@ async def test_an_unknown_wallet_is_an_error_the_agent_can_read(app: Any) -> Non
 
     assert result.is_error
     assert "no wallet" in result.content[0].text  # type: ignore[union-attr]
+
+
+def test_each_request_stands_alone_as_on_the_rest_api(app: Any) -> None:
+    """No session to open first, and one plain JSON answer: any server instance can answer any request."""
+    request = {"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": "list_wallets", "arguments": {}}}
+    headers = {"Accept": "application/json, text/event-stream", "Content-Type": "application/json"}
+
+    # As a local client calls it: the server only answers requests addressed to localhost.
+    with TestClient(app, base_url="http://127.0.0.1:8000") as http:  # runs the app's startup, as a server does
+        response = http.post("/mcp", json=request, headers=headers)
+
+    assert (response.status_code, response.headers["content-type"]) == (200, "application/json")
+    assert "mcp-session-id" not in response.headers
+    assert response.json()["result"]["structuredContent"] == {"result": []}

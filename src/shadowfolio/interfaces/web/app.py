@@ -42,7 +42,9 @@ def create_app(
 ) -> FastAPI:
     # The MCP server for agents, on the same app and use cases; its sessions run while the app does.
     mcp = mcp_server(wallets, valuation, orders, comparison, securities)
-    mcp_app = mcp.streamable_http_app(streamable_http_path=MCP_PATH)
+    # Stateless, answering in plain JSON: every request stands alone, as on the REST API, so any instance (or a fresh
+    # serverless one) can answer it. The tools need no session: they never stream, push or ask anything back.
+    mcp_app = mcp.streamable_http_app(streamable_http_path=MCP_PATH, stateless_http=True, json_response=True)
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
