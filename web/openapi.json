@@ -1585,6 +1585,71 @@
         }
       }
     },
+    "/api/wallets/{wallet_id}/orders/outcomes": {
+      "get": {
+        "summary": "Order Outcomes",
+        "description": "How each filled order turned out: its symbol's return from the fill price to the latest, next to the\nbenchmark's over the same time. Apart from the orders, so a slow price never holds them up.",
+        "operationId": "order_outcomes",
+        "parameters": [
+          {
+            "name": "wallet_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Wallet Id"
+            }
+          },
+          {
+            "name": "benchmark",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "SPY",
+              "title": "Benchmark"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/OrderOutcomeResponse"
+                  },
+                  "title": "Response Order Outcomes"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Malformed request or broken business rule",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/wallets/{wallet_id}/orders/{order_id}/cancel": {
       "post": {
         "summary": "Cancel Order",
@@ -2967,6 +3032,86 @@
           "amount"
         ],
         "title": "OrderEstimateResponse"
+      },
+      "OrderOutcomeResponse": {
+        "properties": {
+          "order_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Order Id"
+          },
+          "price": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price"
+          },
+          "currency": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Currency"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "as_of": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "As Of"
+          },
+          "return_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Return Percent"
+          },
+          "benchmark_symbol": {
+            "type": "string",
+            "title": "Benchmark Symbol"
+          },
+          "benchmark_return_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Benchmark Return Percent"
+          }
+        },
+        "type": "object",
+        "required": [
+          "order_id",
+          "price",
+          "currency",
+          "as_of",
+          "return_percent",
+          "benchmark_symbol",
+          "benchmark_return_percent"
+        ],
+        "title": "OrderOutcomeResponse",
+        "description": "How a filled order turned out since: returns in percent, each in its own currency; null without a price."
       },
       "OrderResponse": {
         "properties": {

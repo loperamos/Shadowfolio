@@ -621,6 +621,39 @@ export type OrderEstimateResponse = {
 };
 
 /**
+ * OrderOutcomeResponse
+ *
+ * How a filled order turned out since: returns in percent, each in its own currency; null without a price.
+ */
+export type OrderOutcomeResponse = {
+    /**
+     * Order Id
+     */
+    order_id: string;
+    /**
+     * Price
+     */
+    price: string | null;
+    currency: Currency | null;
+    /**
+     * As Of
+     */
+    as_of: string | null;
+    /**
+     * Return Percent
+     */
+    return_percent: string | null;
+    /**
+     * Benchmark Symbol
+     */
+    benchmark_symbol: string;
+    /**
+     * Benchmark Return Percent
+     */
+    benchmark_return_percent: string | null;
+};
+
+/**
  * OrderResponse
  */
 export type OrderResponse = {
@@ -2167,6 +2200,47 @@ export type EstimateOrderResponses = {
 };
 
 export type EstimateOrderResponse = EstimateOrderResponses[keyof EstimateOrderResponses];
+
+export type OrderOutcomesData = {
+    body?: never;
+    path: {
+        /**
+         * Wallet Id
+         */
+        wallet_id: string;
+    };
+    query?: {
+        /**
+         * Benchmark
+         */
+        benchmark?: string;
+    };
+    url: '/api/wallets/{wallet_id}/orders/outcomes';
+};
+
+export type OrderOutcomesErrors = {
+    /**
+     * Not found
+     */
+    404: ErrorResponse;
+    /**
+     * Malformed request or broken business rule
+     */
+    422: ErrorResponse;
+};
+
+export type OrderOutcomesError = OrderOutcomesErrors[keyof OrderOutcomesErrors];
+
+export type OrderOutcomesResponses = {
+    /**
+     * Response Order Outcomes
+     *
+     * Successful Response
+     */
+    200: Array<OrderOutcomeResponse>;
+};
+
+export type OrderOutcomesResponse = OrderOutcomesResponses[keyof OrderOutcomesResponses];
 
 export type CancelOrderData = {
     body?: never;

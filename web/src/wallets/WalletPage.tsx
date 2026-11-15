@@ -336,7 +336,7 @@ function WalletDetails({ wallet, operations, orders, version, valuation, onOrder
         )}
       </div>
 
-      <WalletOrders wallet={wallet} orders={orders} onChanged={onOrdersChanged} />
+      <WalletOrders wallet={wallet} orders={orders} benchmarkSymbol={benchmarkSymbol} refreshKey={version} onChanged={onOrdersChanged} />
 
       <div>
         <Group justify="space-between" align="flex-start" mb="sm">

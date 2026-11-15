@@ -1,8 +1,18 @@
-import { Alert, Badge, Button, Group, Modal, Stack, Table, Text, Title, Tooltip } from "@mantine/core";
-import { useState } from "react";
+import { Alert, Badge, Button, Group, Loader, Modal, Stack, Table, Text, Title, Tooltip } from "@mantine/core";
+import { useEffect, useState } from "react";
 
 import { apiErrorMessage } from "../api/errors";
-import { cancelOrder, type OrderResponse, OrderSide, OrderStatus, type WalletResponse } from "../api/generated";
+import {
+  cancelOrder,
+  orderOutcomes,
+  type OrderOutcomeResponse,
+  type OrderResponse,
+  OrderSide,
+  OrderStatus,
+  type WalletResponse,
+} from "../api/generated";
+import { ReturnText } from "../ui/GainText";
+import { InfoTip } from "../ui/InfoTip";
 import { Money } from "../ui/Money";
 import { formatDateTime } from "../ui/format";
 import { TABLE_MIN_WIDTH, TOOLTIP_WIDTH } from "../ui/theme";
@@ -14,11 +24,20 @@ const STATUS_BADGES: Record<OrderStatus, { label: string; color: string }> = {
   [OrderStatus.REJECTED]: { label: "Rejected", color: "red" },
 };
 
-type Props = { wallet: WalletResponse; orders: OrderResponse[]; onChanged: () => void };
+type Props = {
+  wallet: WalletResponse;
+  orders: OrderResponse[];
+  benchmarkSymbol: string | null; // the one chosen on the page; null for the default
+  refreshKey: number; // changes when the wallet's history does, to load the outcomes again
+  onChanged: () => void;
+};
 
-/** The wallet's orders, newest first: what was asked, its status, and when and at what price it filled. */
-export function WalletOrders({ wallet, orders, onChanged }: Props) {
+type OutcomesState = { status: "loading" } | { status: "error"; message: string } | { status: "loaded"; byOrder: Map<string, OrderOutcomeResponse> };
+
+/** The wallet's orders, newest first: what was asked, its status, when and at what price it filled, and since. */
+export function WalletOrders({ wallet, orders, benchmarkSymbol, refreshKey, onChanged }: Props) {
   const [toCancel, setToCancel] = useState<OrderResponse | null>(null);
+  const outcomes = useOrderOutcomes(wallet.id, benchmarkSymbol, refreshKey);
   return (
     <div>
       <Title order={2} mb="sm">
@@ -35,6 +54,16 @@ export function WalletOrders({ wallet, orders, onChanged }: Props) {
                 <Table.Th>Order</Table.Th>
                 <Table.Th>Status</Table.Th>
                 <Table.Th>Filled</Table.Th>
+                <Table.Th>
+                  <Group gap={4} wrap="nowrap">
+                    Since
+                    <InfoTip topic="since">
+                      How the symbol moved from the fill price to its latest, with the benchmark from the same moment
+                      below. A buy did well if it rose more than the benchmark; a sell, if it rose less (or fell), as
+                      the money was out of it.
+                    </InfoTip>
+                  </Group>
+                </Table.Th>
                 <Table.Th>Why</Table.Th>
                 <Table.Th />
               </Table.Tr>
@@ -57,6 +86,7 @@ export function WalletOrders({ wallet, orders, onChanged }: Props) {
                       </Group>
                     )}
                   </Table.Td>
+                  <Table.Td>{order.status === OrderStatus.FILLED && <Outcome state={outcomes} orderId={order.id} />}</Table.Td>
                   <Table.Td>
                     <Text size="sm">{order.reason}</Text>
                   </Table.Td>
@@ -73,8 +103,57 @@ export function WalletOrders({ wallet, orders, onChanged }: Props) {
           </Table>
         </Table.ScrollContainer>
       )}
+      {outcomes.status === "error" && (
+        <Text c="dimmed" size="sm" mt="xs">
+          How the orders turned out is unavailable: {outcomes.message}
+        </Text>
+      )}
       <CancelOrderModal wallet={wallet} order={toCancel} onClose={() => setToCancel(null)} onCancelled={onChanged} />
     </div>
+  );
+}
+
+/** How each filled order turned out, against `benchmarkSymbol` (the default when null), loaded apart from the orders. */
+function useOrderOutcomes(walletId: string, benchmarkSymbol: string | null, refreshKey: number): OutcomesState {
+  const [state, setState] = useState<OutcomesState>({ status: "loading" });
+  useEffect(() => {
+    let current = true; // ignore answers for a wallet or benchmark since changed
+    setState({ status: "loading" });
+    orderOutcomes({ path: { wallet_id: walletId }, query: benchmarkSymbol ? { benchmark: benchmarkSymbol } : undefined })
+      .then(({ data, error }) => {
+        if (current) {
+          setState(
+            data
+              ? { status: "loaded", byOrder: new Map(data.map((outcome) => [outcome.order_id, outcome])) }
+              : { status: "error", message: apiErrorMessage(error) },
+          );
+        }
+      })
+      .catch(() => current && setState({ status: "error", message: "Could not reach the backend." }));
+    return () => {
+      current = false;
+    };
+  }, [walletId, benchmarkSymbol, refreshKey]);
+  return state;
+}
+
+/** A filled order's return since, with the benchmark's below; a dash when a price is missing. */
+function Outcome({ state, orderId }: { state: OutcomesState; orderId: string }) {
+  if (state.status === "loading") {
+    return <Loader size="xs" />;
+  }
+  const outcome = state.status === "loaded" ? state.byOrder.get(orderId) : undefined;
+  if (!outcome || outcome.return_percent == null) {
+    return <Text c="dimmed">—</Text>;
+  }
+  return (
+    <>
+      <ReturnText percent={outcome.return_percent} size="sm" />
+      <Text c="dimmed" size="xs">
+        {outcome.benchmark_symbol}{" "}
+        {outcome.benchmark_return_percent == null ? "—" : <ReturnText percent={outcome.benchmark_return_percent} span inherit />}
+      </Text>
+    </>
   );
 }
 

@@ -17,13 +17,15 @@ from shadowfolio.domain.errors import (
     PriceUnavailableError,
 )
 from shadowfolio.domain.money import Currency, FxRate
-from shadowfolio.domain.orders import Order, OrderSide
+from shadowfolio.domain.operations import Buy, Sell
+from shadowfolio.domain.orders import Order, OrderSide, OrderStatus
 from shadowfolio.domain.valuation import Quote, order_amount, order_price, reserved_for_orders
 from shadowfolio.domain.wallet import Wallet
 from shadowfolio.ports.clock import Clock
 from shadowfolio.ports.fx_rates import FxRates, FxRatesUnavailableError
 from shadowfolio.ports.price_data import PriceData, PriceDataUnavailableError
 from shadowfolio.ports.wallet_repository import WalletRepository
+from shadowfolio.usecases.comparison import DEFAULT_BENCHMARK
 from shadowfolio.usecases.valuation import Valuation
 from shadowfolio.usecases.wallet_changes import WalletChanges
 
@@ -34,6 +36,18 @@ class OrderEstimate:
     currency: Currency  # the price's
     fx_rate: FxRate | None  # into the wallet's currency; None when it is the same
     amount: Decimal  # in the wallet's currency, rounded to cents
+
+
+@dataclass(frozen=True)
+class OrderOutcome:
+    """How a filled order turned out since: its symbol's latest price, and the returns from the fill to then of the
+    symbol and of a benchmark, each in its own currency (None without a price)."""
+
+    order_id: UUID
+    latest: Quote | None
+    since_fill: Decimal | None  # as a ratio (0.1 for +10%)
+    benchmark_symbol: str
+    benchmark_since_fill: Decimal | None
 
 
 @dataclass(frozen=True)
@@ -128,6 +142,37 @@ class Orders:
         updated = wallet.with_order(order)
         self._repo.update(updated)
         return updated, order
+
+    def outcomes(self, wallet_id: UUID, benchmark: str = DEFAULT_BENCHMARK) -> list[OrderOutcome] | None:
+        """How each filled order turned out, against `benchmark` from the same moment: the symbol's return from its fill
+        price to its latest, and the benchmark's from its first price at or after the fill to its latest. In the order
+        they were placed. None if the wallet does not exist; fails when a price cannot be fetched right now."""
+        wallet = self._repo.get(wallet_id)
+        if wallet is None:
+            return None
+        benchmark = benchmark.strip().upper()
+        trades = {op.id: op.trade for op in wallet.operations if isinstance(op, Buy | Sell)}
+        filled = [order for order in wallet.orders if order.status is OrderStatus.FILLED and order.id in trades]
+        symbols = sorted({order.symbol for order in filled} | {benchmark})
+        try:
+            latest = self._prices.latest_prices(symbols) if filled else {}
+            benchmark_then = {order.id: self._prices.price_at(benchmark, order.closed_at) for order in filled if order.closed_at}
+        except PriceDataUnavailableError as error:
+            raise PriceUnavailableError(f"could not fetch the prices of {', '.join(symbols)} right now; try again later") from error
+        benchmark_now = latest.get(benchmark)
+        outcomes = []
+        for order in filled:
+            now, then = latest.get(order.symbol), benchmark_then.get(order.id)
+            outcomes.append(
+                OrderOutcome(
+                    order.id,
+                    now,
+                    None if now is None else now.price / trades[order.id].price - 1,
+                    benchmark,
+                    None if then is None or benchmark_now is None else benchmark_now.price / then.price - 1,
+                )
+            )
+        return outcomes
 
     def list(self, wallet_id: UUID) -> Wallet | None:
         """The wallet, with its due orders filled first (its orders are on it). None if it does not exist."""
