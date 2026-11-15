@@ -1500,6 +1500,56 @@
           }
         }
       }
+    },
+    "/api/securities/{symbol}/fundamentals": {
+      "get": {
+        "summary": "Security Fundamentals",
+        "description": "The company's reported yearly results and shares outstanding, with its P/E and market cap at the latest\nprice.",
+        "operationId": "security_fundamentals",
+        "parameters": [
+          {
+            "name": "symbol",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Symbol"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FundamentalsResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Malformed request or broken business rule",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1960,6 +2010,149 @@
           "filled"
         ],
         "title": "FillSummaryResponse"
+      },
+      "FiscalYearResponse": {
+        "properties": {
+          "start": {
+            "type": "string",
+            "format": "date",
+            "title": "Start"
+          },
+          "end": {
+            "type": "string",
+            "format": "date",
+            "title": "End"
+          },
+          "revenue": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revenue"
+          },
+          "net_income": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Net Income"
+          },
+          "eps_diluted": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Eps Diluted"
+          }
+        },
+        "type": "object",
+        "required": [
+          "start",
+          "end",
+          "revenue",
+          "net_income",
+          "eps_diluted"
+        ],
+        "title": "FiscalYearResponse"
+      },
+      "FundamentalsResponse": {
+        "properties": {
+          "company_name": {
+            "type": "string",
+            "title": "Company Name"
+          },
+          "currency": {
+            "$ref": "#/components/schemas/Currency"
+          },
+          "years": {
+            "items": {
+              "$ref": "#/components/schemas/FiscalYearResponse"
+            },
+            "type": "array",
+            "title": "Years"
+          },
+          "shares_outstanding": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shares Outstanding"
+          },
+          "shares_as_of": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shares As Of"
+          },
+          "price": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price"
+          },
+          "pe": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pe"
+          },
+          "market_cap": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Market Cap"
+          }
+        },
+        "type": "object",
+        "required": [
+          "company_name",
+          "currency",
+          "years",
+          "shares_outstanding",
+          "shares_as_of",
+          "price",
+          "pe",
+          "market_cap"
+        ],
+        "title": "FundamentalsResponse",
+        "description": "A company's reported yearly results (amounts in `currency`, oldest first) and shares outstanding, with the P/E\n(against the last fiscal year's diluted EPS) and market cap at the latest price; those are null without one."
       },
       "FxRateResponse": {
         "properties": {

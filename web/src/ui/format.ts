@@ -93,6 +93,13 @@ export function formatPercent(value: string): string {
   return formatAmount(value);
 }
 
+const COMPACT = new Intl.NumberFormat(undefined, { notation: "compact", maximumFractionDigits: 2 });
+
+/** A large amount from the API, shortened for display, e.g. 215938000000 → "215.94B". Display only: it rounds. */
+export function formatCompactAmount(value: string): string {
+  return COMPACT.format(Number(value));
+}
+
 /** A whole amount for chart axes: thousands separators, no decimals, e.g. 4550 → "4,550". */
 export function formatWholeAmount(value: number): string {
   return formatAmount(Math.round(value).toString()).split(".")[0];

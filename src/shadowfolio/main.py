@@ -17,6 +17,8 @@ ALPACA_KEY_ID_ENV = "ALPACA_API_KEY_ID"
 ALPACA_SECRET_KEY_ENV = "ALPACA_API_SECRET_KEY"
 HOST_ENV = "SHADOWFOLIO_HOST"
 PORT_ENV = "SHADOWFOLIO_PORT"
+# Optional: who SEC EDGAR is told is asking (an app name and a contact email); without it, no fundamentals.
+SEC_EDGAR_CONTACT_ENV = "SEC_EDGAR_CONTACT"
 
 
 class Environment(StrEnum):
@@ -39,7 +41,8 @@ def _build_app(environment: Environment, config_dir: Path) -> FastAPI:
     match environment:
         case Environment.LOCAL:
             alpaca = AlpacaConfig(key_id=_require_env(ALPACA_KEY_ID_ENV), secret_key=_require_env(ALPACA_SECRET_KEY_ENV))
-            return build_local_app(LocalConfig(db_path=resolve_config_path(_require_env(DB_PATH_ENV), config_dir), alpaca=alpaca))
+            db_path = resolve_config_path(_require_env(DB_PATH_ENV), config_dir)
+            return build_local_app(LocalConfig(db_path=db_path, alpaca=alpaca, edgar_contact=os.environ.get(SEC_EDGAR_CONTACT_ENV)))
 
 
 def resolve_config_path(value: str, config_dir: Path) -> Path:

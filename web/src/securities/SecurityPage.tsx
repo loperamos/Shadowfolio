@@ -14,11 +14,12 @@ import { symbolFilterSearch } from "../wallets/operationFilters";
 import { PeriodControls } from "../wallets/PeriodControls";
 import { describeRange, isEverything, usePeriod } from "../wallets/period";
 import { type ValuationState, useWalletValuations } from "../wallets/useWalletValuation";
+import { SecurityFundamentals } from "./SecurityFundamentals";
 import { useCloses, useQuote } from "./useSecurity";
 
 const CLOSE_LINE = "close";
 
-/** One security: its latest price and today's move, its price over a period, and the wallets that hold it. */
+/** One security: its latest price and today's move, its price over a period, its fundamentals, and the wallets that hold it. */
 export function SecurityPage() {
   const { symbol: raw = "" } = useParams();
   const symbol = raw.toUpperCase();
@@ -33,6 +34,7 @@ export function SecurityPage() {
       <Stack gap="xl">
         <Header symbol={symbol} />
         <PriceChart symbol={symbol} />
+        <SecurityFundamentals symbol={symbol} />
         <Positions symbol={symbol} />
       </Stack>
     </>

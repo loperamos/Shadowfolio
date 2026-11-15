@@ -69,6 +69,10 @@ class FxRateUnavailableError(DomainError):
     """There is no exchange rate for a currency pair that needs one."""
 
 
+class CompanyDataUnavailableNowError(DomainError):
+    """A company's information cannot be fetched right now (the provider cannot answer, or is not set up)."""
+
+
 class OrderNotOpenError(DomainError):
     """The order is no longer open (filled, cancelled or rejected), so it cannot change."""
 

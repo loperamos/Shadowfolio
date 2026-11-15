@@ -7,6 +7,7 @@ from shadowfolio.interfaces.web.history import history_router
 from shadowfolio.interfaces.web.imports import imports_router
 from shadowfolio.interfaces.web.market import market_router
 from shadowfolio.interfaces.web.orders import orders_router
+from shadowfolio.interfaces.web.securities import securities_router
 from shadowfolio.interfaces.web.sync import sync_router
 from shadowfolio.interfaces.web.valuation import valuation_router
 from shadowfolio.interfaces.web.wallets import wallets_router
@@ -15,6 +16,7 @@ from shadowfolio.usecases.history import History
 from shadowfolio.usecases.imports import Imports
 from shadowfolio.usecases.market import Market
 from shadowfolio.usecases.orders import Orders
+from shadowfolio.usecases.securities import Securities
 from shadowfolio.usecases.sync import Sync
 from shadowfolio.usecases.valuation import Valuation
 from shadowfolio.usecases.wallets import Wallets
@@ -32,6 +34,7 @@ def create_app(
     imports: Imports,
     comparison: Comparison,
     orders: Orders,
+    securities: Securities,
 ) -> FastAPI:
     # Operation ids are the route functions' names (e.g. list_wallets), so generated clients get readable names.
     app = FastAPI(title="Shadowfolio", generate_unique_id_function=lambda route: route.name)
@@ -43,4 +46,5 @@ def create_app(
     app.include_router(imports_router(imports), prefix=API_PREFIX)
     app.include_router(comparison_router(comparison), prefix=API_PREFIX)
     app.include_router(orders_router(orders), prefix=API_PREFIX)
+    app.include_router(securities_router(securities), prefix=API_PREFIX)
     return app
