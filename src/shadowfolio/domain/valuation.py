@@ -19,6 +19,7 @@ class Quote:
     currency: Currency
     as_of: datetime
     previous_close: Decimal | None = None  # None when the provider has none (e.g. a new listing)
+    volume: Decimal | None = None  # shares traded that day, for a daily close; None when not known
 
     @property
     def change(self) -> Decimal | None:

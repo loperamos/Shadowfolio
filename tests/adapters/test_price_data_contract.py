@@ -18,6 +18,7 @@ from shadowfolio.adapters.alpaca_price_data import AlpacaConfig, AlpacaPriceData
 from shadowfolio.adapters.cached_price_data import CachedPriceData
 from shadowfolio.adapters.fixed_clock import FixedClock
 from shadowfolio.adapters.in_memory_price_data import InMemoryPriceData
+from shadowfolio.adapters.system_clock import SystemClock
 from shadowfolio.domain.market import MinuteBar
 from shadowfolio.domain.money import Currency
 from shadowfolio.domain.valuation import Quote
@@ -48,7 +49,7 @@ def _alpaca() -> PriceData:
     key_id, secret_key = os.environ.get("ALPACA_API_KEY_ID"), os.environ.get("ALPACA_API_SECRET_KEY")
     if not key_id or not secret_key:
         pytest.skip("Alpaca credentials are not set")
-    return AlpacaPriceData(AlpacaConfig(key_id=key_id, secret_key=secret_key))
+    return AlpacaPriceData(AlpacaConfig(key_id=key_id, secret_key=secret_key), SystemClock())
 
 
 def _cached(cache_dir: Path) -> PriceData:

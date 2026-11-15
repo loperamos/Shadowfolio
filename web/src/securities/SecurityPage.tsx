@@ -150,7 +150,7 @@ function PriceChart({ symbol }: { symbol: string }) {
         <SecurityRanges symbol={symbol} start={range.start} end={range.end} currency={state.status === "loaded" ? (state.closes[0]?.currency ?? null) : null} />
       </Box>
       <Box mt="lg">
-        <SecurityStatistics symbol={symbol} start={range.start} end={range.end} />
+        <SecurityStatistics symbol={symbol} start={range.start} end={range.end} currency={state.status === "loaded" ? (state.closes[0]?.currency ?? null) : null} />
       </Box>
     </div>
   );

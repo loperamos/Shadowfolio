@@ -124,6 +124,7 @@ OperationEditRequest = Annotated[DepositEdit | WithdrawalEdit | BuyEdit | SellEd
 
 # Costs and gains are exact in the domain and rounded here, for display: money to cents, percentages to hundredths.
 CENT = Decimal("0.01")
+WHOLE = Decimal(1)  # whole numbers, e.g. an average count of shares
 
 
 def _cents(amount: Decimal) -> Decimal:
@@ -727,6 +728,7 @@ class FundamentalsResponse(BaseModel):
     (against the last fiscal year's diluted EPS) and market cap at the latest price; those are null without one."""
 
     company_name: str
+    industry: str | None  # as the SEC classifies it (SIC); null when not given
     currency: Currency
     years: list[FiscalYearResponse]
     # Each fiscal quarter, oldest first: growth on the same quarter a year before; no EPS (see the company data).
@@ -744,6 +746,7 @@ class FundamentalsResponse(BaseModel):
         fundamentals = figures.fundamentals
         return cls(
             company_name=fundamentals.company_name,
+            industry=fundamentals.industry,
             currency=fundamentals.currency,
             years=[FiscalYearResponse.of(y, fundamentals.revenue_growth(y)) for y in fundamentals.years],
             quarters=[FiscalYearResponse.of(q, fundamentals.quarter_revenue_growth(q)) for q in fundamentals.quarters],
@@ -806,6 +809,7 @@ class DailyCloseResponse(BaseModel):
     day: date
     close: Decimal
     currency: Currency
+    volume: Decimal | None  # shares traded that day; null when not known
 
 
 class SyncSummaryResponse(BaseModel):
@@ -852,6 +856,8 @@ class SecurityStatisticsResponse(BaseModel):
     max_drawdown_percent: Decimal | None  # negative, or 0 when it never fell
     beta: Decimal | None
     benchmark_symbol: str
+    average_daily_volume: Decimal | None  # shares traded on an average day in the period
+    average_daily_value: Decimal | None  # what trades on an average day, in the price's currency
 
     @classmethod
     def from_statistics(cls, statistics: SecurityStatistics) -> "SecurityStatisticsResponse":
@@ -863,4 +869,8 @@ class SecurityStatisticsResponse(BaseModel):
             max_drawdown_percent=_ratio_percent(statistics.max_drawdown),
             beta=None if statistics.beta is None else statistics.beta.quantize(CENT, rounding=ROUND_HALF_EVEN),
             benchmark_symbol=statistics.benchmark_symbol,
+            average_daily_volume=None
+            if statistics.average_daily_volume is None
+            else statistics.average_daily_volume.quantize(WHOLE, rounding=ROUND_HALF_EVEN),
+            average_daily_value=_optional_cents(statistics.average_daily_value),
         )

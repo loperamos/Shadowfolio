@@ -2333,13 +2333,25 @@
           },
           "currency": {
             "$ref": "#/components/schemas/Currency"
+          },
+          "volume": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Volume"
           }
         },
         "type": "object",
         "required": [
           "day",
           "close",
-          "currency"
+          "currency",
+          "volume"
         ],
         "title": "DailyCloseResponse"
       },
@@ -2766,6 +2778,17 @@
             "type": "string",
             "title": "Company Name"
           },
+          "industry": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Industry"
+          },
           "currency": {
             "$ref": "#/components/schemas/Currency"
           },
@@ -2865,6 +2888,7 @@
         "type": "object",
         "required": [
           "company_name",
+          "industry",
           "currency",
           "years",
           "quarters",
@@ -4007,6 +4031,28 @@
           "benchmark_symbol": {
             "type": "string",
             "title": "Benchmark Symbol"
+          },
+          "average_daily_volume": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Average Daily Volume"
+          },
+          "average_daily_value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Average Daily Value"
           }
         },
         "type": "object",
@@ -4017,7 +4063,9 @@
           "volatility_percent",
           "max_drawdown_percent",
           "beta",
-          "benchmark_symbol"
+          "benchmark_symbol",
+          "average_daily_volume",
+          "average_daily_value"
         ],
         "title": "SecurityStatisticsResponse",
         "description": "How the price moved, in percent: its trend back from today, and over the period asked for its volatility (over\na year), deepest fall and beta against `benchmark_symbol`. Each null without enough closes."

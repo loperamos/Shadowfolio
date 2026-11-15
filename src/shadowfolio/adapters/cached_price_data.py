@@ -56,10 +56,17 @@ class CachedPriceData(PriceData):
 
 def _encode(quote: Quote) -> Fields:
     previous = None if quote.previous_close is None else str(quote.previous_close)
-    return [str(quote.price), quote.currency.value, quote.as_of.isoformat(), previous]
+    volume = None if quote.volume is None else str(quote.volume)
+    return [str(quote.price), quote.currency.value, quote.as_of.isoformat(), previous, volume]
 
 
 def _decode(fields: Fields) -> Quote:
-    price, currency, as_of, previous = fields
+    price, currency, as_of, previous, volume = fields
     assert price is not None and currency is not None and as_of is not None
-    return Quote(Decimal(price), Currency(currency), datetime.fromisoformat(as_of), None if previous is None else Decimal(previous))
+    return Quote(
+        Decimal(price),
+        Currency(currency),
+        datetime.fromisoformat(as_of),
+        None if previous is None else Decimal(previous),
+        None if volume is None else Decimal(volume),
+    )

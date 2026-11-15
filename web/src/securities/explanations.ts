@@ -2,6 +2,10 @@
 // Plain language, a few sentences each; general guidance, not advice about any one company.
 
 export const EXPLANATIONS = {
+  industry:
+    "The company's industry as the US SEC classifies it (its SIC code). Compare ratios such as the P/E or margins with companies in the " +
+    "same industry rather than across industries. The codes are old and broad, so newer businesses can sit under dated names " +
+    "(Netflix is still filed under video tape rental).",
   pe:
     "Price to earnings: what investors pay for each dollar of yearly profit per share. 33 means the price is 33 times last year's earnings. " +
     "A high P/E usually means the market expects strong growth (or is optimistic); a low one, slow growth or doubts. Compare it with the " +
@@ -71,6 +75,9 @@ export const EXPLANATIONS = {
   beta:
     "How much the price tends to move when the market (SPY) moves, over the selected period: 1 moves with it, 2 twice as much, 0.5 half, " +
     "and near 0 or below barely or against it. It describes market risk; it has done little to explain which stocks earn more.",
+  averageVolume:
+    "How many shares trade on an average day in the selected period, and what they are worth. The more trades, the more easily a " +
+    "position can be bought or sold without moving the price; thinly traded shares cost more to trade than their fees show.",
   priceRange:
     "The lowest and highest closing price over the period you selected, with today's price as the dot. Near the top means it trades close " +
     "to its recent highs; near the bottom, close to its lows. It shows where the price is, not whether it is cheap.",

@@ -62,3 +62,14 @@ def change_since(closes: Closes, since: date) -> Decimal | None:
     if not closes or not before or not before[-1]:
         return None
     return closes[-1][1] / before[-1] - 1
+
+
+def average_daily_volume(volumes: Sequence[Decimal]) -> Decimal | None:
+    """The shares traded on an average day; None without any day's volume."""
+    return sum(volumes, Decimal(0)) / len(volumes) if volumes else None
+
+
+def average_daily_value(closes: Sequence[tuple[Decimal, Decimal]]) -> Decimal | None:
+    """What trades on an average day, in money: each day's volume at its close, as (close, volume). How easily a
+    position can be bought or sold without moving the price (Amihud 2002); None without any day's volume."""
+    return sum((close * volume for close, volume in closes), Decimal(0)) / len(closes) if closes else None

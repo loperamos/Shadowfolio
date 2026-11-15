@@ -77,8 +77,8 @@ def test_a_symbol_without_prices_has_no_closes() -> None:
 
 def test_a_symbols_closes_are_adjusted_for_its_later_splits() -> None:
     prices = InMemoryPriceData()
-    for day, close in [(7, "1208.88"), (10, "121.79")]:
-        prices.add_close("NVDA", Quote(Decimal(close), Currency.USD, datetime(2024, 6, day, 4, 0, tzinfo=UTC)))
+    for day, close, volume in [(7, "1208.88", "41238580"), (10, "121.79", "314162700")]:
+        prices.add_close("NVDA", Quote(Decimal(close), Currency.USD, datetime(2024, 6, day, 4, 0, tzinfo=UTC), volume=Decimal(volume)))
     actions = InMemoryCorporateActions(SplitEvent("NVDA", date(2024, 6, 10), Decimal(1), Decimal(10), "nvda-2024-split"))
     client = TestClient(
         build_test_app(clock=FixedClock(datetime(2024, 6, 11, 15, 0, tzinfo=UTC)), prices=prices, corporate_actions=actions)
@@ -86,6 +86,9 @@ def test_a_symbols_closes_are_adjusted_for_its_later_splits() -> None:
 
     closes = client.get("/api/market/closes/NVDA", params={"start": "2024-06-07"}).json()
 
-    # Before the 10-for-1 split on 10 June, a share was ten of today's: its close counts as a tenth, so the history
-    # reads continuously (as finance sites show it).
-    assert [(c["day"], c["close"]) for c in closes] == [("2024-06-07", "120.888"), ("2024-06-10", "121.79")]
+    # Before the 10-for-1 split on 10 June, a share was ten of today's: its close counts as a tenth, and its volume ten
+    # times over, so the history reads continuously (as finance sites show it).
+    assert [(c["day"], c["close"], c["volume"]) for c in closes] == [
+        ("2024-06-07", "120.888", "412385800"),
+        ("2024-06-10", "121.79", "314162700"),
+    ]

@@ -19,11 +19,16 @@ from shadowfolio.adapters.daily import last_on_or_before
 from shadowfolio.domain.market import MinuteBar
 from shadowfolio.domain.money import Currency
 from shadowfolio.domain.valuation import Quote
+from shadowfolio.ports.clock import Clock
 from shadowfolio.ports.price_data import PriceData, PriceDataUnavailableError
 
 BASE_URL = "https://data.alpaca.markets"
 # The free plan only includes the IEX exchange's feed.
 FEED = "iex"
+# Daily bars come from the consolidated feed (every US exchange): official closes, and whole volumes rather than one
+# exchange's share. The free plan allows it for data older than SIP_DELAY; the latest prices stay on IEX.
+DAILY_FEED = "sip"
+SIP_DELAY = timedelta(minutes=15)
 TIMEOUT_SECONDS = 10.0
 # How far after a requested time to look for the next traded price (covers nights, weekends and holidays).
 BAR_LOOKAHEAD = timedelta(days=7)
@@ -44,8 +49,10 @@ class AlpacaConfig:
 
 
 class AlpacaPriceData(PriceData):
-    def __init__(self, config: AlpacaConfig, transport: httpx2.BaseTransport | None = None) -> None:
-        """`transport` replaces the network in tests."""
+    def __init__(self, config: AlpacaConfig, clock: Clock, transport: httpx2.BaseTransport | None = None) -> None:
+        """`clock` keeps daily bars clear of the consolidated feed's latest minutes; `transport` replaces the network
+        in tests."""
+        self._clock = clock
         self._client = httpx2.Client(
             base_url=BASE_URL,
             headers={"APCA-API-KEY-ID": config.key_id, "APCA-API-SECRET-KEY": config.secret_key},
@@ -97,6 +104,10 @@ class AlpacaPriceData(PriceData):
             return self._closes_between(symbol, start, end)
         except httpx2.HTTPError as error:
             raise PriceDataUnavailableError(f"Alpaca: {error}") from error
+
+    def _daily_end(self, day: date) -> datetime:
+        """The end of `day`, or earlier for today: never within the consolidated feed's latest minutes."""
+        return min(datetime.combine(day, time.max, tzinfo=UTC), self._clock.now() - SIP_DELAY)
 
     def _latest_price(self, symbol: str) -> Quote | None:
         """The last trade's price and the previous day's close. Alpaca only covers US listings, so prices are in USD."""
@@ -157,15 +168,15 @@ class AlpacaPriceData(PriceData):
 
     def _close_on(self, symbol: str, day: date) -> Quote | None:
         """The close of the last daily bar on or before `day`. Daily bars start at midnight New York time, so every bar of
-        `day` starts before the end of `day` in UTC. Raw prices, as traded then; the IEX feed's close, not the consolidated one."""
+        `day` starts before the end of `day` in UTC. Raw prices, as traded then: the official close."""
         params: dict[str, str | int] = {
             "timeframe": "1Day",
             "start": _rfc3339(datetime.combine(day - CLOSE_LOOKBACK, time(), tzinfo=UTC)),
-            "end": _rfc3339(datetime.combine(day, time.max, tzinfo=UTC)),
+            "end": _rfc3339(self._daily_end(day)),
             "limit": 1,
             "sort": "desc",
             "adjustment": "raw",
-            "feed": FEED,
+            "feed": DAILY_FEED,
         }
         response = self._client.get(f"/v2/stocks/{quote(symbol, safe='')}/bars", params=params)
         if _unknown_symbol(response):
@@ -174,18 +185,18 @@ class AlpacaPriceData(PriceData):
         bars = json.loads(response.text, parse_float=Decimal).get("bars") or []
         if not bars:
             return None
-        return Quote(price=Decimal(bars[0]["c"]), currency=Currency.USD, as_of=datetime.fromisoformat(bars[0]["t"]))
+        return _close(bars[0])
 
     def _closes_between(self, symbol: str, start: date, end: date) -> dict[date, Quote]:
         """Every daily bar from `CLOSE_LOOKBACK` before `start` to the end of `end`, page by page, spread over the days."""
         params: dict[str, str | int] = {
             "timeframe": "1Day",
             "start": _rfc3339(datetime.combine(start - CLOSE_LOOKBACK, time(), tzinfo=UTC)),
-            "end": _rfc3339(datetime.combine(end, time.max, tzinfo=UTC)),
+            "end": _rfc3339(self._daily_end(end)),
             "limit": PAGE_LIMIT,
             "sort": "asc",
             "adjustment": "raw",
-            "feed": FEED,
+            "feed": DAILY_FEED,
         }
         closes: list[tuple[date, Quote]] = []
         while True:
@@ -195,12 +206,23 @@ class AlpacaPriceData(PriceData):
             response.raise_for_status()
             page = json.loads(response.text, parse_float=Decimal)
             for bar in page.get("bars") or []:
-                close = Quote(price=Decimal(bar["c"]), currency=Currency.USD, as_of=datetime.fromisoformat(bar["t"]))
+                close = _close(bar)
                 closes.append((close.as_of.date(), close))
             token = page.get("next_page_token")
             if not token:
                 return last_on_or_before(closes, start, end, CLOSE_LOOKBACK)
             params["page_token"] = token
+
+
+def _close(bar: dict[str, Any]) -> Quote:
+    """A daily bar's close and volume."""
+    volume = bar.get("v")
+    return Quote(
+        price=Decimal(bar["c"]),
+        currency=Currency.USD,
+        as_of=datetime.fromisoformat(bar["t"]),
+        volume=None if volume is None else Decimal(volume),
+    )
 
 
 def _quote(snapshot: dict[str, Any]) -> Quote | None:

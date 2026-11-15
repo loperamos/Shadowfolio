@@ -12,6 +12,7 @@ comparable. Answers are kept in memory for FRESH_FOR: filings change a few times
 """
 
 import json
+from dataclasses import replace
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import Any
@@ -25,6 +26,9 @@ from shadowfolio.ports.company_data import CompanyData, CompanyDataUnavailableEr
 
 TICKERS_URL = "https://www.sec.gov/files/company_tickers.json"
 FACTS_URL = "https://data.sec.gov/api/xbrl/companyfacts/CIK{cik:010d}.json"
+# The company's profile, with its industry as the SEC classifies it (its SIC code's description).
+SUBMISSIONS_URL = "https://data.sec.gov/submissions/CIK{cik:010d}.json"
+INDUSTRY_FIELD = "sicDescription"
 TIMEOUT_SECONDS = 30.0
 FRESH_FOR = timedelta(days=1)
 CONTACT_SETTING = "SEC_EDGAR_CONTACT"
@@ -75,7 +79,8 @@ class SecEdgarCompanyData(CompanyData):
         if cik is None:
             return None
         facts = self._get(FACTS_URL.format(cik=cik))
-        return _fundamentals(facts)
+        profile = self._get(SUBMISSIONS_URL.format(cik=cik))
+        return replace(_fundamentals(facts), industry=profile.get(INDUSTRY_FIELD) or None)
 
     def _get(self, url: str) -> Any:
         now = self._clock.now()

@@ -39,6 +39,7 @@ NVDA = Fundamentals(
     ),
     shares_outstanding=Decimal("24100000000"),
     shares_as_of=date(2026, 8, 21),
+    industry="Semiconductors & Related Devices",
     quarters=(
         FiscalYear(date(2024, 1, 29), date(2024, 4, 28), Decimal("26044000000"), Decimal("14881000000"), None),
         FiscalYear(date(2025, 1, 27), date(2025, 4, 27), Decimal("44062000000"), Decimal("18775000000"), None),
@@ -57,6 +58,7 @@ def test_fundamentals_come_with_the_pe_and_market_cap_at_the_latest_price() -> N
     assert response.status_code == 200
     result = response.json()
     assert (result["company_name"], result["currency"], result["shares_outstanding"]) == ("NVIDIA CORP", "USD", "24100000000")
+    assert result["industry"] == "Semiconductors & Related Devices"
     assert [(y["end"], y["revenue"], y["net_income"], y["eps_diluted"]) for y in result["years"]] == [
         ("2025-01-26", "130497000000", "72880000000", "2.94"),
         ("2026-01-25", "215938000000", "120067000000", "4.90"),
@@ -206,14 +208,18 @@ def test_statistics_describe_the_trend_and_how_much_the_price_swings() -> None:
     the period."""
     prices = InMemoryPriceData()
 
-    def close(symbol: str, day: date, price: str) -> None:
-        prices.add_close(symbol, Quote(Decimal(price), Currency.USD, datetime(day.year, day.month, day.day, 21, 0, tzinfo=UTC)))
+    def close(symbol: str, day: date, price: str, volume: str = "1000") -> None:
+        at = datetime(day.year, day.month, day.day, 21, 0, tzinfo=UTC)
+        prices.add_close(symbol, Quote(Decimal(price), Currency.USD, at, volume=Decimal(volume)))
 
     week = [date(2026, 3, 2), date(2026, 3, 3), date(2026, 3, 4), date(2026, 3, 5)]
     # SPY moves +1%, -1%, +1%; the stock exactly twice as much each day: +2%, -2%, +2%.
-    for day, spy, stock in zip(week, ["100", "101", "99.99", "100.9899"], ["100", "102", "99.96", "101.9592"], strict=True):
+    stock_volumes = ["1000", "3000", "2000", "2000"]
+    for day, spy, stock, volume in zip(
+        week, ["100", "101", "99.99", "100.9899"], ["100", "102", "99.96", "101.9592"], stock_volumes, strict=True
+    ):
         close("SPY", day, spy)
-        close("ACME", day, stock)
+        close("ACME", day, stock, volume)
     close("ACME", date(2025, 9, 5), "50")  # 6 months before
     close("ACME", date(2025, 12, 5), "80")  # 3 months before
     clock = FixedClock(datetime(2026, 3, 6, 12, 0, tzinfo=UTC))
@@ -230,6 +236,8 @@ def test_statistics_describe_the_trend_and_how_much_the_price_swings() -> None:
     )
     # 101.9592 against 80 three months before and 50 six months before; nothing a year before.
     assert (result["three_month_return"], result["six_month_return"], result["one_year_return"]) == ("27.45", "103.92", None)
+    # How easily it trades: 2000 shares a day on average, worth 202,459.60 a day (each day's volume at its close).
+    assert (result["average_daily_volume"], result["average_daily_value"]) == ("2000", "202459.60")
 
 
 def test_without_enough_closes_the_statistics_are_unknown() -> None:

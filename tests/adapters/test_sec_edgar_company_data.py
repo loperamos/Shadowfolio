@@ -113,6 +113,16 @@ FACTS: dict[str, Any] = {
 }
 
 
+SUBMISSIONS = {"name": "NVIDIA CORP", "sic": "3674", "sicDescription": "Semiconductors & Related Devices"}
+
+
+def answer(path: str, facts: dict[str, Any]) -> dict[str, Any]:
+    """What EDGAR answers for a request's path: the tickers, a company's profile, or its facts."""
+    if path.endswith("company_tickers.json"):
+        return TICKERS
+    return SUBMISSIONS if "/submissions/" in path else facts
+
+
 def edgar(
     seen: list[httpx2.Request], status: int = 200, contact: str | None = CONTACT, clock: FixedClock | None = None
 ) -> SecEdgarCompanyData:
@@ -120,8 +130,7 @@ def edgar(
         seen.append(request)
         if status != 200:
             return httpx2.Response(status, text="error")
-        body = TICKERS if request.url.path.endswith("company_tickers.json") else FACTS
-        return httpx2.Response(200, text=json.dumps(body))
+        return httpx2.Response(200, text=json.dumps(answer(request.url.path, FACTS)))
 
     return SecEdgarCompanyData(contact, clock or FixedClock(NOW), transport=httpx2.MockTransport(handler))
 
@@ -140,8 +149,11 @@ def test_yearly_results_come_from_annual_reports_the_latest_filing_winning() -> 
         (date(2025, 1, 27), date(2026, 1, 25), Decimal("215938000000"), Decimal("120067000000"), Decimal("4.9")),
     ]
     assert (fundamentals.shares_outstanding, fundamentals.shares_as_of) == (Decimal("24100000000"), date(2026, 8, 21))
+    # Its industry as the SEC classifies it (SIC), from the company's profile.
+    assert fundamentals.industry == "Semiconductors & Related Devices"
     # The company is found by its ticker, and every request says who is asking, as EDGAR requires.
     assert seen[1].url.path == "/api/xbrl/companyfacts/CIK0001045810.json"
+    assert seen[2].url.path == "/submissions/CIK0001045810.json"
     assert {request.headers["User-Agent"] for request in seen} == {CONTACT}
 
 
@@ -186,7 +198,7 @@ def test_a_share_count_older_than_the_last_fiscal_year_is_not_used() -> None:
     }
 
     def handler(request: httpx2.Request) -> httpx2.Response:
-        return httpx2.Response(200, text=json.dumps(TICKERS if request.url.path.endswith("company_tickers.json") else stale))
+        return httpx2.Response(200, text=json.dumps(answer(request.url.path, stale)))
 
     fundamentals = SecEdgarCompanyData(CONTACT, FixedClock(NOW), transport=httpx2.MockTransport(handler)).fundamentals("NVDA")
 
@@ -212,10 +224,10 @@ def test_answers_are_kept_for_a_while() -> None:
 
     company_data.fundamentals("NVDA")
     company_data.fundamentals("NVDA")
-    assert len(seen) == 2  # the tickers and the facts, once
+    assert len(seen) == 3  # the tickers, the facts and the profile, once
     clock.set(NOW + FRESH_FOR)
     company_data.fundamentals("NVDA")
-    assert len(seen) == 4
+    assert len(seen) == 6
 
 
 @pytest.mark.parametrize("status", [403, 503])
