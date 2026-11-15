@@ -115,12 +115,12 @@ class WalletValuation:
 @dataclass(frozen=True)
 class DailyValue:
     """The wallet at the end of a day, valued at that day's closes, with the money put in up to then. A holding
-    market data has no prices for is valued at an estimated price (see `estimated_price`), and `estimated` says which. `valuation`
+    market data has no prices for is valued at an estimated price (see `estimated_price`), and `estimated` says which. `total`
     is None when a holding has no price at all that day, or its currency no rate: `missing` says which (a symbol, or
     e.g. "USD→EUR")."""
 
     day: date
-    valuation: WalletValuation | None
+    total: Decimal | None  # cash plus the holdings' value, in the wallet's currency
     cash: Decimal
     net_deposits: Decimal
     missing: tuple[str, ...] = ()
@@ -135,6 +135,19 @@ def estimated_price(operations: Iterable[Operation], symbol: str, day: date) -> 
     before = [op for op in trades if op.timestamp.astimezone(UTC).date() <= day]
     nearest = before[-1] if before else next(iter(trades), None)
     return None if nearest is None else Quote(nearest.trade.price, nearest.trade.price_currency, nearest.timestamp)
+
+
+def holdings_value(
+    holdings: Mapping[str, Decimal], quotes: Mapping[str, Quote], rates: Mapping[Currency, FxRate], currency: Currency
+) -> Decimal:
+    """What `holdings` (shares per symbol) are worth in `currency`, each rounded to cents as in a valuation (see
+    HoldingValue). `quotes` must have every symbol, and `rates` every other currency they are quoted in."""
+    total = Decimal(0)
+    for symbol, quantity in holdings.items():
+        quote = quotes[symbol]
+        value = quantity * quote.price
+        total += to_cents(value if quote.currency is currency else value * rates[quote.currency].rate)
+    return total
 
 
 def value_wallet(wallet: Wallet, quotes: Mapping[str, Quote], rates: Mapping[Currency, FxRate]) -> WalletValuation:

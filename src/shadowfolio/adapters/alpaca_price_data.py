@@ -5,10 +5,12 @@ adapter must never be wired into production.
 """
 
 import json
+from collections.abc import Collection
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
 from decimal import Decimal
 from http import HTTPStatus
+from typing import Any
 from urllib.parse import quote
 
 import httpx2
@@ -57,6 +59,21 @@ class AlpacaPriceData(PriceData):
         except httpx2.HTTPError as error:
             raise PriceDataUnavailableError(f"Alpaca: {error}") from error
 
+    def latest_prices(self, symbols: Collection[str]) -> dict[str, Quote]:
+        """In one request; if Alpaca refuses a symbol it cannot read, each one is asked for on its own."""
+        if not symbols:
+            return {}
+        try:
+            response = self._client.get("/v2/stocks/snapshots", params={"symbols": ",".join(symbols), "feed": FEED})
+            if _unknown_symbol(response):
+                return super().latest_prices(symbols)
+            response.raise_for_status()
+        except httpx2.HTTPError as error:
+            raise PriceDataUnavailableError(f"Alpaca: {error}") from error
+        snapshots = json.loads(response.text, parse_float=Decimal)
+        quotes = {symbol: _quote(snapshot) for symbol, snapshot in snapshots.items() if snapshot}
+        return {symbol: quote for symbol, quote in quotes.items() if quote is not None}
+
     def price_at(self, symbol: str, at: datetime) -> Quote | None:
         try:
             return self._price_at(symbol, at)
@@ -88,17 +105,7 @@ class AlpacaPriceData(PriceData):
             return None
         response.raise_for_status()
         # Parse numbers as Decimal directly, never through float.
-        snapshot = json.loads(response.text, parse_float=Decimal)
-        trade = snapshot.get("latestTrade")
-        if not trade:
-            return None
-        previous_bar = snapshot.get("prevDailyBar")
-        return Quote(
-            price=Decimal(trade["p"]),
-            currency=Currency.USD,
-            as_of=datetime.fromisoformat(trade["t"]),
-            previous_close=Decimal(previous_bar["c"]) if previous_bar else None,
-        )
+        return _quote(json.loads(response.text, parse_float=Decimal))
 
     def _price_at(self, symbol: str, at: datetime) -> Quote | None:
         """The open of the first one-minute bar at or after `at`. Raw prices (not adjusted for later splits), as traded then."""
@@ -194,6 +201,20 @@ class AlpacaPriceData(PriceData):
             if not token:
                 return last_on_or_before(closes, start, end, CLOSE_LOOKBACK)
             params["page_token"] = token
+
+
+def _quote(snapshot: dict[str, Any]) -> Quote | None:
+    """The last trade's price and the previous day's close, from a snapshot; None without a trade."""
+    trade = snapshot.get("latestTrade")
+    if not trade:
+        return None
+    previous_bar = snapshot.get("prevDailyBar")
+    return Quote(
+        price=Decimal(trade["p"]),
+        currency=Currency.USD,
+        as_of=datetime.fromisoformat(trade["t"]),
+        previous_close=Decimal(previous_bar["c"]) if previous_bar else None,
+    )
 
 
 def _unknown_symbol(response: httpx2.Response) -> bool:

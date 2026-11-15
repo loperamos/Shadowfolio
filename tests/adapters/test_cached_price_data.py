@@ -1,10 +1,11 @@
 """Past daily closes are kept in a SQLite file, so each is fetched from the provider once."""
 
+from collections.abc import Collection
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 
-from shadowfolio.adapters.cached_price_data import CachedPriceData
+from shadowfolio.adapters.cached_price_data import LATEST_FRESH_FOR, CachedPriceData
 from shadowfolio.adapters.daily_cache import FRESH_FOR
 from shadowfolio.adapters.fixed_clock import FixedClock
 from shadowfolio.adapters.in_memory_price_data import InMemoryPriceData
@@ -27,6 +28,11 @@ class CountingPriceData(InMemoryPriceData):
     def closes_between(self, symbol: str, start: date, end: date) -> dict[date, Quote]:
         self.requests += 1
         return super().closes_between(symbol, start, end)
+
+    def latest_prices(self, symbols: Collection[str]) -> dict[str, Quote]:
+        self.requests += 1
+        self.asked_for = list(symbols)
+        return super().latest_prices(symbols)
 
 
 def close(day: date, price: str) -> Quote:
@@ -98,3 +104,19 @@ def test_another_provider_does_not_share_the_cache(tmp_path: Path) -> None:
     CachedPriceData(source, "alpaca/sip", tmp_path / "cache.sqlite", FixedClock(NOW)).closes_between(SYMBOL, FRIDAY, SUNDAY)
 
     assert source.requests == 2
+
+
+def test_latest_prices_are_kept_for_a_minute_and_only_missing_ones_asked_for(tmp_path: Path) -> None:
+    source = provider()
+    source.set(SYMBOL, close(TUESDAY, "125.00"))
+    source.set("AAPL", close(TUESDAY, "230.00"))
+    clock = FixedClock(NOW)
+    prices = CachedPriceData(source, SOURCE, tmp_path / "cache.sqlite", clock)
+
+    assert prices.latest_prices([SYMBOL])[SYMBOL].price == Decimal("125.00")
+    both = prices.latest_prices([SYMBOL, "AAPL"])  # the first is still fresh: only the second is asked for
+    assert (sorted(both), source.asked_for, prices.latest_price(SYMBOL)) == (["AAPL", SYMBOL], ["AAPL"], both[SYMBOL])
+    clock.set(NOW + LATEST_FRESH_FOR)
+    prices.latest_prices([SYMBOL])
+
+    assert source.requests == 3

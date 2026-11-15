@@ -1,6 +1,6 @@
 """Wallet: a timeline of operations owned by a user. Cash and holdings are derived from it."""
 
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field, replace
 from datetime import UTC, date, datetime, time, timedelta
 from decimal import Decimal
@@ -43,6 +43,15 @@ from shadowfolio.domain.orders import Order
 
 # How far apart two sources' payment dates for the same dividend can be.
 PAYMENT_DATE_TOLERANCE = timedelta(days=7)
+
+
+@dataclass(frozen=True)
+class WalletState:
+    """A wallet at a past moment: what `as_of` gives, without its operations."""
+
+    cash: Decimal
+    net_deposits: Decimal  # money put in less money taken out
+    holdings: dict[str, Decimal]  # shares per symbol; symbols sold out are left out
 
 
 @dataclass(frozen=True)
@@ -203,6 +212,24 @@ class Wallet:
         if not new:
             return self
         return replace(self, dividend_events=self.dividend_events + new)._settled(self.operations)
+
+    def states_at(self, moments: Sequence[datetime]) -> list[WalletState]:
+        """The wallet's cash, net deposits and holdings just before each of `moments` (oldest first), as `as_of` each
+        would give, in one pass over the operations: for reading many past states (e.g. one per day)."""
+        states: list[WalletState] = []
+        cash = net_deposits = Decimal(0)
+        held: dict[str, Decimal] = {}
+        operations = iter(self.operations)
+        upcoming = next(operations, None)
+        for moment in moments:
+            while upcoming is not None and upcoming.timestamp < moment:
+                cash += upcoming.cash_delta
+                if isinstance(upcoming, Deposit | Withdrawal):
+                    net_deposits += upcoming.cash_delta
+                _step(held, upcoming)
+                upcoming = next(operations, None)
+            states.append(WalletState(cash, net_deposits, dict(held)))
+        return states
 
     def as_of(self, moment: datetime) -> Self:
         """The wallet as it was just before `moment`: only its operations before then. For reading past states."""
@@ -382,20 +409,26 @@ def _apply(timeline: Iterable[Operation], check_cash: bool) -> dict[str, Decimal
         cash += op.cash_delta
         if check_cash and cash < 0:
             raise InsufficientCashError(f"cash would be {cash} on {op.timestamp.isoformat()}")
-        change = op.holding_change
-        if change is not None:
-            symbol, delta = change
-            quantity = held.get(symbol, Decimal(0)) + delta
-            if quantity < 0:
-                raise InsufficientSharesError(f"would hold {quantity} {symbol} on {op.timestamp.isoformat()}")
-            if quantity:
-                held[symbol] = quantity
-            else:
-                held.pop(symbol, None)
-        factor = op.share_factor
-        if factor is not None and factor[0] in held:
-            held[factor[0]] *= factor[1]
+        _step(held, op)
     return held
+
+
+def _step(held: dict[str, Decimal], op: Operation) -> None:
+    """Change the shares `held` per symbol by one operation (a trade, received shares, a split); symbols sold out are
+    left out. Fails if a holding would go negative."""
+    change = op.holding_change
+    if change is not None:
+        symbol, delta = change
+        quantity = held.get(symbol, Decimal(0)) + delta
+        if quantity < 0:
+            raise InsufficientSharesError(f"would hold {quantity} {symbol} on {op.timestamp.isoformat()}")
+        if quantity:
+            held[symbol] = quantity
+        else:
+            held.pop(symbol, None)
+    factor = op.share_factor
+    if factor is not None and factor[0] in held:
+        held[factor[0]] *= factor[1]
 
 
 def _require_positive(value: Decimal, name: str) -> None:
