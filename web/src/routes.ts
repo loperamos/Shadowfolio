@@ -6,6 +6,14 @@ export function walletPath(walletId: string): string {
   return `${WALLETS_PATH}/${walletId}`;
 }
 
+// A security's page, e.g. /securities/NVDA: its price and the wallets that hold it.
+export const SECURITIES_PATH = "/securities";
+export const SECURITY_PATH = "/securities/:symbol";
+
+export function securityPath(symbol: string): string {
+  return `${SECURITIES_PATH}/${encodeURIComponent(symbol)}`;
+}
+
 // Wallets side by side: /compare?wallets=<id>,<id>.
 export const COMPARE_PATH = "/compare";
 export const COMPARED_WALLETS_PARAM = "wallets";

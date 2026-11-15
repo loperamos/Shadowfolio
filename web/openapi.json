@@ -923,6 +923,84 @@
         }
       }
     },
+    "/api/market/closes/{symbol}": {
+      "get": {
+        "summary": "Daily Closes",
+        "description": "The symbol's close on each trading day from `start` (default: ten years before `end`) to `end` (default:\ntoday); empty when market data has none.",
+        "operationId": "daily_closes",
+        "parameters": [
+          {
+            "name": "symbol",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Symbol"
+            }
+          },
+          {
+            "name": "start",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start"
+            }
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DailyCloseResponse"
+                  },
+                  "title": "Response Daily Closes"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Malformed request or broken business rule",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/sync": {
       "post": {
         "summary": "Sync All Wallets",
@@ -1655,6 +1733,29 @@
           "EUR"
         ],
         "title": "Currency"
+      },
+      "DailyCloseResponse": {
+        "properties": {
+          "day": {
+            "type": "string",
+            "format": "date",
+            "title": "Day"
+          },
+          "close": {
+            "type": "string",
+            "title": "Close"
+          },
+          "currency": {
+            "$ref": "#/components/schemas/Currency"
+          }
+        },
+        "type": "object",
+        "required": [
+          "day",
+          "close",
+          "currency"
+        ],
+        "title": "DailyCloseResponse"
       },
       "DailyReturnResponse": {
         "properties": {
@@ -2590,6 +2691,28 @@
               }
             ],
             "title": "Previous Close"
+          },
+          "day_change": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Day Change"
+          },
+          "day_change_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Day Change Percent"
           }
         },
         "type": "object",
@@ -2598,7 +2721,9 @@
           "price",
           "currency",
           "as_of",
-          "previous_close"
+          "previous_close",
+          "day_change",
+          "day_change_percent"
         ],
         "title": "QuoteResponse"
       },

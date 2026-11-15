@@ -19,6 +19,16 @@ class Quote:
     as_of: datetime
     previous_close: Decimal | None = None  # None when the provider has none (e.g. a new listing)
 
+    @property
+    def change(self) -> Decimal | None:
+        """How much the price moved since the previous close; None without one."""
+        return None if self.previous_close is None else self.price - self.previous_close
+
+    @property
+    def change_ratio(self) -> Decimal | None:
+        """That move against the previous close (0.0185 for +1.85%); None without one."""
+        return None if self.change is None or not self.previous_close else self.change / self.previous_close
+
 
 @dataclass(frozen=True)
 class HoldingValue:

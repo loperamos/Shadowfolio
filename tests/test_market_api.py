@@ -3,6 +3,7 @@ from decimal import Decimal
 
 from fastapi.testclient import TestClient
 
+from shadowfolio.adapters.fixed_clock import FixedClock
 from shadowfolio.adapters.in_memory_price_data import InMemoryPriceData
 from shadowfolio.domain.money import Currency
 from shadowfolio.domain.valuation import Quote
@@ -24,6 +25,8 @@ def test_latest_quote_for_a_symbol() -> None:
         "currency": "USD",
         "as_of": "2026-03-02T20:59:00Z",
         "previous_close": "133.04",
+        "day_change": "2.46",  # 135.50 - 133.04
+        "day_change_percent": "1.85",
     }
 
 
@@ -45,3 +48,26 @@ def test_a_quote_is_refused_cleanly_when_prices_cannot_be_fetched() -> None:
 
     response = client.get("/api/market/quotes/NVDA")
     assert (response.status_code, response.json()["detail"]) == (422, "could not fetch the price of NVDA right now; try again later")
+
+
+def test_daily_closes_of_a_symbol_are_its_trading_days_in_the_period() -> None:
+    prices = InMemoryPriceData()
+    for day, close in [(27, "123.99"), (28, "123.54"), (1, "124.30")]:
+        month = 6 if day > 1 else 7
+        prices.add_close("NVDA", Quote(Decimal(close), Currency.USD, datetime(2024, month, day, 4, 0, tzinfo=UTC)))
+    client = TestClient(build_test_app(clock=FixedClock(datetime(2024, 7, 2, 15, 0, tzinfo=UTC)), prices=prices))
+
+    response = client.get("/api/market/closes/NVDA", params={"start": "2024-06-28"})
+
+    assert response.status_code == 200
+    # Friday and Monday: the weekend has no closes of its own, and the period starts on Friday.
+    assert [(c["day"], c["close"], c["currency"]) for c in response.json()] == [
+        ("2024-06-28", "123.54", "USD"),
+        ("2024-07-01", "124.30", "USD"),
+    ]
+
+
+def test_a_symbol_without_prices_has_no_closes() -> None:
+    client = TestClient(build_test_app(clock=FixedClock(datetime(2024, 7, 2, 15, 0, tzinfo=UTC))))
+
+    assert client.get("/api/market/closes/ZZZZ", params={"start": "2024-06-28"}).json() == []

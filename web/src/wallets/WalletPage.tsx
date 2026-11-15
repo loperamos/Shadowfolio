@@ -15,7 +15,7 @@ import {
   updateWallet,
   type WalletResponse,
 } from "../api/generated";
-import { walletPath, WALLETS_PATH } from "../routes";
+import { securityPath, walletPath, WALLETS_PATH } from "../routes";
 import { EditableTitle } from "../ui/EditableTitle";
 import { GainText } from "../ui/GainText";
 import { Money } from "../ui/Money";
@@ -306,7 +306,11 @@ function WalletDetails({ wallet, operations, orders, version, onOrdersChanged, o
             <Table.Tbody>
               {holdings.map(([symbol, quantity]) => (
                 <Table.Tr key={symbol}>
-                  <Table.Td>{symbol}</Table.Td>
+                  <Table.Td>
+                    <Anchor component={Link} to={securityPath(symbol)}>
+                      {symbol}
+                    </Anchor>
+                  </Table.Td>
                   <Table.Td ta="right">{quantity}</Table.Td>
                   <Table.Td ta="right">
                     <Money amount={wallet.cost_basis[symbol]} currency={wallet.currency} />

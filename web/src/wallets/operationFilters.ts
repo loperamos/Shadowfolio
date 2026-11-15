@@ -11,6 +11,11 @@ const LIST_SEPARATOR = ",";
 
 export type OperationFilters = { types: string[]; symbol: string | null };
 
+/** The URL query showing only the operations in `symbol`, e.g. to link to a wallet's trades in it. */
+export function symbolFilterSearch(symbol: string): string {
+  return new URLSearchParams({ [SYMBOL_PARAM]: symbol }).toString();
+}
+
 /** The URL query without the operation filters (nor the page), keeping the rest of `current`. */
 export function withoutOperationFilters(current: URLSearchParams): URLSearchParams {
   const updated = new URLSearchParams(current);
