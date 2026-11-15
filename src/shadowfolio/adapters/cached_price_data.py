@@ -1,9 +1,11 @@
 """PriceData that keeps daily closes in a file in front of a provider, so each is fetched once (see DailyCache).
 
-Latest prices and minute bars are always asked of the provider.
+Latest prices are kept in memory for LATEST_FRESH_FOR, so a page valuing several wallets that hold the same symbol asks
+for it once; minute bars are always asked of the provider.
 """
 
-from datetime import date, datetime
+from collections.abc import Collection
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 
@@ -14,15 +16,30 @@ from shadowfolio.domain.valuation import Quote
 from shadowfolio.ports.clock import Clock
 from shadowfolio.ports.price_data import PriceData
 
+# How long a latest price is used before it is asked for again: prices move, but not much within a minute.
+LATEST_FRESH_FOR = timedelta(minutes=1)
+
 
 class CachedPriceData(PriceData):
     def __init__(self, provider: PriceData, source: str, path: Path, clock: Clock) -> None:
         """`source` names the provider and its plan or feed, e.g. "alpaca/iex"; `path` is the cache file."""
         self._provider = provider
         self._closes = DailyCache(path, source, clock, _encode, _decode)
+        self._clock = clock
+        self._latest: dict[str, tuple[datetime, Quote | None]] = {}  # per symbol: when it was asked for, and its price
 
     def latest_price(self, symbol: str) -> Quote | None:
-        return self._provider.latest_price(symbol)
+        return self.latest_prices([symbol]).get(symbol)
+
+    def latest_prices(self, symbols: Collection[str]) -> dict[str, Quote]:
+        now = self._clock.now()
+        missing = [symbol for symbol in symbols if symbol not in self._latest or now - self._latest[symbol][0] >= LATEST_FRESH_FOR]
+        if missing:
+            found = self._provider.latest_prices(missing)
+            for symbol in missing:  # a symbol without a price is remembered too
+                self._latest[symbol] = (now, found.get(symbol))
+        quotes = {symbol: self._latest[symbol][1] for symbol in symbols}
+        return {symbol: quote for symbol, quote in quotes.items() if quote is not None}
 
     def price_at(self, symbol: str, at: datetime) -> Quote | None:
         return self._provider.price_at(symbol, at)

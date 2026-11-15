@@ -1,6 +1,7 @@
 """Market prices."""
 
 from abc import ABC, abstractmethod
+from collections.abc import Collection
 from datetime import date, datetime
 
 from shadowfolio.domain.market import MinuteBar
@@ -18,6 +19,15 @@ class PriceData(ABC):
 
         Raises PriceDataUnavailableError when the provider cannot answer.
         """
+
+    def latest_prices(self, symbols: Collection[str]) -> dict[str, Quote]:
+        """The most recent price of each symbol, by symbol; symbols without one are left out. One request per symbol
+        unless an adapter can ask for several at once.
+
+        Raises PriceDataUnavailableError when the provider cannot answer.
+        """
+        quotes = {symbol: self.latest_price(symbol) for symbol in symbols}
+        return {symbol: quote for symbol, quote in quotes.items() if quote is not None}
 
     @abstractmethod
     def price_at(self, symbol: str, at: datetime) -> Quote | None:

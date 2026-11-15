@@ -58,6 +58,37 @@ def test_snapshot_without_a_previous_day_has_no_previous_close() -> None:
     assert quote is not None and quote.previous_close is None
 
 
+def test_several_latest_prices_come_in_one_request() -> None:
+    seen: list[httpx2.Request] = []
+    nvda = json.loads(SNAPSHOT_BODY)
+    body = json.dumps({"NVDA": nvda, "AAPL": {**nvda, "symbol": "AAPL"}, "ZZZZ": None})
+
+    quotes = adapter_answering(200, body, seen).latest_prices(["NVDA", "AAPL", "ZZZZ"])
+
+    assert sorted(quotes) == ["AAPL", "NVDA"]  # a symbol without a snapshot is left out
+    assert quotes["NVDA"] == Quote(
+        Decimal("135.505"), Currency.USD, datetime(2026, 3, 2, 20, 59, 59, 123456, tzinfo=UTC), Decimal("133.04")
+    )
+    assert (len(seen), seen[0].url.path, seen[0].url.params["symbols"]) == (1, "/v2/stocks/snapshots", "NVDA,AAPL,ZZZZ")
+
+
+def test_a_batch_with_a_symbol_alpaca_cannot_read_asks_for_each_one() -> None:
+    seen: list[httpx2.Request] = []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        seen.append(request)
+        if request.url.path == "/v2/stocks/snapshots":
+            return httpx2.Response(400, text='{"message":"invalid symbol: 9MD.XGAT"}')
+        if "9MD.XGAT" in request.url.path:
+            return httpx2.Response(400, text='{"message":"invalid symbol: 9MD.XGAT"}')
+        return httpx2.Response(200, text=SNAPSHOT_BODY)
+
+    quotes = AlpacaPriceData(CONFIG, transport=httpx2.MockTransport(handler)).latest_prices(["NVDA", "9MD.XGAT"])
+
+    assert list(quotes) == ["NVDA"]
+    assert len(seen) == 3  # the batch, then each symbol
+
+
 BARS_BODY = '{"bars": [{"t": "2024-06-24T14:26:00Z", "o": 122.005, "h": 122.04, "l": 121.78, "c": 121.815, "v": 5832}], "symbol": "NVDA"}'
 
 

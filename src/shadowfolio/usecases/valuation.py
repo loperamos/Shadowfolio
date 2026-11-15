@@ -30,12 +30,13 @@ class Valuation:
         wallet = self._repo.get(wallet_id)
         if wallet is None:
             return None
-        return self._value(
-            wallet,
-            lambda symbol: self._prices.latest_price(symbol),
-            lambda currency: self._fx_rates.latest_rate(currency, wallet.currency),
-            "",
-        )
+        # Every holding's price in one go, rather than one request after another.
+        symbols = sorted(wallet.holdings)
+        try:
+            quotes = self._prices.latest_prices(symbols)
+        except PriceDataUnavailableError as error:
+            raise PriceUnavailableError(f"could not fetch the price of {', '.join(symbols)} right now; try again later") from error
+        return self._value(wallet, quotes.get, lambda currency: self._fx_rates.latest_rate(currency, wallet.currency), "")
 
     def on(self, wallet_id: UUID, day: date) -> WalletValuation | None:
         """The wallet as it was at the end of `day` (every operation dated that day, in UTC, included), valued at that

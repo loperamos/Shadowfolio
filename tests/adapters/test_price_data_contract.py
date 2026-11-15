@@ -76,6 +76,13 @@ def test_known_symbol_has_a_usable_quote(prices: PriceData) -> None:
     assert quote.previous_close > 0
 
 
+def test_several_latest_prices_at_once_leave_out_unknown_symbols(prices: PriceData) -> None:
+    quotes = prices.latest_prices([KNOWN_SYMBOL, UNKNOWN_SYMBOL])
+
+    assert list(quotes) == [KNOWN_SYMBOL]
+    assert quotes[KNOWN_SYMBOL].currency is Currency.USD and quotes[KNOWN_SYMBOL].price > 0
+
+
 def test_unknown_symbol_has_no_price(prices: PriceData) -> None:
     assert prices.latest_price(UNKNOWN_SYMBOL) is None
 
