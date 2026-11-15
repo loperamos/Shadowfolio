@@ -14,6 +14,8 @@ import {
   securityRanges,
   type SecurityRangesResponse,
   securityStatistics,
+  securitySummary,
+  type SecuritySummaryResponse,
   type SecurityStatisticsResponse,
   type DividendsResponse,
   type EarningsResponse,
@@ -224,6 +226,29 @@ export function useClosesOf(symbols: readonly string[], start: string | null, en
     for (const symbol of wanted) {
       dailyCloses({ path: { symbol }, query: { start, end } })
         .then(({ data, error }) => settle(symbol, data ? { status: "loaded", closes: data } : { status: "error", message: apiErrorMessage(error) }))
+        .catch(() => settle(symbol, { status: "error", message: "Could not reach the backend." }));
+    }
+    return () => {
+      current = false;
+    };
+  }, [key, start, end]);
+  return states;
+}
+
+export type SummaryState = { status: "loading" } | { status: "error"; message: string } | { status: "loaded"; summary: SecuritySummaryResponse };
+
+/** Several symbols' summaries over a period, each loading on its own, by symbol. */
+export function useSummariesOf(symbols: readonly string[], start: string | null, end: string | null): Record<string, SummaryState> {
+  const [states, setStates] = useState<Record<string, SummaryState>>({});
+  const key = symbols.join();
+  useEffect(() => {
+    let current = true;
+    const wanted = key ? key.split(",") : [];
+    setStates(Object.fromEntries(wanted.map((symbol) => [symbol, { status: "loading" }])));
+    const settle = (symbol: string, state: SummaryState) => current && setStates((all) => ({ ...all, [symbol]: state }));
+    for (const symbol of wanted) {
+      securitySummary({ path: { symbol }, query: { start, end } })
+        .then(({ data, error }) => settle(symbol, data ? { status: "loaded", summary: data } : { status: "error", message: apiErrorMessage(error) }))
         .catch(() => settle(symbol, { status: "error", message: "Could not reach the backend." }));
     }
     return () => {
