@@ -20,6 +20,7 @@ from shadowfolio.domain.errors import (
     MissingSettledAmountError,
     OperationNotFoundError,
     OperationTypeChangeError,
+    OrderNotFoundError,
 )
 from shadowfolio.domain.ledger import Ledger, build_ledger
 from shadowfolio.domain.money import Currency, to_cents
@@ -38,6 +39,7 @@ from shadowfolio.domain.operations import (
     Trade,
     Withdrawal,
 )
+from shadowfolio.domain.orders import Order
 
 # How far apart two sources' payment dates for the same dividend can be.
 PAYMENT_DATE_TOLERANCE = timedelta(days=7)
@@ -56,6 +58,7 @@ class Wallet:
     dividend_events: tuple[RecordedDividend, ...] = ()
     # Share of each dividend withheld as tax (e.g. 0.15 for 15%), in [0, 1); 0 pays dividends gross.
     withholding_rate: Decimal = Decimal(0)
+    orders: tuple[Order, ...] = ()  # in the order they were placed; a filled one's trade has its id
 
     def __post_init__(self) -> None:
         if not self.name.strip():
@@ -95,11 +98,12 @@ class Wallet:
         so the copy's history can change independently.
 
         With `before`, the history up to then ("what if"): what the owner did from then on is left out, while splits
-        still happen, and dividends are worked out again from what the copy holds.
+        still happen, and dividends are worked out again from what the copy holds. Orders are not copied: they were
+        placed for the original, now.
         """
         kept = (op for op in self.operations if before is None or op.timestamp < before or isinstance(op, Split))
         operations = tuple(replace(op, id=new_operation_id()) for op in kept if not isinstance(op, Dividend))
-        return replace(self, id=wallet_id, name=name)._settled(operations)
+        return replace(self, id=wallet_id, name=name, orders=())._settled(operations)
 
     def rename(self, name: str) -> Self:
         return replace(self, name=name)
@@ -213,6 +217,20 @@ class Wallet:
         if self._get(operation_id).automatic:
             raise AutomaticOperationError("operations added from market data (e.g. splits) cannot be deleted")
         return self._without_untraded_symbols(self._without(operation_id))
+
+    def place_order(self, order: Order) -> Self:
+        return replace(self, orders=(*self.orders, order))
+
+    def order(self, order_id: UUID) -> Order:
+        for order in self.orders:
+            if order.id == order_id:
+                return order
+        raise OrderNotFoundError(f"no order {order_id}")
+
+    def with_order(self, changed: Order) -> Self:
+        """The wallet with `changed` in place of the order with its id (e.g. once filled or cancelled)."""
+        self.order(changed.id)
+        return replace(self, orders=tuple(changed if order.id == changed.id else order for order in self.orders))
 
     def had_effect(self, operation: Operation) -> bool:
         """Whether the operation changed the wallet: a split only does when shares of its symbol were held then."""

@@ -3,6 +3,7 @@
 from abc import ABC, abstractmethod
 from datetime import date, datetime
 
+from shadowfolio.domain.market import MinuteBar
 from shadowfolio.domain.valuation import Quote
 
 
@@ -24,6 +25,12 @@ class PriceData(ABC):
 
         Never a price from before `at`. Outside market hours this is the next open. None if there is no such price.
         Raises PriceDataUnavailableError when the provider cannot answer.
+        """
+
+    @abstractmethod
+    def minute_bars(self, symbol: str, start: datetime, end: datetime) -> list[MinuteBar]:
+        """The one-minute bars starting from `start` to `end` (both included), oldest first, as traded then. Empty
+        for an unknown symbol. Raises PriceDataUnavailableError when the provider cannot answer.
         """
 
     @abstractmethod

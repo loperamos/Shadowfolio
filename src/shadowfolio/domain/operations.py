@@ -30,6 +30,7 @@ class OperationType(StrEnum):
 class PriceSource(StrEnum):
     ENTERED = "entered"  # the price the broker reported, typed in: a record of a real trade
     MARKET = "market"  # filled from historical market data: a simulation, built with hindsight
+    ORDER = "order"  # an order placed now, filled at the first price after it: no hindsight
 
 
 @dataclass(frozen=True)

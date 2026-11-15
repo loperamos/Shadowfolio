@@ -34,5 +34,9 @@ def operation_not_found() -> HTTPException:
     return HTTPException(status_code=404, detail="operation not found")
 
 
+def order_not_found() -> HTTPException:
+    return HTTPException(status_code=404, detail="order not found")
+
+
 def rule_violation(error: DomainError) -> HTTPException:
     return HTTPException(status_code=422, detail=str(error))

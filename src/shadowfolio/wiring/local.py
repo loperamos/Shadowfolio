@@ -19,6 +19,7 @@ from shadowfolio.usecases.comparison import Comparison
 from shadowfolio.usecases.history import History
 from shadowfolio.usecases.imports import Imports
 from shadowfolio.usecases.market import Market
+from shadowfolio.usecases.orders import Orders
 from shadowfolio.usecases.sync import Sync
 from shadowfolio.usecases.valuation import Valuation
 from shadowfolio.usecases.wallet_changes import WalletChanges
@@ -51,6 +52,7 @@ def build_local_app(config: LocalConfig) -> FastAPI:
         history=History(wallet_repository, clock, prices, fx_rates, sync),
         valuation=Valuation(wallet_repository, clock, prices, fx_rates),
         comparison=Comparison(wallet_repository, clock, prices, fx_rates, corporate_actions),
+        orders=Orders(wallet_repository, clock, prices, WalletChanges(clock, prices, fx_rates, sync)),
         market=Market(prices),
         sync=sync,
         imports=Imports(wallet_repository, WalletChanges(clock, prices, fx_rates, sync), OpenFigiSecurityLookup(), DegiroStatementReader()),

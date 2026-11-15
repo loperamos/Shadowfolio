@@ -1,6 +1,6 @@
 """PriceData that keeps daily closes in a file in front of a provider, so each is fetched once (see DailyCache).
 
-Latest and intraday prices are always asked of the provider.
+Latest prices and minute bars are always asked of the provider.
 """
 
 from datetime import date, datetime
@@ -8,6 +8,7 @@ from decimal import Decimal
 from pathlib import Path
 
 from shadowfolio.adapters.daily_cache import DailyCache, Fields
+from shadowfolio.domain.market import MinuteBar
 from shadowfolio.domain.money import Currency
 from shadowfolio.domain.valuation import Quote
 from shadowfolio.ports.clock import Clock
@@ -25,6 +26,9 @@ class CachedPriceData(PriceData):
 
     def price_at(self, symbol: str, at: datetime) -> Quote | None:
         return self._provider.price_at(symbol, at)
+
+    def minute_bars(self, symbol: str, start: datetime, end: datetime) -> list[MinuteBar]:
+        return self._provider.minute_bars(symbol, start, end)
 
     def close_on(self, symbol: str, day: date) -> Quote | None:
         return self.closes_between(symbol, day, day).get(day)
