@@ -33,7 +33,7 @@ from shadowfolio.domain.wallet import Wallet
 from shadowfolio.usecases.comparison import PerformanceComparison
 from shadowfolio.usecases.imports import ImportReport
 from shadowfolio.usecases.orders import OrderEstimate, OrderOutcome
-from shadowfolio.usecases.securities import CompanyFigures, SecurityRanges, SecurityStatistics
+from shadowfolio.usecases.securities import CompanyFigures, Dividends, SecurityRanges, SecurityStatistics
 
 
 class CreateWalletRequest(BaseModel):
@@ -736,6 +736,8 @@ class FundamentalsResponse(BaseModel):
     price: Decimal | None
     pe: Decimal | None
     market_cap: Decimal | None
+    price_to_sales: Decimal | None  # the market cap against the last fiscal year's revenue
+    free_cash_flow_yield: Decimal | None  # the last fiscal year's free cash flow against the market cap, in percent
 
     @classmethod
     def from_figures(cls, figures: CompanyFigures) -> "FundamentalsResponse":
@@ -750,6 +752,8 @@ class FundamentalsResponse(BaseModel):
             price=None if figures.price is None else figures.price.price,
             pe=None if figures.pe is None else figures.pe.quantize(CENT, rounding=ROUND_HALF_EVEN),
             market_cap=_optional_cents(figures.market_cap),
+            price_to_sales=None if figures.price_to_sales is None else figures.price_to_sales.quantize(CENT, rounding=ROUND_HALF_EVEN),
+            free_cash_flow_yield=_ratio_percent(figures.free_cash_flow_yield),
         )
 
 
@@ -816,10 +820,25 @@ class DividendResponse(BaseModel):
     currency: Currency
 
 
-class CalendarResponse(BaseModel):
-    """What is announced ahead for a security."""
+class DividendsResponse(BaseModel):
+    """A security's dividends: the next announced, and those of the last year."""
 
     next_ex_dividend: DividendResponse | None  # null when none is announced
+    last_year_per_share: Decimal  # with an ex-date in the last 12 months
+    yield_percent: Decimal | None  # that, against the latest price; null without one
+
+    @classmethod
+    def from_dividends(cls, dividends: Dividends) -> "DividendsResponse":
+        upcoming = dividends.next_ex_dividend
+        return cls(
+            next_ex_dividend=None
+            if upcoming is None
+            else DividendResponse(
+                ex_date=upcoming.ex_date, payable_date=upcoming.payable_date, per_share=upcoming.per_share, currency=upcoming.currency
+            ),
+            last_year_per_share=dividends.last_year_per_share,
+            yield_percent=_ratio_percent(dividends.last_year_yield),
+        )
 
 
 class SecurityStatisticsResponse(BaseModel):

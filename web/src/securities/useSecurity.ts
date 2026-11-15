@@ -3,19 +3,19 @@ import { useEffect, useState } from "react";
 import { apiErrorMessage } from "../api/errors";
 import {
   type ArticleResponse,
-  type CalendarResponse,
   dailyCloses,
   type DailyCloseResponse,
   type FundamentalsResponse,
   latestQuote,
   type QuoteResponse,
-  securityCalendar,
+  securityDividends,
   securityFundamentals,
   securityNews,
   securityRanges,
   type SecurityRangesResponse,
   securityStatistics,
   type SecurityStatisticsResponse,
+  type DividendsResponse,
 } from "../api/generated";
 
 const NOT_FOUND_STATUS = 404;
@@ -144,18 +144,18 @@ export function useRanges(symbol: string, start: string | null, end: string | nu
   return state;
 }
 
-export type CalendarState = { status: "loading" } | { status: "error"; message: string } | { status: "loaded"; calendar: CalendarResponse };
+export type DividendsState = { status: "loading" } | { status: "error"; message: string } | { status: "loaded"; dividends: DividendsResponse };
 
-/** What is announced ahead for the symbol (its next ex-dividend date). Loads on its own, so it never holds up the page. */
-export function useCalendar(symbol: string): CalendarState {
-  const [state, setState] = useState<CalendarState>({ status: "loading" });
+/** The symbol's next ex-dividend date and last year's yield. Loads on its own, so it never holds up the page. */
+export function useDividends(symbol: string): DividendsState {
+  const [state, setState] = useState<DividendsState>({ status: "loading" });
   useEffect(() => {
     let current = true;
     setState({ status: "loading" });
-    securityCalendar({ path: { symbol } })
+    securityDividends({ path: { symbol } })
       .then(({ data, error }) => {
         if (current) {
-          setState(data ? { status: "loaded", calendar: data } : { status: "error", message: apiErrorMessage(error) });
+          setState(data ? { status: "loaded", dividends: data } : { status: "error", message: apiErrorMessage(error) });
         }
       })
       .catch(() => current && setState({ status: "error", message: "Could not reach the backend." }));

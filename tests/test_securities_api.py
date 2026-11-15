@@ -63,6 +63,9 @@ def test_fundamentals_come_with_the_pe_and_market_cap_at_the_latest_price() -> N
     ]
     # At 161.87 USD: 161.87 / 4.90 (the last fiscal year's diluted EPS), and 161.87 x 24.1 billion shares.
     assert (result["price"], result["pe"], result["market_cap"]) == ("161.87", "33.03", "3901067000000.00")
+    # That market cap against the last fiscal year's revenue (215.938 billion), and its free cash flow against it
+    # (96.676 billion: 102.718 from operations less 6.042 of capital spending).
+    assert (result["price_to_sales"], result["free_cash_flow_yield"]) == ("18.07", "2.48")
 
 
 def test_each_year_says_how_revenue_grew_and_how_much_of_it_was_kept_as_profit() -> None:
@@ -167,23 +170,34 @@ def test_the_latest_news_about_a_security_newest_first() -> None:
     assert client.get("/api/securities/ZZZZ/news").json() == []
 
 
-def test_the_calendar_gives_the_next_ex_dividend_date_announced() -> None:
+def test_dividends_give_the_next_ex_dividend_date_and_the_last_years_yield() -> None:
     def dividend(ex: date, paid: date, per_share: str) -> DividendEvent:
         return DividendEvent("MSFT", ex, paid, Decimal(per_share), Currency.USD, f"msft-{ex}")
 
     corporate_actions = InMemoryCorporateActions(
+        dividend(date(2025, 11, 13), date(2025, 12, 11), "0.91"),  # more than a year ago
+        dividend(date(2026, 2, 19), date(2026, 3, 12), "0.91"),
+        dividend(date(2026, 5, 21), date(2026, 6, 11), "0.91"),
         dividend(date(2026, 8, 20), date(2026, 9, 11), "0.91"),
         dividend(date(2026, 11, 12), date(2026, 11, 16), "0.91"),  # ex-date past, still to be paid: too late to qualify
         dividend(date(2026, 11, 19), date(2026, 12, 10), "0.98"),
         dividend(date(2027, 2, 18), date(2027, 3, 11), "0.98"),
     )
     clock = FixedClock(datetime(2026, 11, 15, 12, 0, tzinfo=UTC))
-    client = TestClient(build_test_app(clock=clock, prices=InMemoryPriceData(), corporate_actions=corporate_actions))
+    prices = InMemoryPriceData({"MSFT": Quote(Decimal("524.19"), Currency.USD, datetime(2026, 11, 13, 21, 0, tzinfo=UTC))})
+    client = TestClient(build_test_app(clock=clock, prices=prices, corporate_actions=corporate_actions))
 
-    assert client.get("/api/securities/msft/calendar").json() == {
-        "next_ex_dividend": {"ex_date": "2026-11-19", "payable_date": "2026-12-10", "per_share": "0.98", "currency": "USD"}
+    # Ex-dates in the last 12 months: 4 x 0.91 = 3.64 a share, 0.69% of 524.19.
+    assert client.get("/api/securities/msft/dividends").json() == {
+        "next_ex_dividend": {"ex_date": "2026-11-19", "payable_date": "2026-12-10", "per_share": "0.98", "currency": "USD"},
+        "last_year_per_share": "3.64",
+        "yield_percent": "0.69",
     }
-    assert client.get("/api/securities/NVDA/calendar").json() == {"next_ex_dividend": None}
+    assert client.get("/api/securities/NVDA/dividends").json() == {
+        "next_ex_dividend": None,
+        "last_year_per_share": "0",
+        "yield_percent": None,
+    }
 
 
 def test_statistics_describe_the_trend_and_how_much_the_price_swings() -> None:

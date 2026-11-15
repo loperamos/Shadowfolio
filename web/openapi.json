@@ -1898,11 +1898,11 @@
         }
       }
     },
-    "/api/securities/{symbol}/calendar": {
+    "/api/securities/{symbol}/dividends": {
       "get": {
-        "summary": "Security Calendar",
-        "description": "What is announced ahead: the next dividend whose ex-date is still to come.",
-        "operationId": "security_calendar",
+        "summary": "Security Dividends",
+        "description": "The next dividend whose ex-date is still to come, and the last 12 months' dividends and their yield.",
+        "operationId": "security_dividends",
         "parameters": [
           {
             "name": "symbol",
@@ -1920,7 +1920,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CalendarResponse"
+                  "$ref": "#/components/schemas/DividendsResponse"
                 }
               }
             }
@@ -2183,26 +2183,6 @@
           "type"
         ],
         "title": "BuyEdit"
-      },
-      "CalendarResponse": {
-        "properties": {
-          "next_ex_dividend": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/DividendResponse"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          }
-        },
-        "type": "object",
-        "required": [
-          "next_ex_dividend"
-        ],
-        "title": "CalendarResponse",
-        "description": "What is announced ahead for a security."
       },
       "CashMovementRequest": {
         "properties": {
@@ -2528,6 +2508,43 @@
         ],
         "title": "DividendResponse"
       },
+      "DividendsResponse": {
+        "properties": {
+          "next_ex_dividend": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DividendResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "last_year_per_share": {
+            "type": "string",
+            "title": "Last Year Per Share"
+          },
+          "yield_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Yield Percent"
+          }
+        },
+        "type": "object",
+        "required": [
+          "next_ex_dividend",
+          "last_year_per_share",
+          "yield_percent"
+        ],
+        "title": "DividendsResponse",
+        "description": "A security's dividends: the next announced, and those of the last year."
+      },
       "ErrorResponse": {
         "properties": {
           "detail": {
@@ -2821,6 +2838,28 @@
               }
             ],
             "title": "Market Cap"
+          },
+          "price_to_sales": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price To Sales"
+          },
+          "free_cash_flow_yield": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Free Cash Flow Yield"
           }
         },
         "type": "object",
@@ -2833,7 +2872,9 @@
           "shares_as_of",
           "price",
           "pe",
-          "market_cap"
+          "market_cap",
+          "price_to_sales",
+          "free_cash_flow_yield"
         ],
         "title": "FundamentalsResponse",
         "description": "A company's reported yearly results (amounts in `currency`, oldest first) and shares outstanding, with the P/E\n(against the last fiscal year's diluted EPS) and market cap at the latest price; those are null without one."

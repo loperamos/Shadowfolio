@@ -96,15 +96,6 @@ export type BuyEdit = {
 };
 
 /**
- * CalendarResponse
- *
- * What is announced ahead for a security.
- */
-export type CalendarResponse = {
-    next_ex_dividend: DividendResponse | null;
-};
-
-/**
  * CashMovementRequest
  *
  * A deposit or a withdrawal.
@@ -290,6 +281,23 @@ export type DividendResponse = {
 };
 
 /**
+ * DividendsResponse
+ *
+ * A security's dividends: the next announced, and those of the last year.
+ */
+export type DividendsResponse = {
+    next_ex_dividend: DividendResponse | null;
+    /**
+     * Last Year Per Share
+     */
+    last_year_per_share: string;
+    /**
+     * Yield Percent
+     */
+    yield_percent: string | null;
+};
+
+/**
  * ErrorResponse
  */
 export type ErrorResponse = {
@@ -427,6 +435,14 @@ export type FundamentalsResponse = {
      * Market Cap
      */
     market_cap: string | null;
+    /**
+     * Price To Sales
+     */
+    price_to_sales: string | null;
+    /**
+     * Free Cash Flow Yield
+     */
+    free_cash_flow_yield: string | null;
 };
 
 /**
@@ -2490,7 +2506,7 @@ export type SecurityStatisticsResponses = {
 
 export type SecurityStatisticsResponse2 = SecurityStatisticsResponses[keyof SecurityStatisticsResponses];
 
-export type SecurityCalendarData = {
+export type SecurityDividendsData = {
     body?: never;
     path: {
         /**
@@ -2499,26 +2515,26 @@ export type SecurityCalendarData = {
         symbol: string;
     };
     query?: never;
-    url: '/api/securities/{symbol}/calendar';
+    url: '/api/securities/{symbol}/dividends';
 };
 
-export type SecurityCalendarErrors = {
+export type SecurityDividendsErrors = {
     /**
      * Malformed request or broken business rule
      */
     422: ErrorResponse;
 };
 
-export type SecurityCalendarError = SecurityCalendarErrors[keyof SecurityCalendarErrors];
+export type SecurityDividendsError = SecurityDividendsErrors[keyof SecurityDividendsErrors];
 
-export type SecurityCalendarResponses = {
+export type SecurityDividendsResponses = {
     /**
      * Successful Response
      */
-    200: CalendarResponse;
+    200: DividendsResponse;
 };
 
-export type SecurityCalendarResponse = SecurityCalendarResponses[keyof SecurityCalendarResponses];
+export type SecurityDividendsResponse = SecurityDividendsResponses[keyof SecurityDividendsResponses];
 
 export type SecurityRangesData = {
     body?: never;

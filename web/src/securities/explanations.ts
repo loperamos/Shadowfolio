@@ -45,6 +45,15 @@ export const EXPLANATIONS = {
   debt:
     "Long-term borrowing at the fiscal year's end, the part due within a year included. Compare it with cash and free cash flow: debt that " +
     "a few years of free cash flow could repay is easy to carry; much more than that makes a company fragile when times are hard.",
+  dividendYield:
+    "The dividends paid over the last 12 months, against today's price: the cash return of holding the shares, before tax. A very high " +
+    "yield can mean the price fell because the market doubts the dividend will last.",
+  priceToSales:
+    "Price to sales: the market cap against the last fiscal year's revenue, what investors pay for each dollar of sales. Useful when " +
+    "profits are small or negative and the P/E means little; compare with similar companies, as margins differ by sector.",
+  freeCashFlowYield:
+    "The last fiscal year's free cash flow against the market cap: the cash the business produced for each dollar the whole company " +
+    "costs today. Higher means cheaper for the cash it makes; compare it with what a bond would pay.",
   exDividend:
     "The first day the shares trade without their next dividend: you receive it only if you own the shares before that day starts. " +
     "The price usually drops by about the dividend that morning, so buying just before it to collect the dividend gains nothing. The " +
