@@ -14,7 +14,8 @@ import { SecuritiesSideBySide } from "./SecuritiesSideBySide";
 import { type ClosesState, useClosesOf, useSummariesOf } from "./useSecurity";
 
 // As many securities as the chart has distinct colours for.
-const MAX_SYMBOLS = COMPARISON_COLORS.length;
+export const MAX_COMPARED_SYMBOLS = COMPARISON_COLORS.length;
+const MAX_SYMBOLS = MAX_COMPARED_SYMBOLS;
 const PERCENT_FACTOR = 100;
 
 /** Securities side by side: how each price changed over a period, from the same start, whatever its level. */

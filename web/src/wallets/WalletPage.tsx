@@ -1,5 +1,5 @@
 import { Alert, Anchor, Breadcrumbs, Button, Group, Loader, Stack, Table, Text, Title, Tooltip } from "@mantine/core";
-import { IconArrowsExchange, IconPlus } from "@tabler/icons-react";
+import { IconArrowsExchange, IconArrowsLeftRight, IconPlus } from "@tabler/icons-react";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router";
 
@@ -15,7 +15,8 @@ import {
   updateWallet,
   type WalletResponse,
 } from "../api/generated";
-import { securityPath, walletPath, WALLETS_PATH } from "../routes";
+import { securitiesComparePath, securityPath, walletPath, WALLETS_PATH } from "../routes";
+import { MAX_COMPARED_SYMBOLS } from "../securities/SecuritiesComparePage";
 import { EditableTitle } from "../ui/EditableTitle";
 import { GainText } from "../ui/GainText";
 import { Money } from "../ui/Money";
@@ -291,9 +292,10 @@ function WalletDetails({ wallet, operations, orders, version, valuation, onOrder
       />
 
       <div>
-        <Title order={2} mb="sm">
-          Holdings
-        </Title>
+        <Group justify="space-between" align="flex-start" mb="sm">
+          <Title order={2}>Holdings</Title>
+          {holdings.length > 0 && <CompareHoldings wallet={wallet} valuation={valuation} />}
+        </Group>
         {holdings.length === 0 ? (
           <Text c="dimmed">No holdings.</Text>
         ) : (
@@ -538,5 +540,26 @@ function BuyingPower({ valuation }: { valuation: ValuationState }) {
     >
       <Money amount={loaded.buying_power} currency={loaded.currency} />
     </Figure>
+  );
+}
+
+/**
+ * A link comparing the wallet's holdings side by side, the largest first by value (by symbol until valued); above the
+ * comparison's limit, only the largest, as the tooltip says.
+ */
+function CompareHoldings({ wallet, valuation }: { wallet: WalletResponse; valuation: ValuationState }) {
+  const value = (symbol: string) =>
+    valuation.status === "loaded" ? Number(valuation.valuation.holdings.find((h) => h.symbol === symbol)?.value_in_wallet_currency ?? 0) : 0;
+  const symbols = Object.keys(wallet.holdings).sort((a, b) => value(b) - value(a) || a.localeCompare(b));
+  const compared = symbols.slice(0, MAX_COMPARED_SYMBOLS);
+  const button = (
+    <Button component={Link} to={securitiesComparePath(compared)} variant="default" leftSection={<IconArrowsLeftRight size={ICON_SIZE} />}>
+      Compare holdings
+    </Button>
+  );
+  return symbols.length > MAX_COMPARED_SYMBOLS ? (
+    <Tooltip label={`The ${MAX_COMPARED_SYMBOLS} largest by value: a comparison holds up to ${MAX_COMPARED_SYMBOLS}.`}>{button}</Tooltip>
+  ) : (
+    button
   );
 }
