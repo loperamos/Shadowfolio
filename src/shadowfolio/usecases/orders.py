@@ -15,8 +15,9 @@ from shadowfolio.domain.errors import (
     InsufficientCashError,
     InsufficientSharesError,
     PriceUnavailableError,
+    RuleBrokenError,
 )
-from shadowfolio.domain.money import Currency, FxRate
+from shadowfolio.domain.money import Currency, FxRate, to_cents
 from shadowfolio.domain.operations import Buy, Sell
 from shadowfolio.domain.orders import Order, OrderSide, OrderStatus
 from shadowfolio.domain.valuation import Quote, order_amount, order_price, reserved_for_orders
@@ -51,6 +52,19 @@ class OrderOutcome:
 
 
 @dataclass(frozen=True)
+class OrderPreview:
+    """What an order would do if placed now, without placing it: its estimate, the buying power and the holding's
+    share of the wallet once it fills (each counted as the buying power counts orders), the rule that would refuse it,
+    and why it would be rejected when it fills (not enough cash or shares)."""
+
+    estimate: OrderEstimate
+    buying_power_after: Decimal | None  # None when the open orders cannot all be priced
+    holding_weight_after: Decimal | None  # as a ratio of the wallet's whole value; None for an empty wallet
+    refusal: str | None  # the rule that refuses it now; None when it would be placed
+    warnings: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class FillSummary:
     wallets: int  # wallets looked at
     filled: int  # orders filled
@@ -79,6 +93,66 @@ class Orders:
         quote, rate = self._latest(wallet, order.symbol)
         return OrderEstimate(order_price(order, quote), quote.currency, rate, order_amount(order, quote, rate))
 
+    def preview(
+        self, wallet_id: UUID, side: OrderSide, symbol: str, quantity: Decimal, limit_price: Decimal | None = None
+    ) -> OrderPreview | None:
+        """What the order would do if placed now (see OrderPreview); nothing is placed. None if the wallet does not
+        exist; fails when there is no price or rate to estimate with."""
+        wallet = self._repo.get(wallet_id)
+        if wallet is None:
+            return None
+        order = Order(uuid4(), side, symbol.strip().upper(), quantity, self._clock.now(), limit_price=limit_price)
+        quote, rate = self._latest(wallet, order.symbol)
+        amount = order_amount(order, quote, rate)
+        try:
+            self._check_rules(wallet, order)
+            refusal = None
+        except RuleBrokenError as error:
+            refusal = str(error)
+        valuation = self._valuation.current(wallet.id)
+        assert valuation is not None
+        held = next((h.value_in_wallet_currency for h in valuation.holdings if h.symbol == order.symbol), Decimal(0))
+        buying_power = valuation.buying_power
+        warnings = []
+        if order.side is OrderSide.BUY:
+            reserved = self._reserved_for(wallet, order.symbol, quote, rate)
+            buying_power_after = None if buying_power is None else buying_power - amount
+            holding_after = held + reserved + amount
+            if buying_power is not None and buying_power_after is not None and buying_power_after < 0:
+                warnings.append(
+                    f"it costs {amount} {wallet.currency}, more than the buying power of {to_cents(buying_power)} {wallet.currency}: "
+                    "it would be rejected when it fills"
+                )
+        else:
+            buying_power_after = None if buying_power is None else buying_power + amount
+            holding_after = max(held - amount, Decimal(0))
+            selling = sum(
+                (o.quantity for o in wallet.orders if o.is_open and o.side is OrderSide.SELL and o.symbol == order.symbol), Decimal(0)
+            )
+            shares = wallet.holdings.get(order.symbol, Decimal(0)) - selling
+            if order.quantity > shares:
+                warnings.append(
+                    f"the wallet holds {shares} {order.symbol}, fewer than {order.quantity}: it would be rejected when it fills"
+                )
+        weight_after = holding_after / valuation.total if valuation.total else None
+        estimate = OrderEstimate(order_price(order, quote), quote.currency, rate, amount)
+        return OrderPreview(estimate, buying_power_after, weight_after, refusal, tuple(warnings))
+
+    def _check_rules(self, wallet: Wallet, order: Order) -> None:
+        """Raise RuleBrokenError if the order breaks one of the wallet's rules (see domain.rules)."""
+        wallet.rules.check_order(wallet.orders, order.placed_at)
+        if order.side is OrderSide.BUY:
+            wallet.rules.check_symbol(order.symbol)
+            if wallet.rules.limits_value:
+                self._check_value_rules(wallet, order)
+
+    def _reserved_for(self, wallet: Wallet, symbol: str, quote: Quote, rate: FxRate | None) -> Decimal:
+        """What the open buys of `symbol` would cost, at `quote` and `rate` (see reserved_for_orders)."""
+        same_symbol = [open_order for open_order in wallet.orders if open_order.symbol == symbol]
+        reserved = reserved_for_orders(same_symbol, {symbol: quote}, {quote.currency: rate} if rate else {}, wallet.currency)
+        assert reserved is not None  # the symbol's quote and rate are both given
+        return reserved
+
     def _check_value_rules(self, wallet: Wallet, order: Order) -> None:
         """Raise RuleBrokenError if the buy would make a holding too large, or leave too little cash, once it and the
         open buys before it fill, each at its estimate: the open buys of the same symbol count towards the holding."""
@@ -88,9 +162,7 @@ class Orders:
             raise PriceUnavailableError("could not price the open buys to check the wallet's rules; try again later")
         quote, rate = self._latest(wallet, order.symbol)
         amount = order_amount(order, quote, rate)
-        same_symbol = [open_order for open_order in wallet.orders if open_order.symbol == order.symbol]
-        reserved = reserved_for_orders(same_symbol, {order.symbol: quote}, {quote.currency: rate} if rate else {}, wallet.currency)
-        assert reserved is not None  # the symbol's quote and rate are both given
+        reserved = self._reserved_for(wallet, order.symbol, quote, rate)
         held = next((h.value_in_wallet_currency for h in valuation.holdings if h.symbol == order.symbol), Decimal(0))
         wallet.rules.check_buy(order.symbol, valuation.total, held + reserved + amount, valuation.buying_power - amount)
 
@@ -123,11 +195,7 @@ class Orders:
         if wallet is None:
             return None
         order = Order(uuid4(), side, symbol.strip().upper(), quantity, self._clock.now(), reason.strip(), limit_price)
-        wallet.rules.check_order(wallet.orders, order.placed_at)
-        if order.side is OrderSide.BUY:
-            wallet.rules.check_symbol(order.symbol)
-            if wallet.rules.limits_value:
-                self._check_value_rules(wallet, order)
+        self._check_rules(wallet, order)
         updated = wallet.place_order(order)
         self._repo.update(updated)
         return updated, order

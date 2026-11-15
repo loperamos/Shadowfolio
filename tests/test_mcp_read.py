@@ -67,12 +67,13 @@ async def call(app: Any, tool: str, **arguments: Any) -> Any:
 
 
 @pytest.mark.anyio
-async def test_the_read_tools_are_offered_each_described(app: Any) -> None:
+async def test_the_read_tools_are_offered_each_described_as_only_reading(app: Any) -> None:
     async with Client(app.state.mcp) as client:
-        tools = (await client.list_tools()).tools
+        tools = {tool.name: tool for tool in (await client.list_tools()).tools}
 
-    assert {tool.name for tool in tools} == {"list_wallets", "wallet_snapshot", "security_summary", "compare_securities"}
-    assert all(tool.description for tool in tools)
+    reading = {"list_wallets", "wallet_snapshot", "security_summary", "compare_securities", "preview_order", "list_orders"}
+    assert reading <= tools.keys()
+    assert all(tools[name].description and tools[name].annotations.read_only_hint for name in reading)  # type: ignore[union-attr]
 
 
 @pytest.mark.anyio
