@@ -37,6 +37,10 @@ NVDA = Fundamentals(
     ),
     shares_outstanding=Decimal("24100000000"),
     shares_as_of=date(2026, 8, 21),
+    quarters=(
+        FiscalYear(date(2024, 1, 29), date(2024, 4, 28), Decimal("26044000000"), Decimal("14881000000"), None),
+        FiscalYear(date(2025, 1, 27), date(2025, 4, 27), Decimal("44062000000"), Decimal("18775000000"), None),
+    ),
 )
 
 
@@ -76,6 +80,16 @@ def test_each_year_says_how_much_cash_the_business_made_and_what_it_holds_and_ow
     assert [(y["operating_cash_flow"], y["capital_spending"], y["free_cash_flow"], y["cash"], y["debt"]) for y in years] == [
         (None, None, None, None, None),
         ("102718000000", "6042000000", "96676000000", "10605000000", "8468000000"),
+    ]
+
+
+def test_each_quarter_says_how_revenue_grew_on_the_same_quarter_a_year_before() -> None:
+    quarters = client_with(InMemoryCompanyData({"NVDA": NVDA})).get("/api/securities/NVDA/fundamentals").json()["quarters"]
+
+    # 44.062 / 26.044 = +69.18%, as quarters are compared with the same season; 18.775 / 44.062 = 42.61% kept.
+    assert [(q["end"], q["revenue"], q["revenue_growth"], q["net_margin"]) for q in quarters] == [
+        ("2024-04-28", "26044000000", None, "57.14"),
+        ("2025-04-27", "44062000000", "69.18", "42.61"),
     ]
 
 

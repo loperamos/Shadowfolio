@@ -10,10 +10,14 @@ from shadowfolio.domain.money import Currency
 
 # How far apart one fiscal year's end and the next one's start can be for them to follow each other.
 ADJACENT_YEARS = timedelta(days=7)
+# How far apart the ends of the same quarter a year apart can be: fiscal years of 52 or 53 weeks move them a little.
+A_YEAR_APART = range(357, 372)
 
 
 @dataclass(frozen=True)
 class FiscalYear:
+    """What the company reported for a fiscal year, or a fiscal quarter (see Fundamentals.quarters)."""
+
     start: date
     end: date
     revenue: Decimal | None  # None when the company did not report it (in a way we read)
@@ -46,6 +50,7 @@ class Fundamentals:
     years: tuple[FiscalYear, ...]  # oldest first
     shares_outstanding: Decimal | None
     shares_as_of: date | None
+    quarters: tuple[FiscalYear, ...] = ()  # each fiscal quarter, oldest first; no EPS (see the company data)
 
     def revenue_growth(self, year: FiscalYear) -> Decimal | None:
         """How much `year`'s revenue grew on the fiscal year just before it (0.65 for +65%); None without that year or
@@ -54,6 +59,14 @@ class Fundamentals:
         if previous is None or year.revenue is None or not previous.revenue:
             return None
         return year.revenue / previous.revenue - 1
+
+    def quarter_revenue_growth(self, quarter: FiscalYear) -> Decimal | None:
+        """How much `quarter`'s revenue grew on the same quarter a year before (seasons make the quarter just before a
+        poor comparison); None without that quarter or either revenue."""
+        previous = next((other for other in self.quarters if (quarter.end - other.end).days in A_YEAR_APART), None)
+        if previous is None or quarter.revenue is None or not previous.revenue:
+            return None
+        return quarter.revenue / previous.revenue - 1
 
     def pe(self, price: Decimal) -> Decimal | None:
         """Price to earnings: `price` against the last fiscal year's diluted EPS; None without a positive one."""

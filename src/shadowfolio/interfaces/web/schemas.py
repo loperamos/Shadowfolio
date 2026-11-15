@@ -7,7 +7,7 @@ from uuid import UUID
 
 from pydantic import AwareDatetime, BaseModel, Field
 
-from shadowfolio.domain.company import ValueRange
+from shadowfolio.domain.company import FiscalYear, ValueRange
 from shadowfolio.domain.comparison import Benchmark
 from shadowfolio.domain.money import Currency
 from shadowfolio.domain.operations import (
@@ -704,6 +704,23 @@ class FiscalYearResponse(BaseModel):
     cash: Decimal | None  # at the year's end
     debt: Decimal | None  # long-term debt at the year's end, the part due within a year included
 
+    @classmethod
+    def of(cls, period: FiscalYear, revenue_growth: Decimal | None) -> "FiscalYearResponse":
+        return cls(
+            start=period.start,
+            end=period.end,
+            revenue=period.revenue,
+            net_income=period.net_income,
+            eps_diluted=period.eps_diluted,
+            revenue_growth=_ratio_percent(revenue_growth),
+            net_margin=_ratio_percent(period.net_margin),
+            operating_cash_flow=period.operating_cash_flow,
+            capital_spending=period.capital_spending,
+            free_cash_flow=period.free_cash_flow,
+            cash=period.cash,
+            debt=period.debt,
+        )
+
 
 class FundamentalsResponse(BaseModel):
     """A company's reported yearly results (amounts in `currency`, oldest first) and shares outstanding, with the P/E
@@ -712,6 +729,8 @@ class FundamentalsResponse(BaseModel):
     company_name: str
     currency: Currency
     years: list[FiscalYearResponse]
+    # Each fiscal quarter, oldest first: growth on the same quarter a year before; no EPS (see the company data).
+    quarters: list[FiscalYearResponse]
     shares_outstanding: Decimal | None
     shares_as_of: date | None
     price: Decimal | None
@@ -724,23 +743,8 @@ class FundamentalsResponse(BaseModel):
         return cls(
             company_name=fundamentals.company_name,
             currency=fundamentals.currency,
-            years=[
-                FiscalYearResponse(
-                    start=y.start,
-                    end=y.end,
-                    revenue=y.revenue,
-                    net_income=y.net_income,
-                    eps_diluted=y.eps_diluted,
-                    revenue_growth=_ratio_percent(fundamentals.revenue_growth(y)),
-                    net_margin=_ratio_percent(y.net_margin),
-                    operating_cash_flow=y.operating_cash_flow,
-                    capital_spending=y.capital_spending,
-                    free_cash_flow=y.free_cash_flow,
-                    cash=y.cash,
-                    debt=y.debt,
-                )
-                for y in fundamentals.years
-            ],
+            years=[FiscalYearResponse.of(y, fundamentals.revenue_growth(y)) for y in fundamentals.years],
+            quarters=[FiscalYearResponse.of(q, fundamentals.quarter_revenue_growth(q)) for q in fundamentals.quarters],
             shares_outstanding=fundamentals.shares_outstanding,
             shares_as_of=fundamentals.shares_as_of,
             price=None if figures.price is None else figures.price.price,

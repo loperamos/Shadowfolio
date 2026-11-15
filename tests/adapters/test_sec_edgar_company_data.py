@@ -45,6 +45,11 @@ FACTS: dict[str, Any] = {
                         entry("2025-01-27", "2026-01-25", 215938000000),
                         entry("2025-10-27", "2026-01-25", 68127000000, form="10-K", fp="FY"),  # a quarter inside a 10-K
                         entry("2026-01-26", "2026-04-26", 44062000000, form="10-Q", fp="Q1"),
+                        # Quarterly reports give the quarter, the year to date, or both (here no third quarter alone).
+                        entry("2025-01-27", "2025-04-27", 44062000000, form="10-Q", fp="Q1", filed="2025-05-28"),
+                        entry("2025-04-28", "2025-07-27", 46743000000, form="10-Q", fp="Q2", filed="2025-08-27"),
+                        entry("2025-01-27", "2025-07-27", 90805000000, form="10-Q", fp="Q2", filed="2025-08-27"),
+                        entry("2025-01-27", "2025-10-26", 147811000000, form="10-Q", fp="Q3", filed="2025-11-19"),
                     ]
                 }
             },
@@ -52,7 +57,19 @@ FACTS: dict[str, Any] = {
                 "units": {"USD": [entry("2024-01-29", "2025-01-26", 72880000000), entry("2025-01-27", "2026-01-25", 120067000000)]}
             },
             "NetCashProvidedByUsedInOperatingActivities": {
-                "units": {"USD": [entry("2024-01-29", "2025-01-26", 64089000000), entry("2025-01-27", "2026-01-25", 102718000000)]}
+                "units": {
+                    "USD": [
+                        entry("2024-01-29", "2025-01-26", 64089000000),
+                        entry("2025-01-27", "2026-01-25", 102718000000),
+                        # Cash flows only for the year to date.
+                        entry("2025-01-27", "2025-04-27", 27414000000, form="10-Q", fp="Q1", filed="2025-05-28"),
+                        entry("2025-01-27", "2025-07-27", 42563000000, form="10-Q", fp="Q2", filed="2025-08-27"),
+                        entry("2025-01-27", "2025-10-26", 66530000000, form="10-Q", fp="Q3", filed="2025-11-19"),
+                        # And in the fiscal year under way, not reported as a whole yet.
+                        entry("2026-01-26", "2026-04-26", 50340000000, form="10-Q", fp="Q1", filed="2026-05-28"),
+                        entry("2026-01-26", "2026-07-26", 90000000000, form="10-Q", fp="Q2", filed="2026-08-26"),
+                    ]
+                }
             },
             # Capital spending under one concept, then another, as NVIDIA switched.
             "PaymentsToAcquirePropertyPlantAndEquipment": {"units": {"USD": [entry("2024-01-29", "2025-01-26", 3236000000)]}},
@@ -64,6 +81,7 @@ FACTS: dict[str, Any] = {
                         {"end": "2025-01-26", "val": 8589000000, "form": "10-K", "fp": "FY", "filed": "2026-02-25"},
                         {"end": "2026-01-25", "val": 10605000000, "form": "10-K", "fp": "FY", "filed": "2026-02-25"},
                         {"end": "2026-04-26", "val": 9000000000, "form": "10-Q", "fp": "Q1", "filed": "2026-05-28"},
+                        {"end": "2025-10-26", "val": 11486000000, "form": "10-Q", "fp": "Q3", "filed": "2025-11-19"},
                     ]
                 }
             },
@@ -135,6 +153,23 @@ def test_cash_flows_and_the_balance_sheet_at_each_year_end_come_from_annual_repo
         (date(2024, 1, 28), None, None, None, None),
         (date(2025, 1, 26), Decimal("64089000000"), Decimal("3236000000"), Decimal("8589000000"), None),
         (date(2026, 1, 25), Decimal("102718000000"), Decimal("6042000000"), Decimal("10605000000"), Decimal("8468000000")),
+    ]
+
+
+def test_quarters_come_from_quarterly_reports_or_the_difference_of_years_to_date() -> None:
+    """The third quarter's revenue is nine months less six; each cash flow quarter the year to date less the one
+    before, in the year under way too; the fourth quarter the year less nine months. No EPS: earlier quarters' are not
+    restated for later splits."""
+    fundamentals = edgar([]).fundamentals("NVDA")
+
+    assert fundamentals is not None
+    assert [(q.start, q.end, q.revenue, q.operating_cash_flow, q.cash, q.eps_diluted) for q in fundamentals.quarters] == [
+        (date(2025, 1, 27), date(2025, 4, 27), Decimal("44062000000"), Decimal("27414000000"), None, None),
+        (date(2025, 4, 28), date(2025, 7, 27), Decimal("46743000000"), Decimal("15149000000"), None, None),
+        (date(2025, 7, 28), date(2025, 10, 26), Decimal("57006000000"), Decimal("23967000000"), Decimal("11486000000"), None),
+        (date(2025, 10, 27), date(2026, 1, 25), Decimal("68127000000"), Decimal("36188000000"), Decimal("10605000000"), None),
+        (date(2026, 1, 26), date(2026, 4, 26), Decimal("44062000000"), Decimal("50340000000"), Decimal("9000000000"), None),
+        (date(2026, 4, 27), date(2026, 7, 26), None, Decimal("39660000000"), None, None),
     ]
 
 

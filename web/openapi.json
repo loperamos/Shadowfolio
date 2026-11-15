@@ -2589,6 +2589,13 @@
             "type": "array",
             "title": "Years"
           },
+          "quarters": {
+            "items": {
+              "$ref": "#/components/schemas/FiscalYearResponse"
+            },
+            "type": "array",
+            "title": "Quarters"
+          },
           "shares_outstanding": {
             "anyOf": [
               {
@@ -2651,6 +2658,7 @@
           "company_name",
           "currency",
           "years",
+          "quarters",
           "shares_outstanding",
           "shares_as_of",
           "price",

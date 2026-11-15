@@ -24,6 +24,9 @@ export const EXPLANATIONS = {
   revenueGrowth:
     "How much revenue grew (or shrank) compared with the year before. Steady growth year after year is a sign of a business in demand; " +
     "compare it with the growth the P/E seems to expect.",
+  quarterRevenueGrowth:
+    "How much the quarter's revenue grew (or shrank) compared with the same quarter a year before. Compared with the same season, as " +
+    "many businesses sell more in some quarters than others (e.g. the holidays), so the quarter just before would mislead.",
   netMargin:
     "Net income as a share of revenue: of every dollar of sales, how many cents the company keeps as profit. Margins differ a lot by " +
     "sector (software is often above 20%, retail a few percent), so compare with similar companies and with the company's own past.",

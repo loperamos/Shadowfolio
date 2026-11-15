@@ -4,8 +4,11 @@ Its data is public domain. Only companies that file with the SEC are covered (US
 others have no fundamentals. EDGAR asks every client to say who is asking (an app name and a contact email) in each
 request's User-Agent: the contact comes from the configuration and nothing is asked without one.
 
-Yearly results come from annual reports (10-K): when a later report restates a year, the latest filing wins. Answers
-are kept in memory for FRESH_FOR: filings change a few times a year.
+Yearly results come from annual reports (10-K): when a later report restates a year, the latest filing wins. Quarters
+come from quarterly reports (10-Q) and annual ones: a quarter reported on its own, or else the difference of two
+years to date (cash flows are only reported so), the fourth quarter being the year less nine months. Quarters have no
+EPS: a quarter's EPS is only restated for a later stock split if a later report repeats it, so older ones would not be
+comparable. Answers are kept in memory for FRESH_FOR: filings change a few times a year.
 """
 
 import json
@@ -29,9 +32,11 @@ CONTACT_SETTING = "SEC_EDGAR_CONTACT"
 CLASS_SEPARATOR = "."
 EDGAR_CLASS_SEPARATOR = "-"
 ANNUAL_FORM = "10-K"
+QUARTERLY_FORM = "10-Q"
 ANNUAL_PERIOD = "FY"
-# How long a period must be to be a fiscal year (10-K reports also hold the last quarter's figures).
+# How long a period must be to be a fiscal year (10-K reports also hold the last quarter's figures), or a quarter.
 FISCAL_YEAR_DAYS = range(350, 380)
+QUARTER_DAYS = range(80, 100)
 # The reported concepts read, in US GAAP's taxonomy; revenue under either name, as companies switch.
 REVENUE_CONCEPTS = ("Revenues", "RevenueFromContractWithCustomerExcludingAssessedTax")
 NET_INCOME_CONCEPT = "NetIncomeLoss"
@@ -97,6 +102,9 @@ def _fundamentals(facts: dict[str, Any]) -> Fundamentals:
     cash = _first_at_year_end(gaap, CASH_CONCEPTS)
     debt = _first_at_year_end(gaap, DEBT_CONCEPTS)
     periods = sorted(revenue.keys() | net_income.keys() | eps.keys() | operating_cash_flow.keys() | capital_spending.keys())
+    # With the fiscal year under way, which starts the day after the last one ended, for its quarters so far.
+    under_way = [(periods[-1][1] + timedelta(days=1), periods[-1][1] + timedelta(days=max(FISCAL_YEAR_DAYS)))] if periods else []
+    quarters = _quarters(gaap, periods + under_way)
     years = tuple(
         FiscalYear(
             start,
@@ -125,7 +133,59 @@ def _fundamentals(facts: dict[str, Any]) -> Fundamentals:
         years=years,
         shares_outstanding=None if latest is None else Decimal(latest["val"]),
         shares_as_of=None if latest is None else date.fromisoformat(latest["end"]),
+        quarters=quarters,
     )
+
+
+def _quarters(gaap: dict[str, Any], fiscal_years: list[tuple[date, date]]) -> tuple[FiscalYear, ...]:
+    """Each fiscal quarter's results, cash flows and balance sheet, oldest first; see the module's description."""
+    revenue = _quarterly(gaap, REVENUE_CONCEPTS, fiscal_years)
+    net_income = _quarterly(gaap, (NET_INCOME_CONCEPT,), fiscal_years)
+    operating_cash_flow = _quarterly(gaap, (OPERATING_CASH_FLOW_CONCEPT,), fiscal_years)
+    capital_spending = _quarterly(gaap, CAPITAL_SPENDING_CONCEPTS, fiscal_years)
+    cash = _first_at_year_end(gaap, CASH_CONCEPTS, with_quarters=True)
+    debt = _first_at_year_end(gaap, DEBT_CONCEPTS, with_quarters=True)
+    periods = sorted(revenue.keys() | net_income.keys() | operating_cash_flow.keys() | capital_spending.keys())
+    return tuple(
+        FiscalYear(
+            start,
+            end,
+            revenue.get((start, end)),
+            net_income.get((start, end)),
+            None,
+            operating_cash_flow.get((start, end)),
+            capital_spending.get((start, end)),
+            cash.get(end),
+            debt.get(end),
+        )
+        for start, end in periods
+    )
+
+
+def _quarterly(gaap: dict[str, Any], concepts: tuple[str, ...], fiscal_years: list[tuple[date, date]]) -> dict[tuple[date, date], Decimal]:
+    """A flow's value for each fiscal quarter, by (start, end): as reported for the quarter, or else the year to date
+    less the year to date before it, within each of `fiscal_years`. The first concept wins for a period both report,
+    and the latest filing for a period reported again."""
+    reported: dict[tuple[date, date], Decimal] = {}
+    for concept in concepts:
+        by_period: dict[tuple[date, date], Decimal] = {}
+        facts = gaap.get(concept, {}).get("units", {}).get(USD, [])
+        for fact in sorted(facts, key=lambda fact: fact["filed"]):
+            if fact.get("form") in (ANNUAL_FORM, QUARTERLY_FORM) and "start" in fact:
+                by_period[(date.fromisoformat(fact["start"]), date.fromisoformat(fact["end"]))] = Decimal(fact["val"])
+        reported = by_period | reported
+    quarters = {}
+    for year_start, year_end in fiscal_years:
+        # The year to date at each end reported within the year, oldest first: each less the one before is a quarter.
+        to_date = sorted((end, value) for (start, end), value in reported.items() if start == year_start and end <= year_end)
+        previous_end, previous_value = None, Decimal(0)
+        for end, value in to_date:
+            start = year_start if previous_end is None else previous_end + timedelta(days=1)
+            if (end - start).days in QUARTER_DAYS:
+                quarters[(start, end)] = value - previous_value
+            previous_end, previous_value = end, value
+    # A quarter reported on its own wins over one worked out.
+    return quarters | {period: value for period, value in reported.items() if (period[1] - period[0]).days in QUARTER_DAYS}
 
 
 def _first_reported(gaap: dict[str, Any], concepts: tuple[str, ...]) -> dict[tuple[date, date], Decimal]:
@@ -136,15 +196,17 @@ def _first_reported(gaap: dict[str, Any], concepts: tuple[str, ...]) -> dict[tup
     return values
 
 
-def _first_at_year_end(gaap: dict[str, Any], concepts: tuple[str, ...]) -> dict[date, Decimal]:
-    """A balance sheet amount at each fiscal year's end, from annual reports, under one of `concepts`: the first wins
-    for a date both report, and the latest filing for a date reported again."""
+def _first_at_year_end(gaap: dict[str, Any], concepts: tuple[str, ...], with_quarters: bool = False) -> dict[date, Decimal]:
+    """A balance sheet amount at each fiscal year's end from annual reports, or `with_quarters` at each quarter's end
+    from quarterly ones too, under one of `concepts`: the first wins for a date both report, and the latest filing for
+    a date reported again."""
+    forms = (ANNUAL_FORM, QUARTERLY_FORM) if with_quarters else (ANNUAL_FORM,)
     values: dict[date, Decimal] = {}
     for concept in concepts:
         at_end: dict[date, Decimal] = {}
         facts = gaap.get(concept, {}).get("units", {}).get(USD, [])
         for fact in sorted(facts, key=lambda fact: fact["filed"]):
-            if fact.get("form") == ANNUAL_FORM and fact.get("fp") == ANNUAL_PERIOD and "start" not in fact:
+            if fact.get("form") in forms and (with_quarters or fact.get("fp") == ANNUAL_PERIOD) and "start" not in fact:
                 at_end[date.fromisoformat(fact["end"])] = Decimal(fact["val"])
         values = at_end | values
     return values
