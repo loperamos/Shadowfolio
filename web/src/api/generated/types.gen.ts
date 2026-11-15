@@ -1081,6 +1081,104 @@ export type SecurityStatisticsResponse = {
 };
 
 /**
+ * SecuritySummaryResponse
+ *
+ * What compares securities, in one place: each as on the security page, percentages in percent, and null when not
+ * known. `unavailable` says what could not be fetched right now; the rest still comes.
+ */
+export type SecuritySummaryResponse = {
+    /**
+     * Symbol
+     */
+    symbol: string;
+    /**
+     * Company Name
+     */
+    company_name: string | null;
+    /**
+     * Industry
+     */
+    industry: string | null;
+    /**
+     * Price
+     */
+    price: string | null;
+    currency: Currency | null;
+    /**
+     * Pe
+     */
+    pe: string | null;
+    /**
+     * Price To Sales
+     */
+    price_to_sales: string | null;
+    /**
+     * Free Cash Flow Yield
+     */
+    free_cash_flow_yield: string | null;
+    /**
+     * Market Cap
+     */
+    market_cap: string | null;
+    /**
+     * Revenue Growth
+     */
+    revenue_growth: string | null;
+    /**
+     * Net Margin
+     */
+    net_margin: string | null;
+    /**
+     * Dividend Yield
+     */
+    dividend_yield: string | null;
+    /**
+     * Next Ex Dividend
+     */
+    next_ex_dividend: string | null;
+    /**
+     * Three Month Return
+     */
+    three_month_return: string | null;
+    /**
+     * Six Month Return
+     */
+    six_month_return: string | null;
+    /**
+     * One Year Return
+     */
+    one_year_return: string | null;
+    /**
+     * Volatility
+     */
+    volatility: string | null;
+    /**
+     * Max Drawdown
+     */
+    max_drawdown: string | null;
+    /**
+     * Beta
+     */
+    beta: string | null;
+    /**
+     * Benchmark Symbol
+     */
+    benchmark_symbol: string | null;
+    /**
+     * Average Daily Value
+     */
+    average_daily_value: string | null;
+    /**
+     * Next Earnings
+     */
+    next_earnings: string | null;
+    /**
+     * Unavailable
+     */
+    unavailable: Array<string>;
+};
+
+/**
  * SellEdit
  */
 export type SellEdit = {
@@ -2510,6 +2608,45 @@ export type SecurityNewsResponses = {
 };
 
 export type SecurityNewsResponse = SecurityNewsResponses[keyof SecurityNewsResponses];
+
+export type SecuritySummaryData = {
+    body?: never;
+    path: {
+        /**
+         * Symbol
+         */
+        symbol: string;
+    };
+    query?: {
+        /**
+         * Start
+         */
+        start?: string | null;
+        /**
+         * End
+         */
+        end?: string | null;
+    };
+    url: '/api/securities/{symbol}/summary';
+};
+
+export type SecuritySummaryErrors = {
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type SecuritySummaryError = SecuritySummaryErrors[keyof SecuritySummaryErrors];
+
+export type SecuritySummaryResponses = {
+    /**
+     * Successful Response
+     */
+    200: SecuritySummaryResponse;
+};
+
+export type SecuritySummaryResponse2 = SecuritySummaryResponses[keyof SecuritySummaryResponses];
 
 export type SecurityStatisticsData = {
     body?: never;
