@@ -1,16 +1,17 @@
-import { Alert, Anchor, Box, Group, Loader, Skeleton, Stack, Table, Text, Title } from "@mantine/core";
+import { Alert, Anchor, Box, Button, Group, Loader, Skeleton, Stack, Table, Text, Title } from "@mantine/core";
+import { IconArrowsLeftRight } from "@tabler/icons-react";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router";
 
 import { apiErrorMessage } from "../api/errors";
 import { listWallets, type WalletResponse } from "../api/generated";
-import { walletPath } from "../routes";
+import { securitiesComparePath, walletPath } from "../routes";
 import { GainText } from "../ui/GainText";
 import { Money } from "../ui/Money";
 import { formatAmount, formatDate, formatDateTime, formatPercent, todayAsInputValue } from "../ui/format";
 import { InfoTip } from "../ui/InfoTip";
 import { TimeSeriesChart } from "../ui/TimeSeriesChart";
-import { CHART_HEIGHT, TABLE_MIN_WIDTH } from "../ui/theme";
+import { CHART_HEIGHT, ICON_SIZE, TABLE_MIN_WIDTH } from "../ui/theme";
 import { symbolFilterSearch } from "../wallets/operationFilters";
 import { PeriodControls } from "../wallets/PeriodControls";
 import { describeRange, isEverything, usePeriod } from "../wallets/period";
@@ -45,7 +46,13 @@ function Header({ symbol }: { symbol: string }) {
   const state = useQuote(symbol);
   return (
     <div>
-      <Title order={1}>{symbol}</Title>
+      <Group justify="space-between" align="flex-start">
+        <Title order={1}>{symbol}</Title>
+        {/* A link, so the comparison can open in a new tab; it starts with this security, to add others to. */}
+        <Button component={Link} to={securitiesComparePath([symbol])} variant="default" leftSection={<IconArrowsLeftRight size={ICON_SIZE} />}>
+          Compare
+        </Button>
+      </Group>
       {state.status === "loading" && <Loader size="sm" mt="xs" />}
       {state.status === "error" && (
         <Alert color="yellow" mt="xs" title="Price unavailable">
