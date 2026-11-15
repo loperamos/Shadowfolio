@@ -1,10 +1,12 @@
 """Routes for market information."""
 
+from datetime import date
+
 from fastapi import APIRouter, HTTPException
 
 from shadowfolio.domain.errors import DomainError
 from shadowfolio.interfaces.web.errors import INVALID, NOT_FOUND, rule_violation
-from shadowfolio.interfaces.web.schemas import QuoteResponse
+from shadowfolio.interfaces.web.schemas import DailyCloseResponse, QuoteResponse
 from shadowfolio.usecases.market import Market
 
 
@@ -22,5 +24,15 @@ def market_router(market: Market) -> APIRouter:
         return QuoteResponse(
             symbol=symbol, price=quote.price, currency=quote.currency, as_of=quote.as_of, previous_close=quote.previous_close
         )
+
+    @router.get("/market/closes/{symbol}", responses=INVALID)
+    def daily_closes(symbol: str, start: date | None = None, end: date | None = None) -> list[DailyCloseResponse]:
+        """The symbol's close on each trading day from `start` (default: ten years before `end`) to `end` (default:
+        today); empty when market data has none."""
+        try:
+            closes = market.closes(symbol.strip().upper(), start, end)
+        except DomainError as error:
+            raise rule_violation(error) from error
+        return [DailyCloseResponse(day=close.as_of.date(), close=close.price, currency=close.currency) for close in closes]
 
     return router

@@ -545,6 +545,12 @@ class QuoteResponse(BaseModel):
     previous_close: Decimal | None
 
 
+class DailyCloseResponse(BaseModel):
+    day: date
+    close: Decimal
+    currency: Currency
+
+
 class SyncSummaryResponse(BaseModel):
     wallets: int  # wallets checked
     added: int

@@ -53,7 +53,7 @@ def build_local_app(config: LocalConfig) -> FastAPI:
         valuation=Valuation(wallet_repository, clock, prices, fx_rates),
         comparison=Comparison(wallet_repository, clock, prices, fx_rates, corporate_actions),
         orders=Orders(wallet_repository, clock, prices, WalletChanges(clock, prices, fx_rates, sync)),
-        market=Market(prices),
+        market=Market(prices, clock),
         sync=sync,
         imports=Imports(wallet_repository, WalletChanges(clock, prices, fx_rates, sync), OpenFigiSecurityLookup(), DegiroStatementReader()),
     )
