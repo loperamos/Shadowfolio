@@ -26,7 +26,7 @@ from shadowfolio.domain.operations import (
     Withdrawal,
 )
 from shadowfolio.domain.orders import Order, OrderSide, OrderStatus
-from shadowfolio.domain.performance import Performance
+from shadowfolio.domain.performance import Performance, TradingActivity
 from shadowfolio.domain.valuation import DailyValue, Quote, WalletValuation
 from shadowfolio.domain.wallet import Wallet
 from shadowfolio.usecases.comparison import PerformanceComparison
@@ -468,6 +468,26 @@ class DailyReturnResponse(BaseModel):
     value: Decimal | None  # the return since the start of the period, in percent; null when the day could not be valued
 
 
+class TradingActivityResponse(BaseModel):
+    """What the wallet traded over the period and what that cost, in its currency; percentages of its average value."""
+
+    bought: Decimal  # spent on buys, before fees
+    sold: Decimal  # received from sells, before fees
+    fees: Decimal  # on trades, and charged on their own
+    turnover_percent: Decimal | None  # the smaller of bought and sold; null when no day was valued
+    fees_percent: Decimal | None
+
+    @classmethod
+    def from_activity(cls, activity: TradingActivity) -> "TradingActivityResponse":
+        return cls(
+            bought=_cents(activity.bought),
+            sold=_cents(activity.sold),
+            fees=_cents(activity.fees),
+            turnover_percent=_ratio_percent(activity.turnover),
+            fees_percent=_ratio_percent(activity.fees_ratio),
+        )
+
+
 class PerformanceComparisonResponse(BaseModel):
     """How the wallet did over a period next to `benchmark_symbol` with the same deposits; null when nothing in the
     period could be valued."""
@@ -478,6 +498,7 @@ class PerformanceComparisonResponse(BaseModel):
     # The time-weighted return since the start of the period, day by day: comparable whatever money each had.
     wallet_returns: list[DailyReturnResponse]
     benchmark_returns: list[DailyReturnResponse]
+    trading: TradingActivityResponse
 
     @classmethod
     def from_comparison(cls, comparison: PerformanceComparison) -> "PerformanceComparisonResponse":
@@ -487,6 +508,7 @@ class PerformanceComparisonResponse(BaseModel):
             benchmark=None if comparison.benchmark is None else PerformanceResponse.from_performance(comparison.benchmark),
             wallet_returns=_daily_returns(comparison.wallet_returns),
             benchmark_returns=_daily_returns(comparison.benchmark_returns),
+            trading=TradingActivityResponse.from_activity(comparison.trading),
         )
 
 

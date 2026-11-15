@@ -3026,6 +3026,9 @@
             },
             "type": "array",
             "title": "Benchmark Returns"
+          },
+          "trading": {
+            "$ref": "#/components/schemas/TradingActivityResponse"
           }
         },
         "type": "object",
@@ -3034,7 +3037,8 @@
           "benchmark_symbol",
           "benchmark",
           "wallet_returns",
-          "benchmark_returns"
+          "benchmark_returns",
+          "trading"
         ],
         "title": "PerformanceComparisonResponse",
         "description": "How the wallet did over a period next to `benchmark_symbol` with the same deposits; null when nothing in the\nperiod could be valued."
@@ -3479,6 +3483,54 @@
           "timestamp"
         ],
         "title": "TradeRequest"
+      },
+      "TradingActivityResponse": {
+        "properties": {
+          "bought": {
+            "type": "string",
+            "title": "Bought"
+          },
+          "sold": {
+            "type": "string",
+            "title": "Sold"
+          },
+          "fees": {
+            "type": "string",
+            "title": "Fees"
+          },
+          "turnover_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turnover Percent"
+          },
+          "fees_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fees Percent"
+          }
+        },
+        "type": "object",
+        "required": [
+          "bought",
+          "sold",
+          "fees",
+          "turnover_percent",
+          "fees_percent"
+        ],
+        "title": "TradingActivityResponse",
+        "description": "What the wallet traded over the period and what that cost, in its currency; percentages of its average value."
       },
       "UncreditedDividendResponse": {
         "properties": {

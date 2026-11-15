@@ -87,3 +87,32 @@ def test_the_daily_returns_from_zero_come_with_the_performance(client: TestClien
         ("2024-06-04", "10.00"),
         ("2024-06-05", "10.00"),
     ]
+
+
+def test_a_period_says_how_much_was_traded_and_paid_in_fees(client: TestClient, prices: InMemoryPriceData) -> None:
+    wallet_id: str = client.post("/api/wallets", json={"name": "W", "currency": "USD", "cash": "0"}).json()["id"]
+    client.post(f"/api/wallets/{wallet_id}/deposits", json={"amount": "10000", "timestamp": "2024-06-01T09:00:00Z"})
+    trade = {"symbol": "AAPL", "price_currency": "USD"}
+    for kind, day, quantity, price, fees in [
+        ("buys", "2024-06-01", "5", "100", "1"),  # before the period: not counted
+        ("buys", "2024-06-03", "10", "100", "2"),
+        ("sells", "2024-06-04", "5", "110", "2"),
+    ]:
+        body = {**trade, "quantity": quantity, "price": price, "fees": fees, "timestamp": f"{day}T14:00:00Z"}
+        assert client.post(f"/api/wallets/{wallet_id}/{kind}", json=body).status_code == 200
+    closes: list[tuple[date, str]] = [(MONDAY, "100"), (TUESDAY, "110")]
+    for close_day, close in closes:
+        at = datetime(close_day.year, close_day.month, close_day.day, 20, 0, tzinfo=UTC)
+        prices.add_close("AAPL", Quote(Decimal(close), Currency.USD, at))
+
+    response = client.get(f"/api/wallets/{wallet_id}/performance", params={"start": "2024-06-03", "end": "2024-06-04"})
+
+    # Worth 8497 + 15 x 100 = 9997 on Monday and 9045 + 10 x 110 = 10145 on Tuesday: 10071 on average. Turnover is the
+    # smaller of buys and sells against it, 550 / 10071; fees 4 / 10071.
+    assert response.json()["trading"] == {
+        "bought": "1000.00",
+        "sold": "550.00",
+        "fees": "4.00",
+        "turnover_percent": "5.46",
+        "fees_percent": "0.04",
+    }

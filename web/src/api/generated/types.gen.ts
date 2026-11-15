@@ -683,6 +683,7 @@ export type PerformanceComparisonResponse = {
      * Benchmark Returns
      */
     benchmark_returns: Array<DailyReturnResponse>;
+    trading: TradingActivityResponse;
 };
 
 /**
@@ -908,6 +909,34 @@ export type TradeRequest = {
      * Fees
      */
     fees?: number | string;
+};
+
+/**
+ * TradingActivityResponse
+ *
+ * What the wallet traded over the period and what that cost, in its currency; percentages of its average value.
+ */
+export type TradingActivityResponse = {
+    /**
+     * Bought
+     */
+    bought: string;
+    /**
+     * Sold
+     */
+    sold: string;
+    /**
+     * Fees
+     */
+    fees: string;
+    /**
+     * Turnover Percent
+     */
+    turnover_percent: string | null;
+    /**
+     * Fees Percent
+     */
+    fees_percent: string | null;
 };
 
 /**
