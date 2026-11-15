@@ -47,6 +47,14 @@ The timer reads the backend's address from `.env` at every run, and only the bac
 
 Lingering is a setting for all your user services, not part of the timer, so uninstalling leaves it as it is. If nothing else needs it, turn it off with `loginctl disable-linger "$USER"` (check it with `loginctl show-user "$USER" --property=Linger`).
 
+## Agents (MCP)
+
+The backend also serves an MCP server at `http://127.0.0.1:8000/mcp` (Streamable HTTP), so an agent can read your wallets and securities with the same figures as the web app. It is read-only for now, and has no sign-in yet: keep the backend on localhost. For example, with Claude Code:
+
+```bash
+claude mcp add --transport http shadowfolio http://127.0.0.1:8000/mcp
+```
+
 ## Frontend
 
 The web app lives in `web/` (Vite, React, TypeScript). It needs Node 24 LTS; with [nvm](https://github.com/nvm-sh/nvm), run `nvm use` inside `web/`.
