@@ -1,6 +1,9 @@
 import { Alert, Group, Skeleton, Text, Title } from "@mantine/core";
 
-import { formatDate } from "../ui/format";
+import type { TradingActivityResponse } from "../api/generated";
+import { Figure } from "../ui/Figure";
+import { formatDate, formatPercent } from "../ui/format";
+import { Money } from "../ui/Money";
 import { CHART_HEIGHT } from "../ui/theme";
 import { BenchmarkField } from "./BenchmarkField";
 import { PerformanceTable } from "./PerformanceTable";
@@ -43,7 +46,7 @@ function PerformanceBody({ state, currency }: { state: ReturnType<typeof usePerf
         </Alert>
       );
     case "loaded": {
-      const { wallet, benchmark, benchmark_symbol } = state.comparison;
+      const { wallet, benchmark, benchmark_symbol, trading } = state.comparison;
       if (wallet === null) {
         return <Text c="dimmed">Nothing could be valued in this period.</Text>;
       }
@@ -61,8 +64,40 @@ function PerformanceBody({ state, currency }: { state: ReturnType<typeof usePerf
               { key: "benchmark", label: `${benchmark_symbol} with the same deposits`, result: benchmark, currency },
             ]}
           />
+          <Trading trading={trading} currency={currency} />
         </>
       );
     }
   }
+}
+
+/**
+ * What the wallet traded in the period and what it cost, against its average value: frequent trading and its costs are
+ * what most hurt individual investors' returns (Barber & Odean, 2000).
+ */
+function Trading({ trading, currency }: { trading: TradingActivityResponse; currency: string }) {
+  const percent = (value: string | null) => (value === null ? "—" : `${formatPercent(value)}%`);
+  return (
+    <Group gap="xl" mt="md" align="flex-start">
+      <Figure label="Bought" explanation="Spent on buys in this period, before fees.">
+        <Money amount={trading.bought} currency={currency} />
+      </Figure>
+      <Figure label="Sold" explanation="Received from sells in this period, before fees.">
+        <Money amount={trading.sold} currency={currency} />
+      </Figure>
+      <Figure
+        label="Turnover"
+        explanation="The share of the wallet replaced in this period: the smaller of what was bought and sold, against the wallet's average value, as funds report it. Buying with new money, or selling to take money out, does not count."
+      >
+        {percent(trading.turnover_percent)}
+      </Figure>
+      <Figure
+        label="Fees"
+        explanation="Paid on trades and charged on their own in this period, and their share of the wallet's average value. Every fee comes straight off the return."
+        note={trading.fees_percent === null ? undefined : `${percent(trading.fees_percent)} of the average value`}
+      >
+        <Money amount={trading.fees} currency={currency} />
+      </Figure>
+    </Group>
+  );
 }
