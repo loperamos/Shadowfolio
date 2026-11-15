@@ -9,9 +9,11 @@ from fastapi.testclient import TestClient
 
 from shadowfolio.adapters.fixed_clock import FixedClock
 from shadowfolio.adapters.in_memory_company_data import InMemoryCompanyData
+from shadowfolio.adapters.in_memory_corporate_actions import InMemoryCorporateActions
 from shadowfolio.adapters.in_memory_news import InMemoryNews
 from shadowfolio.adapters.in_memory_price_data import InMemoryPriceData
 from shadowfolio.domain.company import FiscalYear, Fundamentals
+from shadowfolio.domain.corporate_actions import DividendEvent
 from shadowfolio.domain.money import Currency
 from shadowfolio.domain.news import Article
 from shadowfolio.domain.valuation import Quote
@@ -163,3 +165,22 @@ def test_the_latest_news_about_a_security_newest_first() -> None:
         ("Nvidia partner launches a probe", "benzinga", "https://example.com/1", "2026-11-15T12:07:00Z"),
     ]
     assert client.get("/api/securities/ZZZZ/news").json() == []
+
+
+def test_the_calendar_gives_the_next_ex_dividend_date_announced() -> None:
+    def dividend(ex: date, paid: date, per_share: str) -> DividendEvent:
+        return DividendEvent("MSFT", ex, paid, Decimal(per_share), Currency.USD, f"msft-{ex}")
+
+    corporate_actions = InMemoryCorporateActions(
+        dividend(date(2026, 8, 20), date(2026, 9, 11), "0.91"),
+        dividend(date(2026, 11, 12), date(2026, 11, 16), "0.91"),  # ex-date past, still to be paid: too late to qualify
+        dividend(date(2026, 11, 19), date(2026, 12, 10), "0.98"),
+        dividend(date(2027, 2, 18), date(2027, 3, 11), "0.98"),
+    )
+    clock = FixedClock(datetime(2026, 11, 15, 12, 0, tzinfo=UTC))
+    client = TestClient(build_test_app(clock=clock, prices=InMemoryPriceData(), corporate_actions=corporate_actions))
+
+    assert client.get("/api/securities/msft/calendar").json() == {
+        "next_ex_dividend": {"ex_date": "2026-11-19", "payable_date": "2026-12-10", "per_share": "0.98", "currency": "USD"}
+    }
+    assert client.get("/api/securities/NVDA/calendar").json() == {"next_ex_dividend": None}

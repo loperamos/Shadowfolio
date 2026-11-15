@@ -807,3 +807,16 @@ class DailyCloseResponse(BaseModel):
 class SyncSummaryResponse(BaseModel):
     wallets: int  # wallets checked
     added: int
+
+
+class DividendResponse(BaseModel):
+    ex_date: date  # shares held before it starts receive the dividend
+    payable_date: date | None  # null when the provider does not know it
+    per_share: Decimal
+    currency: Currency
+
+
+class CalendarResponse(BaseModel):
+    """What is announced ahead for a security."""
+
+    next_ex_dividend: DividendResponse | None  # null when none is announced

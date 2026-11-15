@@ -7,7 +7,8 @@ import { listWallets, type WalletResponse } from "../api/generated";
 import { walletPath } from "../routes";
 import { GainText } from "../ui/GainText";
 import { Money } from "../ui/Money";
-import { formatDateTime, todayAsInputValue } from "../ui/format";
+import { formatDate, formatDateTime, todayAsInputValue } from "../ui/format";
+import { InfoTip } from "../ui/InfoTip";
 import { TimeSeriesChart } from "../ui/TimeSeriesChart";
 import { CHART_HEIGHT, TABLE_MIN_WIDTH } from "../ui/theme";
 import { symbolFilterSearch } from "../wallets/operationFilters";
@@ -17,7 +18,8 @@ import { type ValuationState, useWalletValuations } from "../wallets/useWalletVa
 import { SecurityFundamentals } from "./SecurityFundamentals";
 import { SecurityNews } from "./SecurityNews";
 import { SecurityRanges } from "./SecurityRanges";
-import { useCloses, useQuote } from "./useSecurity";
+import { EXPLANATIONS } from "./explanations";
+import { useCalendar, useCloses, useQuote } from "./useSecurity";
 
 const CLOSE_LINE = "close";
 
@@ -64,7 +66,36 @@ function Header({ symbol }: { symbol: string }) {
           </Text>
         </Group>
       )}
+      <NextDividend symbol={symbol} />
     </div>
+  );
+}
+
+/** The next ex-dividend date announced, under the price; nothing while it loads. */
+function NextDividend({ symbol }: { symbol: string }) {
+  const state = useCalendar(symbol);
+  if (state.status === "loading") {
+    return null;
+  }
+  const dividend = state.status === "loaded" ? state.calendar.next_ex_dividend : null;
+  return (
+    <Group gap={4} mt={4} wrap="nowrap">
+      <Text size="sm" c={dividend ? undefined : "dimmed"}>
+        {state.status === "error" && `Dividends unavailable: ${state.message}`}
+        {state.status === "loaded" && !dividend && "No dividend announced."}
+        {dividend && (
+          <>
+            Next ex-dividend:{" "}
+            <Text span inherit fw={600}>
+              {formatDate(dividend.ex_date)}
+            </Text>{" "}
+            · <Money amount={dividend.per_share} currency={dividend.currency} /> a share
+            {dividend.payable_date && `, paid ${formatDate(dividend.payable_date)}`}
+          </>
+        )}
+      </Text>
+      {state.status === "loaded" && <InfoTip topic="the ex-dividend date">{EXPLANATIONS.exDividend}</InfoTip>}
+    </Group>
   );
 }
 

@@ -1824,6 +1824,46 @@
         }
       }
     },
+    "/api/securities/{symbol}/calendar": {
+      "get": {
+        "summary": "Security Calendar",
+        "description": "What is announced ahead: the next dividend whose ex-date is still to come.",
+        "operationId": "security_calendar",
+        "parameters": [
+          {
+            "name": "symbol",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Symbol"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Malformed request or broken business rule",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/securities/{symbol}/ranges": {
       "get": {
         "summary": "Security Ranges",
@@ -2069,6 +2109,26 @@
           "type"
         ],
         "title": "BuyEdit"
+      },
+      "CalendarResponse": {
+        "properties": {
+          "next_ex_dividend": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DividendResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "next_ex_dividend"
+        ],
+        "title": "CalendarResponse",
+        "description": "What is announced ahead for a security."
       },
       "CashMovementRequest": {
         "properties": {
@@ -2357,6 +2417,42 @@
           "type"
         ],
         "title": "DepositEdit"
+      },
+      "DividendResponse": {
+        "properties": {
+          "ex_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Ex Date"
+          },
+          "payable_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payable Date"
+          },
+          "per_share": {
+            "type": "string",
+            "title": "Per Share"
+          },
+          "currency": {
+            "$ref": "#/components/schemas/Currency"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ex_date",
+          "payable_date",
+          "per_share",
+          "currency"
+        ],
+        "title": "DividendResponse"
       },
       "ErrorResponse": {
         "properties": {

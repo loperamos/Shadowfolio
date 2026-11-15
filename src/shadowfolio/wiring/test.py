@@ -60,7 +60,7 @@ def build_test_app(
         valuation=Valuation(wallet_repository, clock, prices, fx_rates),
         comparison=Comparison(wallet_repository, clock, prices, fx_rates, corporate_actions),
         orders=Orders(wallet_repository, clock, prices, fx_rates, WalletChanges(clock, prices, fx_rates, sync)),
-        securities=Securities(company_data or InMemoryCompanyData(), prices, news or InMemoryNews(), market),
+        securities=Securities(company_data or InMemoryCompanyData(), prices, news or InMemoryNews(), market, corporate_actions, clock),
         market=market,
         sync=sync,
         imports=Imports(
