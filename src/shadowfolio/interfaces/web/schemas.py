@@ -599,6 +599,14 @@ class FundamentalsResponse(BaseModel):
         )
 
 
+class ArticleResponse(BaseModel):
+    headline: str
+    summary: str
+    source: str
+    url: str
+    published_at: AwareDatetime
+
+
 class DailyCloseResponse(BaseModel):
     day: date
     close: Decimal

@@ -9,6 +9,7 @@ from shadowfolio.adapters.fixed_clock import FixedClock
 from shadowfolio.adapters.in_memory_company_data import InMemoryCompanyData
 from shadowfolio.adapters.in_memory_corporate_actions import InMemoryCorporateActions
 from shadowfolio.adapters.in_memory_fx_rates import InMemoryFxRates
+from shadowfolio.adapters.in_memory_news import InMemoryNews
 from shadowfolio.adapters.in_memory_price_data import InMemoryPriceData
 from shadowfolio.adapters.in_memory_security_lookup import InMemorySecurityLookup
 from shadowfolio.adapters.in_memory_wallet_repository import InMemoryWalletRepository
@@ -17,6 +18,7 @@ from shadowfolio.ports.clock import Clock
 from shadowfolio.ports.company_data import CompanyData
 from shadowfolio.ports.corporate_actions import CorporateActions
 from shadowfolio.ports.fx_rates import FxRates
+from shadowfolio.ports.news import News
 from shadowfolio.ports.price_data import PriceData
 from shadowfolio.ports.security_lookup import SecurityLookup
 from shadowfolio.usecases.comparison import Comparison
@@ -41,6 +43,7 @@ def build_test_app(
     wallet_repository: InMemoryWalletRepository | None = None,
     security_lookup: SecurityLookup | None = None,
     company_data: CompanyData | None = None,
+    news: News | None = None,
 ) -> FastAPI:
     """Pass fakes to control them (or to prepare stored data); otherwise "now" is DEFAULT_NOW, storage is empty and there
     are no prices, rates or corporate actions."""
@@ -56,7 +59,7 @@ def build_test_app(
         valuation=Valuation(wallet_repository, clock, prices, fx_rates),
         comparison=Comparison(wallet_repository, clock, prices, fx_rates, corporate_actions),
         orders=Orders(wallet_repository, clock, prices, WalletChanges(clock, prices, fx_rates, sync)),
-        securities=Securities(company_data or InMemoryCompanyData(), prices),
+        securities=Securities(company_data or InMemoryCompanyData(), prices, news or InMemoryNews()),
         market=Market(prices, clock),
         sync=sync,
         imports=Imports(

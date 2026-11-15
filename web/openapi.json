@@ -1550,10 +1550,88 @@
           }
         }
       }
+    },
+    "/api/securities/{symbol}/news": {
+      "get": {
+        "summary": "Security News",
+        "description": "The latest articles about the symbol, newest first; empty when there are none.",
+        "operationId": "security_news",
+        "parameters": [
+          {
+            "name": "symbol",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Symbol"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ArticleResponse"
+                  },
+                  "title": "Response Security News"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Malformed request or broken business rule",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "ArticleResponse": {
+        "properties": {
+          "headline": {
+            "type": "string",
+            "title": "Headline"
+          },
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "published_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Published At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "headline",
+          "summary",
+          "source",
+          "url",
+          "published_at"
+        ],
+        "title": "ArticleResponse"
+      },
       "BenchmarkResponse": {
         "properties": {
           "symbol": {

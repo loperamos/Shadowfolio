@@ -104,7 +104,8 @@ web/            the React frontend; its API client is generated from the backend
 | --- | --- | --- |
 | `PriceData` | Minute bars, daily bars, latest price | Fake (fixtures), Alpaca, cache of past daily closes (SQLite file) |
 | `CorporateActions` | Dividends and splits | Fake, real provider |
-| `CompanyData` | Profile and fundamentals (after the MVP) | Fake, real provider |
+| `CompanyData` | Reported yearly results and shares outstanding | Fake, SEC EDGAR (US filers) |
+| `News` | The latest articles about a security | Fake, Alpaca (development only) |
 | `FxRates` | Daily rates | Fake, ECB, cache of past daily rates (SQLite file) |
 | `SecurityLookup` | ISIN (and trading venue) → ticker | Fake, OpenFIGI |
 | `StatementReader` | A broker's export → broker-neutral import records | DEGIRO (CSV) |

@@ -6,6 +6,7 @@ from pathlib import Path
 from fastapi import FastAPI
 
 from shadowfolio.adapters.alpaca_corporate_actions import AlpacaCorporateActions
+from shadowfolio.adapters.alpaca_news import AlpacaNews
 from shadowfolio.adapters.alpaca_price_data import FEED, AlpacaConfig, AlpacaPriceData
 from shadowfolio.adapters.cached_fx_rates import CachedFxRates
 from shadowfolio.adapters.cached_price_data import CachedPriceData
@@ -56,7 +57,7 @@ def build_local_app(config: LocalConfig) -> FastAPI:
         valuation=Valuation(wallet_repository, clock, prices, fx_rates),
         comparison=Comparison(wallet_repository, clock, prices, fx_rates, corporate_actions),
         orders=Orders(wallet_repository, clock, prices, WalletChanges(clock, prices, fx_rates, sync)),
-        securities=Securities(SecEdgarCompanyData(config.edgar_contact, clock), prices),
+        securities=Securities(SecEdgarCompanyData(config.edgar_contact, clock), prices, AlpacaNews(config.alpaca)),
         market=Market(prices, clock),
         sync=sync,
         imports=Imports(wallet_repository, WalletChanges(clock, prices, fx_rates, sync), OpenFigiSecurityLookup(), DegiroStatementReader()),
