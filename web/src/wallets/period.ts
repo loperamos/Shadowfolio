@@ -20,6 +20,8 @@ export enum Period {
 export type DayRange = { start: string | null; end: string | null };
 
 const PERIOD_PARAM = "period";
+// The period shown when the URL names none: recent enough to read, long enough for returns to mean something.
+const DEFAULT_PERIOD = Period.HALF_YEAR;
 const FROM_PARAM = "from";
 const TO_PARAM = "to";
 const DAY_FORMAT = "YYYY-MM-DD";
@@ -68,11 +70,13 @@ export function isEverything(range: DayRange): boolean {
 export function periodSearch(current: URLSearchParams, choice: Period | DayRange): URLSearchParams {
   const updated = new URLSearchParams(current);
   [PERIOD_PARAM, FROM_PARAM, TO_PARAM, PAGE_PARAM].forEach((param) => updated.delete(param));
-  if (typeof choice === "string") {
-    if (choice !== Period.ALL) {
-      updated.set(PERIOD_PARAM, choice);
+  // Clearing both dates means everything, not back to the default.
+  const preset = typeof choice === "string" ? choice : isEverything(choice) ? Period.ALL : null;
+  if (preset !== null) {
+    if (preset !== DEFAULT_PERIOD) {
+      updated.set(PERIOD_PARAM, preset);
     }
-  } else {
+  } else if (typeof choice !== "string") {
     if (choice.start !== null) {
       updated.set(FROM_PARAM, choice.start);
     }
@@ -84,7 +88,7 @@ export function periodSearch(current: URLSearchParams, choice: Period | DayRange
 }
 
 /**
- * The period in the URL: chosen dates if it has any, else its preset (everything when it has none or an unknown one;
+ * The period in the URL: chosen dates if it has any, else its preset (the last six months when it has none or an unknown one;
  * an invalid date is ignored). `period` is null for chosen dates. `choose` changes it.
  */
 export function usePeriod(today: string) {
@@ -92,7 +96,7 @@ export function usePeriod(today: string) {
   const updateQuery = useUpdateQuery();
   const from = day(params.get(FROM_PARAM));
   const to = day(params.get(TO_PARAM));
-  const preset = Object.values(Period).find((known) => known === params.get(PERIOD_PARAM)) ?? Period.ALL;
+  const preset = Object.values(Period).find((known) => known === params.get(PERIOD_PARAM)) ?? DEFAULT_PERIOD;
   const period = from === null && to === null ? preset : null;
   const range = period === null ? { start: from, end: to } : periodRange(period, today);
   const choose = (choice: Period | DayRange) => updateQuery((current) => periodSearch(current, choice));
