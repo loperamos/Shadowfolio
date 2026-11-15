@@ -58,6 +58,10 @@ export const EXPLANATIONS = {
   freeCashFlowYield:
     "The last fiscal year's free cash flow against the market cap: the cash the business produced for each dollar the whole company " +
     "costs today. Higher means cheaper for the cash it makes; compare it with what a bond would pay.",
+  earnings:
+    "The day the company reports its quarterly results. Prices often jump that day, up or down, as results beat or miss what was " +
+    "expected; buying or selling just before it is a bet on that news. Before the open or after the close means the move shows at the " +
+    "next open.",
   exDividend:
     "The first day the shares trade without their next dividend: you receive it only if you own the shares before that day starts. " +
     "The price usually drops by about the dividend that morning, so buying just before it to collect the dividend gains nothing. The " +

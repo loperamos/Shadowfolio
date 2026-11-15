@@ -302,6 +302,34 @@ export type DividendsResponse = {
 };
 
 /**
+ * EarningsResponse
+ *
+ * When the company reports results next; both null when not known.
+ */
+export type EarningsResponse = {
+    /**
+     * Next Date
+     */
+    next_date: string | null;
+    time: EarningsTime | null;
+};
+
+/**
+ * EarningsTime
+ */
+export const EarningsTime = {
+    BEFORE_OPEN: 'before_open',
+    DURING_MARKET: 'during_market',
+    AFTER_CLOSE: 'after_close',
+    UNKNOWN: 'unknown'
+} as const;
+
+/**
+ * EarningsTime
+ */
+export type EarningsTime = typeof EarningsTime[keyof typeof EarningsTime];
+
+/**
  * ErrorResponse
  */
 export type ErrorResponse = {
@@ -2521,6 +2549,36 @@ export type SecurityStatisticsResponses = {
 };
 
 export type SecurityStatisticsResponse2 = SecurityStatisticsResponses[keyof SecurityStatisticsResponses];
+
+export type SecurityEarningsData = {
+    body?: never;
+    path: {
+        /**
+         * Symbol
+         */
+        symbol: string;
+    };
+    query?: never;
+    url: '/api/securities/{symbol}/earnings';
+};
+
+export type SecurityEarningsErrors = {
+    /**
+     * Malformed request or broken business rule
+     */
+    422: ErrorResponse;
+};
+
+export type SecurityEarningsError = SecurityEarningsErrors[keyof SecurityEarningsErrors];
+
+export type SecurityEarningsResponses = {
+    /**
+     * Successful Response
+     */
+    200: EarningsResponse;
+};
+
+export type SecurityEarningsResponse = SecurityEarningsResponses[keyof SecurityEarningsResponses];
 
 export type SecurityDividendsData = {
     body?: never;

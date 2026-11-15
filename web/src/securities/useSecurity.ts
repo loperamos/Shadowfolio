@@ -16,6 +16,8 @@ import {
   securityStatistics,
   type SecurityStatisticsResponse,
   type DividendsResponse,
+  type EarningsResponse,
+  securityEarnings,
 } from "../api/generated";
 
 const NOT_FOUND_STATUS = 404;
@@ -185,5 +187,27 @@ export function useStatistics(symbol: string, start: string | null, end: string 
       current = false;
     };
   }, [symbol, start, end]);
+  return state;
+}
+
+export type EarningsState = { status: "loading" } | { status: "error"; message: string } | { status: "loaded"; earnings: EarningsResponse };
+
+/** When the company reports results next. Loads on its own, so it never holds up the page. */
+export function useEarnings(symbol: string): EarningsState {
+  const [state, setState] = useState<EarningsState>({ status: "loading" });
+  useEffect(() => {
+    let current = true;
+    setState({ status: "loading" });
+    securityEarnings({ path: { symbol } })
+      .then(({ data, error }) => {
+        if (current) {
+          setState(data ? { status: "loaded", earnings: data } : { status: "error", message: apiErrorMessage(error) });
+        }
+      })
+      .catch(() => current && setState({ status: "error", message: "Could not reach the backend." }));
+    return () => {
+      current = false;
+    };
+  }, [symbol]);
   return state;
 }

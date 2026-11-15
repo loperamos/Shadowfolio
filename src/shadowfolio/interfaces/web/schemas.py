@@ -9,6 +9,7 @@ from pydantic import AwareDatetime, BaseModel, Field
 
 from shadowfolio.domain.company import FiscalYear, ValueRange
 from shadowfolio.domain.comparison import Benchmark
+from shadowfolio.domain.earnings import EarningsTime
 from shadowfolio.domain.money import Currency
 from shadowfolio.domain.operations import (
     Buy,
@@ -874,3 +875,10 @@ class SecurityStatisticsResponse(BaseModel):
             else statistics.average_daily_volume.quantize(WHOLE, rounding=ROUND_HALF_EVEN),
             average_daily_value=_optional_cents(statistics.average_daily_value),
         )
+
+
+class EarningsResponse(BaseModel):
+    """When the company reports results next; both null when not known."""
+
+    next_date: date | None
+    time: EarningsTime | None  # when in the day

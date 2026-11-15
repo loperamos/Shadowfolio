@@ -20,7 +20,8 @@ import { SecurityNews } from "./SecurityNews";
 import { SecurityRanges } from "./SecurityRanges";
 import { SecurityStatistics } from "./SecurityStatistics";
 import { EXPLANATIONS } from "./explanations";
-import { useCloses, useDividends, useQuote } from "./useSecurity";
+import { EarningsTime } from "../api/generated";
+import { useCloses, useDividends, useEarnings, useQuote } from "./useSecurity";
 
 const CLOSE_LINE = "close";
 
@@ -67,8 +68,44 @@ function Header({ symbol }: { symbol: string }) {
           </Text>
         </Group>
       )}
+      <NextEarnings symbol={symbol} />
       <NextDividend symbol={symbol} />
     </div>
+  );
+}
+
+// When in the day results come out, as said after the date.
+const EARNINGS_TIMES: Record<EarningsTime, string> = {
+  [EarningsTime.BEFORE_OPEN]: ", before the market opens",
+  [EarningsTime.DURING_MARKET]: ", during market hours",
+  [EarningsTime.AFTER_CLOSE]: ", after the market closes",
+  [EarningsTime.UNKNOWN]: "",
+};
+
+/** When the company reports results next, under the price; nothing while it loads. */
+function NextEarnings({ symbol }: { symbol: string }) {
+  const state = useEarnings(symbol);
+  if (state.status === "loading") {
+    return null;
+  }
+  const next = state.status === "loaded" ? state.earnings : null;
+  return (
+    <Group gap={4} mt="xs" wrap="nowrap">
+      <Text size="sm" c={next?.next_date ? undefined : "dimmed"}>
+        {state.status === "error" && `Earnings date unavailable: ${state.message}`}
+        {next && !next.next_date && "No earnings date announced."}
+        {next?.next_date && (
+          <>
+            Next earnings:{" "}
+            <Text span inherit fw={600}>
+              {formatDate(next.next_date)}
+            </Text>
+            {next.time && EARNINGS_TIMES[next.time]}
+          </>
+        )}
+      </Text>
+      {state.status === "loaded" && <InfoTip topic="the earnings date">{EXPLANATIONS.earnings}</InfoTip>}
+    </Group>
   );
 }
 

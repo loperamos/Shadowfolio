@@ -6,13 +6,20 @@ from decimal import Decimal
 
 from shadowfolio.domain.company import Fundamentals, ValueRange, pe_by_day
 from shadowfolio.domain.corporate_actions import DividendEvent
-from shadowfolio.domain.errors import CompanyDataUnavailableNowError, CorporateActionsUnavailableNowError, NewsUnavailableNowError
+from shadowfolio.domain.earnings import EarningsDate
+from shadowfolio.domain.errors import (
+    CompanyDataUnavailableNowError,
+    CorporateActionsUnavailableNowError,
+    EarningsCalendarUnavailableNowError,
+    NewsUnavailableNowError,
+)
 from shadowfolio.domain.news import Article
 from shadowfolio.domain.statistics import average_daily_value, average_daily_volume, beta, change_since, max_drawdown, volatility
 from shadowfolio.domain.valuation import Quote
 from shadowfolio.ports.clock import Clock
 from shadowfolio.ports.company_data import CompanyData, CompanyDataUnavailableError
 from shadowfolio.ports.corporate_actions import CorporateActions, CorporateActionsUnavailableError
+from shadowfolio.ports.earnings_calendar import EarningsCalendar, EarningsCalendarUnavailableError
 from shadowfolio.ports.news import News, NewsUnavailableError
 from shadowfolio.ports.price_data import PriceData, PriceDataUnavailableError
 from shadowfolio.usecases.market import Market
@@ -47,6 +54,8 @@ NEWS_LIMIT = 10
 # for from this much earlier.
 DIVIDENDS_AHEAD = timedelta(days=365)
 PAYMENT_LAG = timedelta(days=90)
+# How far ahead the next earnings date is looked for: companies report every quarter.
+EARNINGS_AHEAD = timedelta(days=120)
 # The trend: the change over each of these, back from today; and the benchmark that beta is measured against.
 THREE_MONTHS, SIX_MONTHS, ONE_YEAR = timedelta(days=91), timedelta(days=182), timedelta(days=365)
 # A few days more than a year of closes, so the close a year back is there even after a weekend or a holiday.
@@ -80,14 +89,31 @@ class SecurityRanges:
 
 class Securities:
     def __init__(
-        self, company_data: CompanyData, prices: PriceData, news: News, market: Market, corporate_actions: CorporateActions, clock: Clock
+        self,
+        company_data: CompanyData,
+        prices: PriceData,
+        news: News,
+        market: Market,
+        corporate_actions: CorporateActions,
+        earnings_calendar: EarningsCalendar,
+        clock: Clock,
     ) -> None:
         self._company_data = company_data
         self._prices = prices
         self._news = news
         self._market = market
         self._corporate_actions = corporate_actions
+        self._earnings_calendar = earnings_calendar
         self._clock = clock
+
+    def next_earnings(self, symbol: str) -> EarningsDate | None:
+        """The next day, from today on, the company reports results; None when none is known."""
+        today = self._clock.now().date()
+        try:
+            found = self._earnings_calendar.earnings(symbol, today, today + EARNINGS_AHEAD)
+        except EarningsCalendarUnavailableError as error:
+            raise EarningsCalendarUnavailableNowError(f"could not fetch when {symbol} reports next right now: {error}") from error
+        return found[0] if found else None
 
     def statistics(self, symbol: str, start: date | None = None, end: date | None = None) -> SecurityStatistics:
         """The trend over the last 3, 6 and 12 months, and from `start` to `end` (as for its closes) the volatility, the

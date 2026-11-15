@@ -8,6 +8,7 @@ from shadowfolio.adapters.degiro_statements import DegiroStatementReader
 from shadowfolio.adapters.fixed_clock import FixedClock
 from shadowfolio.adapters.in_memory_company_data import InMemoryCompanyData
 from shadowfolio.adapters.in_memory_corporate_actions import InMemoryCorporateActions
+from shadowfolio.adapters.in_memory_earnings_calendar import InMemoryEarningsCalendar
 from shadowfolio.adapters.in_memory_fx_rates import InMemoryFxRates
 from shadowfolio.adapters.in_memory_news import InMemoryNews
 from shadowfolio.adapters.in_memory_price_data import InMemoryPriceData
@@ -17,6 +18,7 @@ from shadowfolio.interfaces.web.app import create_app
 from shadowfolio.ports.clock import Clock
 from shadowfolio.ports.company_data import CompanyData
 from shadowfolio.ports.corporate_actions import CorporateActions
+from shadowfolio.ports.earnings_calendar import EarningsCalendar
 from shadowfolio.ports.fx_rates import FxRates
 from shadowfolio.ports.news import News
 from shadowfolio.ports.price_data import PriceData
@@ -40,6 +42,7 @@ def build_test_app(
     prices: PriceData | None = None,
     fx_rates: FxRates | None = None,
     corporate_actions: CorporateActions | None = None,
+    earnings_calendar: EarningsCalendar | None = None,
     wallet_repository: InMemoryWalletRepository | None = None,
     security_lookup: SecurityLookup | None = None,
     company_data: CompanyData | None = None,
@@ -60,7 +63,15 @@ def build_test_app(
         valuation=Valuation(wallet_repository, clock, prices, fx_rates),
         comparison=Comparison(wallet_repository, clock, prices, fx_rates, corporate_actions),
         orders=Orders(wallet_repository, clock, prices, fx_rates, WalletChanges(clock, prices, fx_rates, sync)),
-        securities=Securities(company_data or InMemoryCompanyData(), prices, news or InMemoryNews(), market, corporate_actions, clock),
+        securities=Securities(
+            company_data or InMemoryCompanyData(),
+            prices,
+            news or InMemoryNews(),
+            market,
+            corporate_actions,
+            earnings_calendar or InMemoryEarningsCalendar(),
+            clock,
+        ),
         market=market,
         sync=sync,
         imports=Imports(

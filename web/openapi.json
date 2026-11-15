@@ -1898,6 +1898,46 @@
         }
       }
     },
+    "/api/securities/{symbol}/earnings": {
+      "get": {
+        "summary": "Security Earnings",
+        "description": "When the company reports results next, from today on: the days prices often jump.",
+        "operationId": "security_earnings",
+        "parameters": [
+          {
+            "name": "symbol",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Symbol"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EarningsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Malformed request or broken business rule",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/securities/{symbol}/dividends": {
       "get": {
         "summary": "Security Dividends",
@@ -2556,6 +2596,49 @@
         ],
         "title": "DividendsResponse",
         "description": "A security's dividends: the next announced, and those of the last year."
+      },
+      "EarningsResponse": {
+        "properties": {
+          "next_date": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Date"
+          },
+          "time": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EarningsTime"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "next_date",
+          "time"
+        ],
+        "title": "EarningsResponse",
+        "description": "When the company reports results next; both null when not known."
+      },
+      "EarningsTime": {
+        "type": "string",
+        "enum": [
+          "before_open",
+          "during_market",
+          "after_close",
+          "unknown"
+        ],
+        "title": "EarningsTime"
       },
       "ErrorResponse": {
         "properties": {
