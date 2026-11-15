@@ -58,3 +58,11 @@ def test_a_symbol_without_news_has_none() -> None:
 def test_an_error_from_alpaca_means_unavailable() -> None:
     with pytest.raises(NewsUnavailableError):
         news_answering({"message": "forbidden"}, [], status=403).latest("NVDA", 10)
+
+
+def test_html_escapes_in_the_text_are_turned_into_characters() -> None:
+    escaped = {**ARTICLE, "headline": "S&amp;P 500 inflows", "summary": "Bending Spoons tops the week&#39;s moves"}
+
+    [article] = news_answering({"news": [escaped], "next_page_token": None}, []).latest("NVDA", 10)
+
+    assert (article.headline, article.summary) == ("S&P 500 inflows", "Bending Spoons tops the week's moves")

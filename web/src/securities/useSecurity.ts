@@ -1,7 +1,16 @@
 import { useEffect, useState } from "react";
 
 import { apiErrorMessage } from "../api/errors";
-import { dailyCloses, type DailyCloseResponse, type FundamentalsResponse, latestQuote, type QuoteResponse, securityFundamentals } from "../api/generated";
+import {
+  type ArticleResponse,
+  dailyCloses,
+  type DailyCloseResponse,
+  type FundamentalsResponse,
+  latestQuote,
+  type QuoteResponse,
+  securityFundamentals,
+  securityNews,
+} from "../api/generated";
 
 const NOT_FOUND_STATUS = 404;
 
@@ -75,6 +84,28 @@ export function useFundamentals(symbol: string): FundamentalsState {
           setState({ status: "loaded", fundamentals: data });
         } else {
           setState(response?.status === NOT_FOUND_STATUS ? { status: "none" } : { status: "error", message: apiErrorMessage(error) });
+        }
+      })
+      .catch(() => current && setState({ status: "error", message: "Could not reach the backend." }));
+    return () => {
+      current = false;
+    };
+  }, [symbol]);
+  return state;
+}
+
+export type NewsState = { status: "loading" } | { status: "error"; message: string } | { status: "loaded"; articles: ArticleResponse[] };
+
+/** The latest articles about the symbol, newest first. Loads on its own, so it never holds up the page. */
+export function useNews(symbol: string): NewsState {
+  const [state, setState] = useState<NewsState>({ status: "loading" });
+  useEffect(() => {
+    let current = true;
+    setState({ status: "loading" });
+    securityNews({ path: { symbol } })
+      .then(({ data, error }) => {
+        if (current) {
+          setState(data ? { status: "loaded", articles: data } : { status: "error", message: apiErrorMessage(error) });
         }
       })
       .catch(() => current && setState({ status: "error", message: "Could not reach the backend." }));

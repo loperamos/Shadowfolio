@@ -3,6 +3,7 @@
 Development use only, like Alpaca's prices: its license does not allow showing its data to public users.
 """
 
+import html
 import json
 from datetime import datetime
 from typing import Any
@@ -37,9 +38,10 @@ class AlpacaNews(News):
 
 
 def _article(item: dict[str, Any]) -> Article:
+    """An article as Alpaca sends it; its text comes HTML-escaped (e.g. "S&amp;P"), so it is turned into characters."""
     return Article(
-        headline=item["headline"],
-        summary=item.get("summary") or "",
+        headline=html.unescape(item["headline"]),
+        summary=html.unescape(item.get("summary") or ""),
         source=item.get("source") or "",
         url=item["url"],
         published_at=datetime.fromisoformat(item["created_at"]),
