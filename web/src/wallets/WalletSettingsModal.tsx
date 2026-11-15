@@ -1,11 +1,11 @@
-import { Alert, Button, Divider, Group, Modal, Stack, Text, TextInput } from "@mantine/core";
+import { Alert, Button, Divider, Group, Modal, Stack, TagsInput, Text, TextInput } from "@mantine/core";
 import { type FormEvent, useState } from "react";
 
 import { apiErrorMessage } from "../api/errors";
 import { setWalletRules, updateWallet, type WalletResponse } from "../api/generated";
 import { shiftDecimal } from "../ui/format";
 import { SettingRow, settingDescriptionId } from "../ui/SettingRow";
-import { PERCENT_INPUT_WIDTH } from "../ui/theme";
+import { COUNT_INPUT_WIDTH, PERCENT_INPUT_WIDTH } from "../ui/theme";
 
 // A percentage as typed: digits, optionally with decimals.
 const PERCENT_PATTERN = /^\d+(\.\d+)?$/;
@@ -13,6 +13,10 @@ const PERCENT_PLACES = 2; // a rate of 0.15 is 15%
 const WITHHOLDING_INPUT_ID = "wallet-withholding-rate";
 const MAX_POSITION_INPUT_ID = "wallet-max-position";
 const MIN_CASH_INPUT_ID = "wallet-min-cash";
+const MAX_ORDERS_INPUT_ID = "wallet-max-orders";
+const SYMBOLS_INPUT_ID = "wallet-allowed-symbols";
+// A count as typed: whole digits only.
+const COUNT_PATTERN = /^\d+$/;
 const FULL_PERCENT = 100;
 
 /** A percentage typed into a field, kept as text so it stays exact; `inRange` says whether a number is allowed. */
@@ -50,9 +54,19 @@ function SettingsForm({ wallet, onClose, onSaved }: { wallet: WalletResponse; on
     "Must be above 0% and at most 100%",
   );
   const minCash = usePercentField(wallet.rules.min_cash_weight, (percent) => percent < FULL_PERCENT, "Must be below 100%");
+  const [symbols, setSymbols] = useState<string[]>(wallet.rules.allowed_symbols);
+  const [maxOrders, setMaxOrders] = useState(wallet.rules.max_orders_per_month?.toString() ?? "");
+  const typedOrders = maxOrders.trim();
+  const ordersError = typedOrders === "" ? null : !COUNT_PATTERN.test(typedOrders) || Number(typedOrders) < 1 ? "Enter a whole number from 1" : null;
+  const ordersValue = typedOrders === "" || ordersError ? null : Number(typedOrders);
+  const rulesChanged =
+    maxPosition.changed ||
+    minCash.changed ||
+    ordersValue !== wallet.rules.max_orders_per_month ||
+    symbols.join() !== wallet.rules.allowed_symbols.join();
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const invalid = [withholding, maxPosition, minCash].some((field) => field.error !== null);
+  const invalid = [withholding, maxPosition, minCash].some((field) => field.error !== null) || ordersError !== null;
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -72,8 +86,13 @@ function SettingsForm({ wallet, onClose, onSaved }: { wallet: WalletResponse; on
         }
         saved = data;
       }
-      if (maxPosition.changed || minCash.changed) {
-        const body = { max_position_weight: maxPosition.value, min_cash_weight: minCash.value };
+      if (rulesChanged) {
+        const body = {
+          max_position_weight: maxPosition.value,
+          min_cash_weight: minCash.value,
+          allowed_symbols: symbols,
+          max_orders_per_month: ordersValue,
+        };
         const { data, error } = await setWalletRules({ path, body });
         if (!data) {
           setError(apiErrorMessage(error));
@@ -116,8 +135,8 @@ function SettingsForm({ wallet, onClose, onSaved }: { wallet: WalletResponse; on
         </SettingRow>
         <Divider label="Rules for orders" labelPosition="left" />
         <Text size="xs" c="dimmed">
-          Checked when a buy is placed: one that would break a rule is refused, saying which. Open buys count too. Leave a
-          rule empty for no limit.
+          Checked when an order is placed: one that would break a rule is refused, saying which. Open buys count too.
+          Leave a rule empty for no limit.
         </Text>
         <SettingRow
           id={MAX_POSITION_INPUT_ID}
@@ -132,6 +151,36 @@ function SettingsForm({ wallet, onClose, onSaved }: { wallet: WalletResponse; on
           description="The share of the wallet’s value to keep in cash after a buy, e.g. 5% to always have some ready."
         >
           {percentInput(MIN_CASH_INPUT_ID, minCash, "No limit")}
+        </SettingRow>
+        <SettingRow
+          id={MAX_ORDERS_INPUT_ID}
+          label="Orders a month"
+          description="How many orders, buys and sells, the wallet may place in a calendar month; cancelled ones don’t count. Trading often costs returns."
+        >
+          <TextInput
+            id={MAX_ORDERS_INPUT_ID}
+            aria-describedby={settingDescriptionId(MAX_ORDERS_INPUT_ID)}
+            w={COUNT_INPUT_WIDTH}
+            inputMode="numeric"
+            placeholder="No limit"
+            value={maxOrders}
+            onChange={(e) => setMaxOrders(e.currentTarget.value)}
+            error={ordersError}
+          />
+        </SettingRow>
+        <SettingRow
+          id={SYMBOLS_INPUT_ID}
+          label="Symbols it may buy"
+          description="Only these can be bought; any can still be sold, to get out of a position. Leave empty for any symbol. Press Enter after each."
+          wide
+        >
+          <TagsInput
+            id={SYMBOLS_INPUT_ID}
+            aria-describedby={settingDescriptionId(SYMBOLS_INPUT_ID)}
+            placeholder="e.g. NVDA"
+            value={symbols}
+            onChange={(values) => setSymbols([...new Set(values.map((value) => value.trim().toUpperCase()).filter(Boolean))])}
+          />
         </SettingRow>
         {error && <Alert color="red">{error}</Alert>}
         <Group justify="flex-end">
