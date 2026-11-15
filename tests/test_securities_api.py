@@ -39,6 +39,7 @@ NVDA = Fundamentals(
     ),
     shares_outstanding=Decimal("24100000000"),
     shares_as_of=date(2026, 8, 21),
+    industry="Semiconductors & Related Devices",
     quarters=(
         FiscalYear(date(2024, 1, 29), date(2024, 4, 28), Decimal("26044000000"), Decimal("14881000000"), None),
         FiscalYear(date(2025, 1, 27), date(2025, 4, 27), Decimal("44062000000"), Decimal("18775000000"), None),
@@ -57,6 +58,7 @@ def test_fundamentals_come_with_the_pe_and_market_cap_at_the_latest_price() -> N
     assert response.status_code == 200
     result = response.json()
     assert (result["company_name"], result["currency"], result["shares_outstanding"]) == ("NVIDIA CORP", "USD", "24100000000")
+    assert result["industry"] == "Semiconductors & Related Devices"
     assert [(y["end"], y["revenue"], y["net_income"], y["eps_diluted"]) for y in result["years"]] == [
         ("2025-01-26", "130497000000", "72880000000", "2.94"),
         ("2026-01-25", "215938000000", "120067000000", "4.90"),

@@ -70,7 +70,7 @@ function FundamentalsBody({ symbol, state }: { symbol: string; state: ReturnType
     case "none":
       return <Text c="dimmed">No fundamentals for {symbol}: only companies that report to the US SEC are covered.</Text>;
     case "loaded": {
-      const { company_name, currency, years, quarters, shares_outstanding, shares_as_of, pe, market_cap, price_to_sales, free_cash_flow_yield } =
+      const { company_name, industry, currency, years, quarters, shares_outstanding, shares_as_of, pe, market_cap, price_to_sales, free_cash_flow_yield } =
         state.fundamentals;
       const latest = years.at(-1);
       const quarterly = view === ResultsView.QUARTERLY;
@@ -84,7 +84,18 @@ function FundamentalsBody({ symbol, state }: { symbol: string; state: ReturnType
       );
       return (
         <>
-          <Text mb="sm">{company_name}</Text>
+          <Group gap={4} mb="sm" wrap="nowrap">
+            <Text>
+              {company_name}
+              {industry && (
+                <Text span c="dimmed" inherit>
+                  {" "}
+                  · {industry}
+                </Text>
+              )}
+            </Text>
+            {industry && <InfoTip topic="the industry">{EXPLANATIONS.industry}</InfoTip>}
+          </Group>
           {/* Top-aligned, so each label, value and note sits on the same line as the others'. */}
           <Group gap="xl" mb="md" align="flex-start">
             {figure("P/E", EXPLANATIONS.pe, pe ?? "—", pe == null ? "No positive diluted EPS for the last fiscal year" : "Price against the last fiscal year's diluted EPS")}

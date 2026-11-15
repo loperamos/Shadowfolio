@@ -51,6 +51,7 @@ class Fundamentals:
     shares_outstanding: Decimal | None
     shares_as_of: date | None
     quarters: tuple[FiscalYear, ...] = ()  # each fiscal quarter, oldest first; no EPS (see the company data)
+    industry: str | None = None  # as the provider classifies it, e.g. "Semiconductors & Related Devices"
 
     def revenue_growth(self, year: FiscalYear) -> Decimal | None:
         """How much `year`'s revenue grew on the fiscal year just before it (0.65 for +65%); None without that year or

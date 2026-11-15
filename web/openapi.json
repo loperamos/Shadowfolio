@@ -2766,6 +2766,17 @@
             "type": "string",
             "title": "Company Name"
           },
+          "industry": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Industry"
+          },
           "currency": {
             "$ref": "#/components/schemas/Currency"
           },
@@ -2865,6 +2876,7 @@
         "type": "object",
         "required": [
           "company_name",
+          "industry",
           "currency",
           "years",
           "quarters",

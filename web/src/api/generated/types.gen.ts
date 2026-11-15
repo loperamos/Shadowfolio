@@ -406,6 +406,10 @@ export type FundamentalsResponse = {
      * Company Name
      */
     company_name: string;
+    /**
+     * Industry
+     */
+    industry: string | null;
     currency: Currency;
     /**
      * Years

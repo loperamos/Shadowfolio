@@ -727,6 +727,7 @@ class FundamentalsResponse(BaseModel):
     (against the last fiscal year's diluted EPS) and market cap at the latest price; those are null without one."""
 
     company_name: str
+    industry: str | None  # as the SEC classifies it (SIC); null when not given
     currency: Currency
     years: list[FiscalYearResponse]
     # Each fiscal quarter, oldest first: growth on the same quarter a year before; no EPS (see the company data).
@@ -744,6 +745,7 @@ class FundamentalsResponse(BaseModel):
         fundamentals = figures.fundamentals
         return cls(
             company_name=fundamentals.company_name,
+            industry=fundamentals.industry,
             currency=fundamentals.currency,
             years=[FiscalYearResponse.of(y, fundamentals.revenue_growth(y)) for y in fundamentals.years],
             quarters=[FiscalYearResponse.of(q, fundamentals.quarter_revenue_growth(q)) for q in fundamentals.quarters],
