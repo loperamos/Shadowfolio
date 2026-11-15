@@ -13,7 +13,7 @@ from shadowfolio.adapters.in_memory_corporate_actions import InMemoryCorporateAc
 from shadowfolio.adapters.in_memory_earnings_calendar import InMemoryEarningsCalendar
 from shadowfolio.adapters.in_memory_news import InMemoryNews
 from shadowfolio.adapters.in_memory_price_data import InMemoryPriceData
-from shadowfolio.domain.company import FiscalYear, Fundamentals
+from shadowfolio.domain.company import FiscalYear, Fundamentals, SharesSource
 from shadowfolio.domain.corporate_actions import DividendEvent
 from shadowfolio.domain.earnings import EarningsDate, EarningsTime
 from shadowfolio.domain.money import Currency
@@ -41,6 +41,7 @@ NVDA = Fundamentals(
     ),
     shares_outstanding=Decimal("24100000000"),
     shares_as_of=date(2026, 8, 21),
+    shares_source=SharesSource.COVER,
     industry="Semiconductors & Related Devices",
     quarters=(
         FiscalYear(date(2024, 1, 29), date(2024, 4, 28), Decimal("26044000000"), Decimal("14881000000"), None),
@@ -61,6 +62,7 @@ def test_fundamentals_come_with_the_pe_and_market_cap_at_the_latest_price() -> N
     result = response.json()
     assert (result["company_name"], result["currency"], result["shares_outstanding"]) == ("NVIDIA CORP", "USD", "24100000000")
     assert result["industry"] == "Semiconductors & Related Devices"
+    assert result["shares_source"] == "cover"  # as the company stated it, not an approximation
     assert [(y["end"], y["revenue"], y["net_income"], y["eps_diluted"]) for y in result["years"]] == [
         ("2025-01-26", "130497000000", "72880000000", "2.94"),
         ("2026-01-25", "215938000000", "120067000000", "4.90"),

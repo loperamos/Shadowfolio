@@ -14,6 +14,7 @@ import pytest
 
 from shadowfolio.adapters.fixed_clock import FixedClock
 from shadowfolio.adapters.sec_edgar_company_data import FRESH_FOR, SecEdgarCompanyData
+from shadowfolio.domain.company import Fundamentals, SharesSource
 from shadowfolio.domain.money import Currency
 from shadowfolio.ports.company_data import CompanyDataUnavailableError
 
@@ -149,6 +150,7 @@ def test_yearly_results_come_from_annual_reports_the_latest_filing_winning() -> 
         (date(2025, 1, 27), date(2026, 1, 25), Decimal("215938000000"), Decimal("120067000000"), Decimal("4.9")),
     ]
     assert (fundamentals.shares_outstanding, fundamentals.shares_as_of) == (Decimal("24100000000"), date(2026, 8, 21))
+    assert fundamentals.shares_source is SharesSource.COVER
     # Its industry as the SEC classifies it (SIC), from the company's profile.
     assert fundamentals.industry == "Semiconductors & Related Devices"
     # The company is found by its ticker, and every request says who is asking, as EDGAR requires.
@@ -202,7 +204,64 @@ def test_a_share_count_older_than_the_last_fiscal_year_is_not_used() -> None:
 
     fundamentals = SecEdgarCompanyData(CONTACT, FixedClock(NOW), transport=httpx2.MockTransport(handler)).fundamentals("NVDA")
 
-    assert fundamentals is not None and (fundamentals.shares_outstanding, fundamentals.shares_as_of) == (None, None)
+    assert fundamentals is not None and (fundamentals.shares_outstanding, fundamentals.shares_as_of, fundamentals.shares_source) == (
+        None,
+        None,
+        None,
+    )
+
+
+def with_shares(cover: list[dict[str, Any]], **gaap: Any) -> dict[str, Any]:
+    """FACTS with only these cover page counts, and these extra share concepts."""
+    return {
+        **FACTS,
+        "facts": {
+            "us-gaap": {**FACTS["facts"]["us-gaap"], **gaap},
+            "dei": {"EntityCommonStockSharesOutstanding": {"units": {"shares": cover}}},
+        },
+    }
+
+
+def fundamentals_of(facts: dict[str, Any]) -> Fundamentals:
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        return httpx2.Response(200, text=json.dumps(answer(request.url.path, facts)))
+
+    found = SecEdgarCompanyData(CONTACT, FixedClock(NOW), transport=httpx2.MockTransport(handler)).fundamentals("NVDA")
+    assert found is not None
+    return found
+
+
+def test_without_a_cover_page_count_the_balance_sheets_count_of_every_class_is_used() -> None:
+    # Companies with several share classes (Alphabet, Meta) state the cover page count per class, which EDGAR's
+    # summary leaves out; the balance sheet counts every class together.
+    balance_sheet = {"units": {"shares": [{"end": "2026-04-26", "val": 24250000000, "form": "10-Q", "fp": "Q1", "filed": "2026-05-28"}]}}
+
+    found = fundamentals_of(with_shares([], CommonStockSharesOutstanding=balance_sheet))
+
+    assert (found.shares_outstanding, found.shares_as_of, found.shares_source) == (
+        Decimal("24250000000"),
+        date(2026, 4, 26),
+        SharesSource.BALANCE_SHEET,
+    )
+
+
+def test_without_either_the_quarters_diluted_average_stands_in_approximately() -> None:
+    diluted = {
+        "units": {
+            "shares": [
+                entry("2026-01-26", "2026-04-26", 24438000000, form="10-Q", fp="Q1", filed="2026-05-28"),
+                entry("2025-01-27", "2026-01-25", 24555000000),  # a whole year: the latest quarter is closer to now
+            ]
+        }
+    }
+
+    found = fundamentals_of(with_shares([], WeightedAverageNumberOfDilutedSharesOutstanding=diluted))
+
+    assert (found.shares_outstanding, found.shares_as_of, found.shares_source) == (
+        Decimal("24438000000"),
+        date(2026, 4, 26),
+        SharesSource.DILUTED_AVERAGE,
+    )
 
 
 def test_a_share_class_is_found_with_edgars_dash() -> None:

@@ -7,7 +7,7 @@ from uuid import UUID
 
 from pydantic import AwareDatetime, BaseModel, Field
 
-from shadowfolio.domain.company import FiscalYear, ValueRange
+from shadowfolio.domain.company import FiscalYear, SharesSource, ValueRange
 from shadowfolio.domain.comparison import Benchmark
 from shadowfolio.domain.earnings import EarningsTime
 from shadowfolio.domain.money import Currency
@@ -736,6 +736,7 @@ class FundamentalsResponse(BaseModel):
     quarters: list[FiscalYearResponse]
     shares_outstanding: Decimal | None
     shares_as_of: date | None
+    shares_source: SharesSource | None  # where the count comes from: the cover page, the balance sheet, or approximate
     price: Decimal | None
     pe: Decimal | None
     market_cap: Decimal | None
@@ -753,6 +754,7 @@ class FundamentalsResponse(BaseModel):
             quarters=[FiscalYearResponse.of(q, fundamentals.quarter_revenue_growth(q)) for q in fundamentals.quarters],
             shares_outstanding=fundamentals.shares_outstanding,
             shares_as_of=fundamentals.shares_as_of,
+            shares_source=fundamentals.shares_source,
             price=None if figures.price is None else figures.price.price,
             pe=None if figures.pe is None else figures.pe.quantize(CENT, rounding=ROUND_HALF_EVEN),
             market_cap=_optional_cents(figures.market_cap),

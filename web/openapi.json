@@ -2986,6 +2986,16 @@
             ],
             "title": "Shares As Of"
           },
+          "shares_source": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SharesSource"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "price": {
             "anyOf": [
               {
@@ -3051,6 +3061,7 @@
           "quarters",
           "shares_outstanding",
           "shares_as_of",
+          "shares_source",
           "price",
           "pe",
           "market_cap",
@@ -4588,6 +4599,16 @@
           "type"
         ],
         "title": "SellEdit"
+      },
+      "SharesSource": {
+        "type": "string",
+        "enum": [
+          "cover",
+          "balance_sheet",
+          "diluted_average"
+        ],
+        "title": "SharesSource",
+        "description": "Where a company's share count comes from, the most exact first."
       },
       "StatementRequest": {
         "properties": {

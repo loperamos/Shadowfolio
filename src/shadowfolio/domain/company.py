@@ -5,6 +5,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date, timedelta
 from decimal import Decimal
+from enum import StrEnum
 
 from shadowfolio.domain.money import Currency
 
@@ -12,6 +13,14 @@ from shadowfolio.domain.money import Currency
 ADJACENT_YEARS = timedelta(days=7)
 # How far apart the ends of the same quarter a year apart can be: fiscal years of 52 or 53 weeks move them a little.
 A_YEAR_APART = range(357, 372)
+
+
+class SharesSource(StrEnum):
+    """Where a company's share count comes from, the most exact first."""
+
+    COVER = "cover"  # as the company stated it on its latest report's cover
+    BALANCE_SHEET = "balance_sheet"  # every class together, at the end of the latest quarter
+    DILUTED_AVERAGE = "diluted_average"  # approximate: the latest quarter's average, counting shares options could add
 
 
 @dataclass(frozen=True)
@@ -50,6 +59,7 @@ class Fundamentals:
     years: tuple[FiscalYear, ...]  # oldest first
     shares_outstanding: Decimal | None
     shares_as_of: date | None
+    shares_source: SharesSource | None = None  # None without a count
     quarters: tuple[FiscalYear, ...] = ()  # each fiscal quarter, oldest first; no EPS (see the company data)
     industry: str | None = None  # as the provider classifies it, e.g. "Semiconductors & Related Devices"
 

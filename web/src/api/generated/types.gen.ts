@@ -459,6 +459,7 @@ export type FundamentalsResponse = {
      * Shares As Of
      */
     shares_as_of: string | null;
+    shares_source: SharesSource | null;
     /**
      * Price
      */
@@ -1212,6 +1213,24 @@ export type SellEdit = {
      */
     type: 'sell';
 };
+
+/**
+ * SharesSource
+ *
+ * Where a company's share count comes from, the most exact first.
+ */
+export const SharesSource = {
+    COVER: 'cover',
+    BALANCE_SHEET: 'balance_sheet',
+    DILUTED_AVERAGE: 'diluted_average'
+} as const;
+
+/**
+ * SharesSource
+ *
+ * Where a company's share count comes from, the most exact first.
+ */
+export type SharesSource = typeof SharesSource[keyof typeof SharesSource];
 
 /**
  * StatementRequest
