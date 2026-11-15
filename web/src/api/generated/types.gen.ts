@@ -301,6 +301,14 @@ export type FiscalYearResponse = {
      * Eps Diluted
      */
     eps_diluted: string | null;
+    /**
+     * Revenue Growth
+     */
+    revenue_growth: string | null;
+    /**
+     * Net Margin
+     */
+    net_margin: string | null;
 };
 
 /**

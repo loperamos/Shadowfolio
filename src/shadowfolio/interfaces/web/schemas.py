@@ -566,6 +566,8 @@ class FiscalYearResponse(BaseModel):
     revenue: Decimal | None
     net_income: Decimal | None
     eps_diluted: Decimal | None
+    revenue_growth: Decimal | None  # on the year before, in percent; null without it
+    net_margin: Decimal | None  # net income as a share of revenue, in percent
 
 
 class FundamentalsResponse(BaseModel):
@@ -588,7 +590,15 @@ class FundamentalsResponse(BaseModel):
             company_name=fundamentals.company_name,
             currency=fundamentals.currency,
             years=[
-                FiscalYearResponse(start=y.start, end=y.end, revenue=y.revenue, net_income=y.net_income, eps_diluted=y.eps_diluted)
+                FiscalYearResponse(
+                    start=y.start,
+                    end=y.end,
+                    revenue=y.revenue,
+                    net_income=y.net_income,
+                    eps_diluted=y.eps_diluted,
+                    revenue_growth=_ratio_percent(fundamentals.revenue_growth(y)),
+                    net_margin=_ratio_percent(y.net_margin),
+                )
                 for y in fundamentals.years
             ],
             shares_outstanding=fundamentals.shares_outstanding,

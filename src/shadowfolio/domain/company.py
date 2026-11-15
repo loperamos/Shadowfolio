@@ -1,10 +1,13 @@
 """What a company reported about itself: yearly results and shares outstanding, and the ratios they give at a price."""
 
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 
 from shadowfolio.domain.money import Currency
+
+# How far apart one fiscal year's end and the next one's start can be for them to follow each other.
+ADJACENT_YEARS = timedelta(days=7)
 
 
 @dataclass(frozen=True)
@@ -15,6 +18,13 @@ class FiscalYear:
     net_income: Decimal | None
     eps_diluted: Decimal | None  # net income per share, counting shares that options and the like could add
 
+    @property
+    def net_margin(self) -> Decimal | None:
+        """The share of revenue kept as net income (0.556 for 55.6%); None without both, or without revenue."""
+        if self.net_income is None or not self.revenue:
+            return None
+        return self.net_income / self.revenue
+
 
 @dataclass(frozen=True)
 class Fundamentals:
@@ -23,6 +33,14 @@ class Fundamentals:
     years: tuple[FiscalYear, ...]  # oldest first
     shares_outstanding: Decimal | None
     shares_as_of: date | None
+
+    def revenue_growth(self, year: FiscalYear) -> Decimal | None:
+        """How much `year`'s revenue grew on the fiscal year just before it (0.65 for +65%); None without that year or
+        either revenue."""
+        previous = next((other for other in self.years if timedelta(0) < year.start - other.end <= ADJACENT_YEARS), None)
+        if previous is None or year.revenue is None or not previous.revenue:
+            return None
+        return year.revenue / previous.revenue - 1
 
     def pe(self, price: Decimal) -> Decimal | None:
         """Price to earnings: `price` against the last fiscal year's diluted EPS; None without a positive one."""

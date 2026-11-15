@@ -2133,6 +2133,28 @@
               }
             ],
             "title": "Eps Diluted"
+          },
+          "revenue_growth": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revenue Growth"
+          },
+          "net_margin": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Net Margin"
           }
         },
         "type": "object",
@@ -2141,7 +2163,9 @@
           "end",
           "revenue",
           "net_income",
-          "eps_diluted"
+          "eps_diluted",
+          "revenue_growth",
+          "net_margin"
         ],
         "title": "FiscalYearResponse"
       },

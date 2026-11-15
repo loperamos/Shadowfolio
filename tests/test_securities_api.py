@@ -48,6 +48,16 @@ def test_fundamentals_come_with_the_pe_and_market_cap_at_the_latest_price() -> N
     assert (result["price"], result["pe"], result["market_cap"]) == ("161.87", "33.03", "3901067000000.00")
 
 
+def test_each_year_says_how_revenue_grew_and_how_much_of_it_was_kept_as_profit() -> None:
+    years = client_with(InMemoryCompanyData({"NVDA": NVDA})).get("/api/securities/NVDA/fundamentals").json()["years"]
+
+    # 2026: 215.938 / 130.497 = +65.47%; 120.067 / 215.938 = 55.60% kept. The first year has no year before it.
+    assert [(y["end"], y["revenue_growth"], y["net_margin"]) for y in years] == [
+        ("2025-01-26", None, "55.85"),
+        ("2026-01-25", "65.47", "55.60"),
+    ]
+
+
 def test_a_symbol_without_fundamentals_returns_404() -> None:
     response = client_with(InMemoryCompanyData({})).get("/api/securities/NNND.XGAT/fundamentals")
 

@@ -1,6 +1,7 @@
 import { Alert, Group, Skeleton, Table, Text, Title } from "@mantine/core";
 
-import { formatAmount, formatCompactAmount, formatDate } from "../ui/format";
+import { formatAmount, formatCompactAmount, formatDate, formatPercent } from "../ui/format";
+import { ReturnText } from "../ui/GainText";
 import { InfoTip } from "../ui/InfoTip";
 import { CHART_HEIGHT, TABLE_MIN_WIDTH } from "../ui/theme";
 import { EXPLANATIONS } from "./explanations";
@@ -77,7 +78,13 @@ function FundamentalsBody({ symbol, state }: { symbol: string; state: ReturnType
                       <HeaderWithInfo label="Revenue" explanation={EXPLANATIONS.revenue} />
                     </Table.Th>
                     <Table.Th ta="right">
+                      <HeaderWithInfo label="Growth" explanation={EXPLANATIONS.revenueGrowth} />
+                    </Table.Th>
+                    <Table.Th ta="right">
                       <HeaderWithInfo label="Net income" explanation={EXPLANATIONS.netIncome} />
+                    </Table.Th>
+                    <Table.Th ta="right">
+                      <HeaderWithInfo label="Net margin" explanation={EXPLANATIONS.netMargin} />
                     </Table.Th>
                     <Table.Th ta="right">
                       <HeaderWithInfo label="EPS (diluted)" explanation={EXPLANATIONS.eps} />
@@ -93,7 +100,9 @@ function FundamentalsBody({ symbol, state }: { symbol: string; state: ReturnType
                       <Table.Tr key={year.end}>
                         <Table.Td>{formatDate(year.end)}</Table.Td>
                         <Table.Td ta="right">{amount(year.revenue)}</Table.Td>
+                        <Table.Td ta="right">{year.revenue_growth == null ? "—" : <ReturnText percent={year.revenue_growth} />}</Table.Td>
                         <Table.Td ta="right">{amount(year.net_income)}</Table.Td>
+                        <Table.Td ta="right">{year.net_margin == null ? "—" : `${formatPercent(year.net_margin)}%`}</Table.Td>
                         <Table.Td ta="right">{year.eps_diluted == null ? "—" : `${formatAmount(year.eps_diluted)} ${currency}`}</Table.Td>
                       </Table.Tr>
                     ))}
