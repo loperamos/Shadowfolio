@@ -217,6 +217,16 @@ def test_a_symbol_edgar_does_not_list_has_no_fundamentals() -> None:
     assert edgar([]).fundamentals("NNND.XGAT") is None
 
 
+def test_a_listed_filer_without_financial_facts_has_no_fundamentals() -> None:
+    # Funds such as SPY file with the SEC, so EDGAR lists their ticker, but report no company financials: 404.
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        if request.url.path.endswith("company_tickers.json"):
+            return httpx2.Response(200, text=json.dumps({"0": {"cik_str": 884394, "ticker": "SPY", "title": "SPDR S&P 500 ETF TRUST"}}))
+        return httpx2.Response(404, text="Not Found")
+
+    assert SecEdgarCompanyData(CONTACT, FixedClock(NOW), transport=httpx2.MockTransport(handler)).fundamentals("SPY") is None
+
+
 def test_answers_are_kept_for_a_while() -> None:
     seen: list[httpx2.Request] = []
     clock = FixedClock(NOW)

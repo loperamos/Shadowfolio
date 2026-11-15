@@ -15,6 +15,7 @@ import json
 from dataclasses import replace
 from datetime import date, datetime, timedelta
 from decimal import Decimal
+from http import HTTPStatus
 from typing import Any
 
 import httpx2
@@ -78,17 +79,24 @@ class SecEdgarCompanyData(CompanyData):
         cik = next((company["cik_str"] for company in self._get(TICKERS_URL).values() if company["ticker"] == edgar_ticker), None)
         if cik is None:
             return None
-        facts = self._get(FACTS_URL.format(cik=cik))
-        profile = self._get(SUBMISSIONS_URL.format(cik=cik))
+        # Funds (e.g. SPY) file with the SEC, so their ticker is listed, but have no company financials.
+        facts = self._get(FACTS_URL.format(cik=cik), missing_ok=True)
+        if facts is None:
+            return None
+        profile = self._get(SUBMISSIONS_URL.format(cik=cik), missing_ok=True) or {}
         return replace(_fundamentals(facts), industry=profile.get(INDUSTRY_FIELD) or None)
 
-    def _get(self, url: str) -> Any:
+    def _get(self, url: str, missing_ok: bool = False) -> Any:
+        """EDGAR's answer for `url`; with `missing_ok`, None when it has nothing there (404)."""
         now = self._clock.now()
         kept = self._kept.get(url)
         if kept is not None and now - kept[0] < FRESH_FOR:
             return kept[1]
         try:
             response = self._client.get(url)
+            if missing_ok and response.status_code == HTTPStatus.NOT_FOUND:
+                self._kept[url] = (now, None)
+                return None
             response.raise_for_status()
         except httpx2.HTTPError as error:
             raise CompanyDataUnavailableError(f"SEC EDGAR: {error}") from error
