@@ -57,7 +57,7 @@ def build_local_app(config: LocalConfig) -> FastAPI:
         history=History(wallet_repository, clock, prices, fx_rates, sync),
         valuation=Valuation(wallet_repository, clock, prices, fx_rates),
         comparison=Comparison(wallet_repository, clock, prices, fx_rates, corporate_actions),
-        orders=Orders(wallet_repository, clock, prices, WalletChanges(clock, prices, fx_rates, sync)),
+        orders=Orders(wallet_repository, clock, prices, fx_rates, WalletChanges(clock, prices, fx_rates, sync)),
         securities=Securities(SecEdgarCompanyData(config.edgar_contact, clock), prices, AlpacaNews(config.alpaca), market),
         market=market,
         sync=sync,

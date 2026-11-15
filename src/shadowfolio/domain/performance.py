@@ -9,10 +9,12 @@ Both run from the value at the end of the day before the period (or its first va
 Days that could not be valued are skipped: money moved on them counts at the next valued day.
 """
 
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import UTC, date, timedelta
 from decimal import Decimal
+
+from shadowfolio.domain.operations import Buy, Fee, Operation, Sell
 
 DAYS_PER_YEAR = 365
 # Bounds for the daily money-weighted rate (-99% to +100% a day) and how closely it is solved.
@@ -127,3 +129,44 @@ def _daily_rate(flows: Sequence[tuple[date, Decimal]], first_day: date) -> Decim
         else:
             low, worth_low = middle, worth_middle
     return (low + high) / 2
+
+
+@dataclass(frozen=True)
+class TradingActivity:
+    """How much a wallet traded over a period, and what that cost, against what it was worth on average."""
+
+    bought: Decimal  # spent on buys, before fees, in the wallet's currency
+    sold: Decimal  # received from sells, before fees
+    fees: Decimal  # on trades, and charged on their own
+    average_value: Decimal | None  # over the period's valued days; None when none was valued
+
+    @property
+    def turnover(self) -> Decimal | None:
+        """The smaller of buys and sells against the average value, as funds report it (SEC Form N-1A): the share of
+        the wallet replaced, without counting new money invested or money taken out."""
+        return min(self.bought, self.sold) / self.average_value if self.average_value else None
+
+    @property
+    def fees_ratio(self) -> Decimal | None:
+        """Fees against the average value, as a ratio (0.003 for 0.3%)."""
+        return self.fees / self.average_value if self.average_value else None
+
+
+def trading_activity(operations: Iterable[Operation], values: Sequence[DayValue], start: date, end: date) -> TradingActivity:
+    """What the operations dated from `start` to `end` (both included, in UTC) bought, sold and paid in fees, and the
+    average of the daily values in that period."""
+    bought = sold = fees = Decimal(0)
+    for op in operations:
+        if not start <= op.timestamp.astimezone(UTC).date() <= end:
+            continue
+        if isinstance(op, Buy):
+            bought += op.settled_amount
+            fees += op.fees
+        elif isinstance(op, Sell):
+            sold += op.settled_amount
+            fees += op.fees
+        elif isinstance(op, Fee):
+            fees += op.amount
+    valued = [point.value for point in values if start <= point.day <= end and point.value is not None]
+    average = sum(valued, Decimal(0)) / len(valued) if valued else None
+    return TradingActivity(bought, sold, fees, average)

@@ -9,7 +9,7 @@ from uuid import UUID
 from shadowfolio.domain.comparison import Benchmark, benchmark_values
 from shadowfolio.domain.errors import CorporateActionsUnavailableNowError, FxRateUnavailableError, PriceUnavailableError
 from shadowfolio.domain.operations import Deposit, Withdrawal
-from shadowfolio.domain.performance import DayValue, Performance, cumulative_returns, performance
+from shadowfolio.domain.performance import DayValue, Performance, TradingActivity, cumulative_returns, performance, trading_activity
 from shadowfolio.domain.valuation import DailyValue
 from shadowfolio.domain.wallet import Wallet
 from shadowfolio.ports.clock import Clock
@@ -35,6 +35,7 @@ class PerformanceComparison:
     benchmark: Performance | None
     wallet_returns: tuple[tuple[date, Decimal | None], ...]
     benchmark_returns: tuple[tuple[date, Decimal | None], ...]
+    trading: TradingActivity  # the wallet's, over the period
 
 
 class Comparison:
@@ -64,10 +65,10 @@ class Comparison:
         """How the wallet and the benchmark did from `start` (default: the wallet's first operation) to `end` (default:
         today), and their returns day by day. Returns None if the wallet does not exist; fails as a whole when a
         provider cannot answer."""
-        found = self._points(wallet_id, symbol)
-        if found is None:
+        wallet = self._repo.get(wallet_id)
+        if wallet is None:
             return None
-        wallet_points, benchmark_symbol, benchmark_points, first_day = found
+        wallet_points, benchmark_symbol, benchmark_points, first_day = self._points(wallet, symbol)
         start, end = start or first_day, end or self._clock.now().date()
         return PerformanceComparison(
             performance(wallet_points, start, end),
@@ -75,15 +76,13 @@ class Comparison:
             performance(benchmark_points, start, end),
             cumulative_returns(wallet_points, start, end),
             cumulative_returns(benchmark_points, start, end),
+            trading_activity(wallet.operations, wallet_points, start, end),
         )
 
-    def _points(self, wallet_id: UUID, symbol: str) -> tuple[list[DayValue], str, list[DayValue], date] | None:
+    def _points(self, wallet: Wallet, symbol: str) -> tuple[list[DayValue], str, list[DayValue], date]:
         """The wallet's and the benchmark's daily values with the money moved each day, the benchmark's symbol, and the
-        wallet's first day (today when it has none). None if the wallet does not exist."""
-        wallet = self._repo.get(wallet_id)
-        if wallet is None:
-            return None
-        daily = self._valuation.daily(wallet_id) or []
+        wallet's first day (today when it has none)."""
+        daily = self._valuation.daily(wallet.id) or []
         benchmark = self._benchmark(wallet, daily, _normalized(symbol))
         wallet_points, previous_deposits = [], Decimal(0)
         for value in daily:

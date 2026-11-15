@@ -7,6 +7,7 @@ from decimal import Decimal
 
 from shadowfolio.domain.money import Currency, FxRate, to_cents
 from shadowfolio.domain.operations import Buy, Operation, Sell
+from shadowfolio.domain.orders import Order, OrderSide
 from shadowfolio.domain.wallet import Wallet
 
 
@@ -78,6 +79,8 @@ class WalletValuation:
     currency: Currency
     cash: Decimal
     holdings: tuple[HoldingValue, ...]  # sorted by symbol
+    # What open buy orders would cost (see `reserved_for_orders`); None when unknown, or for a past day.
+    reserved_for_orders: Decimal | None = None
 
     @property
     def cost(self) -> Decimal:
@@ -110,6 +113,36 @@ class WalletValuation:
     def total(self) -> Decimal:
         """Cash plus all holdings, in the wallet's currency."""
         return self.cash + sum((h.value_in_wallet_currency for h in self.holdings), Decimal(0))
+
+    @property
+    def buying_power(self) -> Decimal | None:
+        """Cash not yet committed to open buy orders: what new buys can still spend. None when that is unknown."""
+        return None if self.reserved_for_orders is None else self.cash - self.reserved_for_orders
+
+    def weight(self, holding: HoldingValue) -> Decimal | None:
+        """The holding's share of the wallet's whole value, cash included (0.31 for 31%); None for an empty wallet."""
+        return holding.value_in_wallet_currency / self.total if self.total else None
+
+    @property
+    def cash_weight(self) -> Decimal | None:
+        """Cash's share of the wallet's whole value; None for an empty wallet."""
+        return self.cash / self.total if self.total else None
+
+    @property
+    def largest_weight(self) -> Decimal | None:
+        """The largest holding's share of the wallet's whole value; None without holdings."""
+        weights = [weight for holding in self.holdings if (weight := self.weight(holding)) is not None]
+        return max(weights) if weights else None
+
+    @property
+    def effective_holdings(self) -> Decimal | None:
+        """How many equal-sized holdings the holdings spread risk like: 1 / the sum of their squared shares of what is
+        invested (the inverse Herfindahl index). Ten equal holdings give 10; one at 90% and nine small ones about 1.2.
+        None without holdings worth anything."""
+        invested = sum((h.value_in_wallet_currency for h in self.holdings), Decimal(0))
+        if invested <= 0:
+            return None
+        return 1 / sum(((h.value_in_wallet_currency / invested) ** 2 for h in self.holdings), Decimal(0))
 
 
 @dataclass(frozen=True)
@@ -168,3 +201,35 @@ def value_wallet(wallet: Wallet, quotes: Mapping[str, Quote], rates: Mapping[Cur
         for symbol, quantity in sorted(wallet.holdings.items())
     )
     return WalletValuation(currency=wallet.currency, cash=wallet.cash, holdings=holdings)
+
+
+def reserved_for_orders(
+    orders: Iterable[Order], quotes: Mapping[str, Quote], rates: Mapping[Currency, FxRate], currency: Currency
+) -> Decimal | None:
+    """What the open buy orders among `orders` would cost, in `currency`: each at its limit price, or a market order at
+    its symbol's quote, converted at `rates` and rounded to cents per order, as a fill would be. None when an order's
+    symbol has no quote, or its currency no rate."""
+    total = Decimal(0)
+    for order in orders:
+        if not order.is_open or order.side is not OrderSide.BUY:
+            continue
+        quote = quotes.get(order.symbol)
+        if quote is None:
+            return None
+        rate = None if quote.currency is currency else rates.get(quote.currency)
+        if quote.currency is not currency and rate is None:
+            return None
+        total += order_amount(order, quote, rate)
+    return total
+
+
+def order_price(order: Order, quote: Quote) -> Decimal:
+    """The price an order is counted at before it fills: its limit, or for a market order the latest price `quote`."""
+    return quote.price if order.limit_price is None else order.limit_price
+
+
+def order_amount(order: Order, quote: Quote, rate: FxRate | None) -> Decimal:
+    """What `order` would come to at `order_price`, in the wallet's currency, rounded to cents as a fill would be.
+    `rate` converts the quote's currency into the wallet's; None when they are the same."""
+    amount = order.quantity * order_price(order, quote)
+    return to_cents(amount if rate is None else amount * rate.rate)

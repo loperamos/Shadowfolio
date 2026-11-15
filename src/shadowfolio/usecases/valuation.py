@@ -1,13 +1,23 @@
 """Valuation use cases: what a wallet is worth at market prices, in its own currency, now or at the end of a past day."""
 
 from collections.abc import Callable
+from dataclasses import replace
 from datetime import UTC, date, datetime, time, timedelta
 from uuid import UUID
 
 from shadowfolio.domain.errors import FutureTimestampError, FxRateUnavailableError, InvalidPeriodError, PriceUnavailableError
 from shadowfolio.domain.money import Currency, FxRate
 from shadowfolio.domain.operations import Buy, Sell
-from shadowfolio.domain.valuation import DailyValue, Quote, WalletValuation, estimated_price, holdings_value, value_wallet
+from shadowfolio.domain.orders import OrderSide
+from shadowfolio.domain.valuation import (
+    DailyValue,
+    Quote,
+    WalletValuation,
+    estimated_price,
+    holdings_value,
+    reserved_for_orders,
+    value_wallet,
+)
 from shadowfolio.domain.wallet import Wallet
 from shadowfolio.ports.clock import Clock
 from shadowfolio.ports.fx_rates import FxRates, FxRatesUnavailableError
@@ -30,13 +40,24 @@ class Valuation:
         wallet = self._repo.get(wallet_id)
         if wallet is None:
             return None
-        # Every holding's price in one go, rather than one request after another.
-        symbols = sorted(wallet.holdings)
+        # Every holding's price in one go, rather than one request after another; with those of open buy orders, for
+        # what they would cost.
+        buying = {order.symbol for order in wallet.orders if order.is_open and order.side is OrderSide.BUY}
+        symbols = sorted(set(wallet.holdings) | buying)
         try:
             quotes = self._prices.latest_prices(symbols)
         except PriceDataUnavailableError as error:
             raise PriceUnavailableError(f"could not fetch the price of {', '.join(symbols)} right now; try again later") from error
-        return self._value(wallet, quotes.get, lambda currency: self._fx_rates.latest_rate(currency, wallet.currency), "")
+        valuation = self._value(wallet, quotes.get, lambda currency: self._fx_rates.latest_rate(currency, wallet.currency), "")
+        rates = {h.quote.currency: h.fx_rate for h in valuation.holdings if h.fx_rate is not None}
+        for currency in {quotes[symbol].currency for symbol in buying if symbol in quotes} - set(rates) - {wallet.currency}:
+            try:
+                rate = self._fx_rates.latest_rate(currency, wallet.currency)
+            except FxRatesUnavailableError:
+                continue  # what the orders would cost is then unknown
+            if rate is not None:
+                rates[currency] = rate
+        return replace(valuation, reserved_for_orders=reserved_for_orders(wallet.orders, quotes, rates, wallet.currency))
 
     def on(self, wallet_id: UUID, day: date) -> WalletValuation | None:
         """The wallet as it was at the end of `day` (every operation dated that day, in UTC, included), valued at that

@@ -1421,6 +1421,109 @@
         }
       }
     },
+    "/api/wallets/{wallet_id}/orders/estimate": {
+      "get": {
+        "summary": "Estimate Order",
+        "description": "What an order would come to if placed now, in the wallet's currency: at its limit price, or a market order at\nthe latest price, at the latest exchange rate, as the buying power counts open orders. A fill may differ.",
+        "operationId": "estimate_order",
+        "parameters": [
+          {
+            "name": "wallet_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Wallet Id"
+            }
+          },
+          {
+            "name": "side",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/OrderSide"
+            }
+          },
+          {
+            "name": "symbol",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Symbol"
+            }
+          },
+          {
+            "name": "quantity",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "string"
+                }
+              ],
+              "title": "Quantity"
+            }
+          },
+          {
+            "name": "limit_price",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Limit Price"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderEstimateResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Malformed request or broken business rule",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/wallets/{wallet_id}/orders/{order_id}/cancel": {
       "post": {
         "summary": "Cancel Order",
@@ -2446,6 +2549,17 @@
               }
             ],
             "title": "Day Change Percent"
+          },
+          "weight_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight Percent"
           }
         },
         "type": "object",
@@ -2463,7 +2577,8 @@
           "gain_percent",
           "previous_close",
           "day_change",
-          "day_change_percent"
+          "day_change_percent",
+          "weight_percent"
         ],
         "title": "HoldingValueResponse"
       },
@@ -2718,6 +2833,39 @@
         ],
         "title": "OperationType"
       },
+      "OrderEstimateResponse": {
+        "properties": {
+          "price": {
+            "type": "string",
+            "title": "Price"
+          },
+          "currency": {
+            "$ref": "#/components/schemas/Currency"
+          },
+          "fx_rate": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FxRateResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "amount": {
+            "type": "string",
+            "title": "Amount"
+          }
+        },
+        "type": "object",
+        "required": [
+          "price",
+          "currency",
+          "fx_rate",
+          "amount"
+        ],
+        "title": "OrderEstimateResponse"
+      },
       "OrderResponse": {
         "properties": {
           "id": {
@@ -2878,6 +3026,9 @@
             },
             "type": "array",
             "title": "Benchmark Returns"
+          },
+          "trading": {
+            "$ref": "#/components/schemas/TradingActivityResponse"
           }
         },
         "type": "object",
@@ -2886,7 +3037,8 @@
           "benchmark_symbol",
           "benchmark",
           "wallet_returns",
-          "benchmark_returns"
+          "benchmark_returns",
+          "trading"
         ],
         "title": "PerformanceComparisonResponse",
         "description": "How the wallet did over a period next to `benchmark_symbol` with the same deposits; null when nothing in the\nperiod could be valued."
@@ -3332,6 +3484,54 @@
         ],
         "title": "TradeRequest"
       },
+      "TradingActivityResponse": {
+        "properties": {
+          "bought": {
+            "type": "string",
+            "title": "Bought"
+          },
+          "sold": {
+            "type": "string",
+            "title": "Sold"
+          },
+          "fees": {
+            "type": "string",
+            "title": "Fees"
+          },
+          "turnover_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Turnover Percent"
+          },
+          "fees_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fees Percent"
+          }
+        },
+        "type": "object",
+        "required": [
+          "bought",
+          "sold",
+          "fees",
+          "turnover_percent",
+          "fees_percent"
+        ],
+        "title": "TradingActivityResponse",
+        "description": "What the wallet traded over the period and what that cost, in its currency; percentages of its average value."
+      },
       "UncreditedDividendResponse": {
         "properties": {
           "symbol": {
@@ -3492,6 +3692,61 @@
           "total": {
             "type": "string",
             "title": "Total"
+          },
+          "cash_weight_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cash Weight Percent"
+          },
+          "largest_weight_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Largest Weight Percent"
+          },
+          "effective_holdings": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective Holdings"
+          },
+          "reserved_for_orders": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reserved For Orders"
+          },
+          "buying_power": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Buying Power"
           }
         },
         "type": "object",
@@ -3504,7 +3759,12 @@
           "gain_percent",
           "day_change",
           "day_change_percent",
-          "total"
+          "total",
+          "cash_weight_percent",
+          "largest_weight_percent",
+          "effective_holdings",
+          "reserved_for_orders",
+          "buying_power"
         ],
         "title": "ValuationResponse"
       },

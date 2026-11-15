@@ -9,14 +9,30 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID, uuid4
 
-from shadowfolio.domain.errors import DomainError, InsufficientCashError, InsufficientSharesError
+from shadowfolio.domain.errors import (
+    DomainError,
+    FxRateUnavailableError,
+    InsufficientCashError,
+    InsufficientSharesError,
+    PriceUnavailableError,
+)
+from shadowfolio.domain.money import Currency, FxRate
 from shadowfolio.domain.orders import Order, OrderSide
-from shadowfolio.domain.valuation import Quote
+from shadowfolio.domain.valuation import Quote, order_amount, order_price
 from shadowfolio.domain.wallet import Wallet
 from shadowfolio.ports.clock import Clock
+from shadowfolio.ports.fx_rates import FxRates, FxRatesUnavailableError
 from shadowfolio.ports.price_data import PriceData, PriceDataUnavailableError
 from shadowfolio.ports.wallet_repository import WalletRepository
 from shadowfolio.usecases.wallet_changes import WalletChanges
+
+
+@dataclass(frozen=True)
+class OrderEstimate:
+    price: Decimal  # what the order is counted at: its limit, or the latest price for a market order
+    currency: Currency  # the price's
+    fx_rate: FxRate | None  # into the wallet's currency; None when it is the same
+    amount: Decimal  # in the wallet's currency, rounded to cents
 
 
 @dataclass(frozen=True)
@@ -26,11 +42,40 @@ class FillSummary:
 
 
 class Orders:
-    def __init__(self, repo: WalletRepository, clock: Clock, prices: PriceData, changes: WalletChanges) -> None:
+    def __init__(self, repo: WalletRepository, clock: Clock, prices: PriceData, fx_rates: FxRates, changes: WalletChanges) -> None:
         self._repo = repo
         self._clock = clock
         self._prices = prices
+        self._fx_rates = fx_rates
         self._changes = changes
+
+    def estimate(
+        self, wallet_id: UUID, side: OrderSide, symbol: str, quantity: Decimal, limit_price: Decimal | None = None
+    ) -> OrderEstimate | None:
+        """What an order would come to if placed now, as the buying power counts it (see domain.valuation): at its
+        limit, or a market order at the latest price, at the latest exchange rate. A fill may differ. None if the wallet
+        does not exist; fails when there is no price or rate to estimate with."""
+        wallet = self._repo.get(wallet_id)
+        if wallet is None:
+            return None
+        order = Order(uuid4(), side, symbol.strip().upper(), quantity, self._clock.now(), limit_price=limit_price)
+        try:
+            quote = self._prices.latest_prices([order.symbol]).get(order.symbol)
+        except PriceDataUnavailableError as error:
+            raise PriceUnavailableError(f"could not fetch the price of {order.symbol} right now; try again later") from error
+        if quote is None:
+            raise PriceUnavailableError(f"no price for {order.symbol}")
+        rate = None
+        if quote.currency is not wallet.currency:
+            try:
+                rate = self._fx_rates.latest_rate(quote.currency, wallet.currency)
+            except FxRatesUnavailableError as error:
+                raise FxRateUnavailableError(
+                    f"could not fetch the {quote.currency}→{wallet.currency} rate right now; try again later"
+                ) from error
+            if rate is None:
+                raise FxRateUnavailableError(f"no {quote.currency}→{wallet.currency} rate")
+        return OrderEstimate(order_price(order, quote), quote.currency, rate, order_amount(order, quote, rate))
 
     def place(
         self, wallet_id: UUID, side: OrderSide, symbol: str, quantity: Decimal, reason: str = "", limit_price: Decimal | None = None

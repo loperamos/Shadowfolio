@@ -26,11 +26,12 @@ from shadowfolio.domain.operations import (
     Withdrawal,
 )
 from shadowfolio.domain.orders import Order, OrderSide, OrderStatus
-from shadowfolio.domain.performance import Performance
+from shadowfolio.domain.performance import Performance, TradingActivity
 from shadowfolio.domain.valuation import DailyValue, Quote, WalletValuation
 from shadowfolio.domain.wallet import Wallet
 from shadowfolio.usecases.comparison import PerformanceComparison
 from shadowfolio.usecases.imports import ImportReport
+from shadowfolio.usecases.orders import OrderEstimate
 from shadowfolio.usecases.securities import CompanyFigures, SecurityRanges
 
 
@@ -289,6 +290,7 @@ class HoldingValueResponse(BaseModel):
     previous_close: Decimal | None  # in the price's currency
     day_change: Decimal | None  # since the previous close, in the wallet's currency (price only, not exchange rates)
     day_change_percent: Decimal | None  # the price's move since the previous close
+    weight_percent: Decimal | None  # its share of the wallet's whole value, cash included
 
 
 class ValuationResponse(BaseModel):
@@ -301,6 +303,11 @@ class ValuationResponse(BaseModel):
     day_change: Decimal | None  # of all holdings since the previous close; null if any holding has no previous close
     day_change_percent: Decimal | None  # of the holdings' value at the previous close
     total: Decimal  # cash plus holdings, in the wallet's currency
+    cash_weight_percent: Decimal | None  # cash's share of the whole value
+    largest_weight_percent: Decimal | None  # the largest holding's share of the whole value
+    effective_holdings: Decimal | None  # how many equal-sized holdings the holdings spread risk like
+    reserved_for_orders: Decimal | None  # what open buy orders would cost; null when unknown, or for a past day
+    buying_power: Decimal | None  # cash less what open buy orders would cost
 
     @classmethod
     def from_valuation(cls, valuation: WalletValuation) -> "ValuationResponse":
@@ -323,6 +330,7 @@ class ValuationResponse(BaseModel):
                     previous_close=h.quote.previous_close,
                     day_change=_optional_cents(h.day_change),
                     day_change_percent=_ratio_percent(h.day_change_ratio),
+                    weight_percent=_ratio_percent(valuation.weight(h)),
                 )
                 for h in valuation.holdings
             ],
@@ -332,6 +340,13 @@ class ValuationResponse(BaseModel):
             day_change=_optional_cents(valuation.day_change),
             day_change_percent=_ratio_percent(valuation.day_change_ratio),
             total=valuation.total,
+            cash_weight_percent=_ratio_percent(valuation.cash_weight),
+            largest_weight_percent=_ratio_percent(valuation.largest_weight),
+            effective_holdings=None
+            if valuation.effective_holdings is None
+            else valuation.effective_holdings.quantize(CENT, rounding=ROUND_HALF_EVEN),
+            reserved_for_orders=_optional_cents(valuation.reserved_for_orders),
+            buying_power=_optional_cents(valuation.buying_power),
         )
 
 
@@ -394,6 +409,22 @@ class PlaceOrderRequest(BaseModel):
     limit_price: Decimal | None = None  # the most a buy pays or the least a sell takes, in the symbol's currency
 
 
+class OrderEstimateResponse(BaseModel):
+    price: Decimal  # what the order is counted at: its limit, or the latest price for a market order
+    currency: Currency  # the price's
+    fx_rate: FxRateResponse | None  # into the wallet's currency; null when it is the same
+    amount: Decimal  # what the order would come to in the wallet's currency
+
+    @classmethod
+    def from_estimate(cls, estimate: OrderEstimate) -> "OrderEstimateResponse":
+        return cls(
+            price=estimate.price,
+            currency=estimate.currency,
+            fx_rate=FxRateResponse(rate=estimate.fx_rate.rate, as_of=estimate.fx_rate.as_of) if estimate.fx_rate else None,
+            amount=estimate.amount,
+        )
+
+
 class OrderResponse(BaseModel):
     id: UUID
     side: OrderSide
@@ -437,6 +468,26 @@ class DailyReturnResponse(BaseModel):
     value: Decimal | None  # the return since the start of the period, in percent; null when the day could not be valued
 
 
+class TradingActivityResponse(BaseModel):
+    """What the wallet traded over the period and what that cost, in its currency; percentages of its average value."""
+
+    bought: Decimal  # spent on buys, before fees
+    sold: Decimal  # received from sells, before fees
+    fees: Decimal  # on trades, and charged on their own
+    turnover_percent: Decimal | None  # the smaller of bought and sold; null when no day was valued
+    fees_percent: Decimal | None
+
+    @classmethod
+    def from_activity(cls, activity: TradingActivity) -> "TradingActivityResponse":
+        return cls(
+            bought=_cents(activity.bought),
+            sold=_cents(activity.sold),
+            fees=_cents(activity.fees),
+            turnover_percent=_ratio_percent(activity.turnover),
+            fees_percent=_ratio_percent(activity.fees_ratio),
+        )
+
+
 class PerformanceComparisonResponse(BaseModel):
     """How the wallet did over a period next to `benchmark_symbol` with the same deposits; null when nothing in the
     period could be valued."""
@@ -447,6 +498,7 @@ class PerformanceComparisonResponse(BaseModel):
     # The time-weighted return since the start of the period, day by day: comparable whatever money each had.
     wallet_returns: list[DailyReturnResponse]
     benchmark_returns: list[DailyReturnResponse]
+    trading: TradingActivityResponse
 
     @classmethod
     def from_comparison(cls, comparison: PerformanceComparison) -> "PerformanceComparisonResponse":
@@ -456,6 +508,7 @@ class PerformanceComparisonResponse(BaseModel):
             benchmark=None if comparison.benchmark is None else PerformanceResponse.from_performance(comparison.benchmark),
             wallet_returns=_daily_returns(comparison.wallet_returns),
             benchmark_returns=_daily_returns(comparison.benchmark_returns),
+            trading=TradingActivityResponse.from_activity(comparison.trading),
         )
 
 
