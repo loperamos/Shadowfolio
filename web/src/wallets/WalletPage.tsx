@@ -19,7 +19,8 @@ import { securityPath, walletPath, WALLETS_PATH } from "../routes";
 import { EditableTitle } from "../ui/EditableTitle";
 import { GainText } from "../ui/GainText";
 import { Money } from "../ui/Money";
-import { dateInputValueOf, formatDate, formatDateTime, shortDecimal, todayAsInputValue } from "../ui/format";
+import { Figure } from "../ui/Figure";
+import { dateInputValueOf, formatDate, formatDateTime, formatPercent, shortDecimal, todayAsInputValue } from "../ui/format";
 import { usePage } from "../ui/pagination";
 import { SortableTh } from "../ui/SortableTh";
 import { sorted, SortOrder, useSort } from "../ui/sorting";
@@ -54,12 +55,15 @@ enum HoldingColumn {
   SHARES = "shares",
   COST = "cost",
   VALUE = "value",
+  WEIGHT = "weight",
   TODAY = "today",
   GAIN = "gain",
 }
 const HOLDINGS_DEFAULT_SORT = { key: HoldingColumn.VALUE, order: SortOrder.DESCENDING };
 // Exchange rates are shown to this many decimals in tooltips; the valuation uses the exact rate.
 const RATE_DECIMALS = 4;
+// The effective number of holdings is shown to one decimal, e.g. 1.9.
+const EFFECTIVE_HOLDINGS_DECIMALS = 1;
 
 type Loaded = { wallet: WalletResponse; operations: OperationResponse[]; orders: OrderResponse[] };
 type State = { status: "loading" } | { status: "not-found" } | { status: "error"; message: string } | ({ status: "loaded" } & Loaded);
@@ -289,6 +293,8 @@ function WalletDetails({ wallet, operations, orders, version, onOrdersChanged, o
         {holdings.length === 0 ? (
           <Text c="dimmed">No holdings.</Text>
         ) : (
+          <>
+          <Concentration valuation={valuation} />
           <Table.ScrollContainer minWidth={TABLE_MIN_WIDTH}>
           <Table striped>
             <Table.Thead>
@@ -299,6 +305,7 @@ function WalletDetails({ wallet, operations, orders, version, onOrdersChanged, o
                 {/* Prices are in each listing's currency, so they are not compared. */}
                 <Table.Th ta="right">Price</Table.Th>
                 {holdingTh(HoldingColumn.VALUE, "Value")}
+                {holdingTh(HoldingColumn.WEIGHT, "Weight")}
                 {holdingTh(HoldingColumn.TODAY, "Today")}
                 {holdingTh(HoldingColumn.GAIN, "Gain")}
               </Table.Tr>
@@ -321,6 +328,7 @@ function WalletDetails({ wallet, operations, orders, version, onOrdersChanged, o
             </Table.Tbody>
           </Table>
           </Table.ScrollContainer>
+          </>
         )}
       </div>
 
@@ -423,6 +431,8 @@ function holdingSortValue(column: HoldingColumn, wallet: WalletResponse, valuati
         return Number(wallet.cost_basis[symbol]);
       case HoldingColumn.VALUE:
         return holding ? Number(holding.value_in_wallet_currency) : null;
+      case HoldingColumn.WEIGHT:
+        return holding?.weight_percent != null ? Number(holding.weight_percent) : null;
       case HoldingColumn.TODAY:
         return holding?.day_change != null ? Number(holding.day_change) : null;
       case HoldingColumn.GAIN:
@@ -439,6 +449,7 @@ function HoldingPriceAndValue({ symbol, valuation }: { symbol: string; valuation
     return (
       <>
         <Table.Td ta="right">{valuation.status === "loading" ? <Loader size="xs" /> : "—"}</Table.Td>
+        <Table.Td ta="right">—</Table.Td>
         <Table.Td ta="right">—</Table.Td>
         <Table.Td ta="right">—</Table.Td>
         <Table.Td ta="right">—</Table.Td>
@@ -461,6 +472,7 @@ function HoldingPriceAndValue({ symbol, valuation }: { symbol: string; valuation
       <Table.Td ta="right">
         <Money amount={holding.value_in_wallet_currency} currency={loaded.currency} />
       </Table.Td>
+      <Table.Td ta="right">{percentOrDash(holding.weight_percent)}</Table.Td>
       <Table.Td ta="right">
         {holding.day_change != null ? (
           <GainText amount={holding.day_change} currency={loaded.currency} percent={holding.day_change_percent} />
@@ -472,5 +484,38 @@ function HoldingPriceAndValue({ symbol, valuation }: { symbol: string; valuation
         <GainText amount={holding.gain} currency={loaded.currency} percent={holding.gain_percent} />
       </Table.Td>
     </>
+  );
+}
+
+function percentOrDash(percent: string | null | undefined): string {
+  return percent == null ? "—" : `${formatPercent(percent)}%`;
+}
+
+/**
+ * How spread the wallet is: the share of its value in cash and in its largest holding, and how many equal holdings
+ * would be as diversified, as in Morningstar's X-Ray and most brokers' allocation views.
+ */
+function Concentration({ valuation }: { valuation: ValuationState }) {
+  const loaded = valuation.status === "loaded" ? valuation.valuation : null;
+  const shown = (value: string | null | undefined, text: (value: string) => string) =>
+    valuation.status === "loading" ? <Loader size="xs" /> : value == null ? "—" : text(value);
+  return (
+    <Group gap="xl" mb="md" align="flex-start">
+      <Figure label="Cash" explanation="The share of the wallet's value held as cash: money not invested, and ready for new orders.">
+        {shown(loaded?.cash_weight_percent, (v) => `${formatPercent(v)}%`)}
+      </Figure>
+      <Figure
+        label="Largest holding"
+        explanation="The share of the wallet's value in its biggest holding. Above about 20%, one company's news moves the whole wallet."
+      >
+        {shown(loaded?.largest_weight_percent, (v) => `${formatPercent(v)}%`)}
+      </Figure>
+      <Figure
+        label="Effective holdings"
+        explanation="How many equally sized holdings would be as diversified as these (the inverse of the Herfindahl index of their weights). Ten holdings with most of the money in one count as little more than one."
+      >
+        {shown(loaded?.effective_holdings, (v) => shortDecimal(v, EFFECTIVE_HOLDINGS_DECIMALS))}
+      </Figure>
+    </Group>
   );
 }

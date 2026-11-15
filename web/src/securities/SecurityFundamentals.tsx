@@ -2,6 +2,7 @@ import { Alert, Group, Skeleton, Table, Text, Title } from "@mantine/core";
 
 import { formatAmount, formatCompactAmount, formatDate, formatPercent } from "../ui/format";
 import { ReturnText } from "../ui/GainText";
+import { Figure } from "../ui/Figure";
 import { InfoTip } from "../ui/InfoTip";
 import { CHART_HEIGHT, TABLE_MIN_WIDTH } from "../ui/theme";
 import { EXPLANATIONS } from "./explanations";
@@ -40,22 +41,9 @@ function FundamentalsBody({ symbol, state }: { symbol: string; state: ReturnType
       const latest = years.at(-1);
       const amount = (value: string | null | undefined) => (value == null ? "—" : `${formatCompactAmount(value)} ${currency}`);
       const figure = (label: string, explanation: string, value: string, note?: string) => (
-        <div>
-          <Group gap={4} wrap="nowrap">
-            <Text c="dimmed" size="sm">
-              {label}
-            </Text>
-            <InfoTip topic={label}>{explanation}</InfoTip>
-          </Group>
-          <Text size="xl" fw={600}>
-            {value}
-          </Text>
-          {note && (
-            <Text c="dimmed" size="xs">
-              {note}
-            </Text>
-          )}
-        </div>
+        <Figure label={label} explanation={explanation} note={note}>
+          {value}
+        </Figure>
       );
       return (
         <>
