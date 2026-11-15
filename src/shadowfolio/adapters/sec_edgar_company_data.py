@@ -86,7 +86,7 @@ def _fundamentals(facts: dict[str, Any]) -> Fundamentals:
     for concept in REVENUE_CONCEPTS:  # the first concept wins for a year both report
         revenue = _yearly(gaap, concept, USD) | revenue
     net_income = _yearly(gaap, NET_INCOME_CONCEPT, USD)
-    eps = _yearly(gaap, EPS_DILUTED_CONCEPT, USD_PER_SHARE)
+    eps = _yearly(gaap, EPS_DILUTED_CONCEPT, USD_PER_SHARE, latest_report_only=True)
     periods = sorted(revenue.keys() | net_income.keys() | eps.keys())
     years = tuple(
         FiscalYear(start, end, revenue.get((start, end)), net_income.get((start, end)), eps.get((start, end))) for start, end in periods
@@ -95,6 +95,10 @@ def _fundamentals(facts: dict[str, Any]) -> Fundamentals:
         facts["facts"].get(DEI, {}).get(SHARES_CONCEPT, {}).get("units", {}).get(SHARES, []), key=lambda fact: (fact["end"], fact["filed"])
     )
     latest = shares[-1] if shares else None
+    # A count from before the last fiscal year is stale: companies with several share classes stop reporting a single
+    # one on the cover page (Berkshire's ends in 2011), and an old count would give a wrong market cap.
+    if latest is not None and years and date.fromisoformat(latest["end"]) < years[-1].start:
+        latest = None
     return Fundamentals(
         company_name=facts["entityName"],
         currency=Currency.USD,
@@ -104,9 +108,12 @@ def _fundamentals(facts: dict[str, Any]) -> Fundamentals:
     )
 
 
-def _yearly(gaap: dict[str, Any], concept: str, unit: str) -> dict[tuple[date, date], Decimal]:
-    """A concept's value for each fiscal year in annual reports, by (start, end); the latest filing wins."""
+def _yearly(gaap: dict[str, Any], concept: str, unit: str, latest_report_only: bool = False) -> dict[tuple[date, date], Decimal]:
+    """A concept's value for each fiscal year in annual reports, by (start, end); the latest filing wins. With
+    `latest_report_only`, only the years in the latest annual report (e.g. per-share figures, which earlier reports
+    give from before later splits)."""
     values: dict[tuple[date, date], Decimal] = {}
+    filed: dict[tuple[date, date], str] = {}
     facts = gaap.get(concept, {}).get("units", {}).get(unit, [])
     for fact in sorted(facts, key=lambda fact: fact["filed"]):
         if fact.get("form") != ANNUAL_FORM or fact.get("fp") != ANNUAL_PERIOD or "start" not in fact:
@@ -114,4 +121,8 @@ def _yearly(gaap: dict[str, Any], concept: str, unit: str) -> dict[tuple[date, d
         start, end = date.fromisoformat(fact["start"]), date.fromisoformat(fact["end"])
         if (end - start).days in FISCAL_YEAR_DAYS:
             values[(start, end)] = Decimal(fact["val"])
+            filed[(start, end)] = fact["filed"]
+    if latest_report_only and filed:
+        latest = max(filed.values())
+        return {period: value for period, value in values.items() if filed[period] == latest}
     return values

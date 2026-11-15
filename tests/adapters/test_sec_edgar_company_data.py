@@ -30,7 +30,7 @@ def entry(start: str, end: str, value: float | int, form: str = "10-K", fp: str 
     return {"start": start, "end": end, "val": value, "form": form, "fp": fp, "filed": filed}
 
 
-FACTS = {
+FACTS: dict[str, Any] = {
     "entityName": "NVIDIA CORP",
     "facts": {
         "us-gaap": {
@@ -53,7 +53,14 @@ FACTS = {
                 "units": {"USD": [entry("2024-01-29", "2025-01-26", 72880000000), entry("2025-01-27", "2026-01-25", 120067000000)]}
             },
             "EarningsPerShareDiluted": {
-                "units": {"USD/shares": [entry("2024-01-29", "2025-01-26", 2.94), entry("2025-01-27", "2026-01-25", 4.9)]}
+                "units": {
+                    "USD/shares": [
+                        # Last reported before a later split, so not comparable with the others: left out.
+                        entry("2023-01-30", "2024-01-28", 11.93, filed="2024-02-21"),
+                        entry("2024-01-29", "2025-01-26", 2.94),
+                        entry("2025-01-27", "2026-01-25", 4.9),
+                    ]
+                }
             },
         },
         "dei": {
@@ -84,6 +91,7 @@ def edgar(
 
 
 def test_yearly_results_come_from_annual_reports_the_latest_filing_winning() -> None:
+    """EPS only for the years in the latest annual report: older figures were not restated for later splits."""
     seen: list[httpx2.Request] = []
 
     fundamentals = edgar(seen).fundamentals("NVDA")
@@ -99,6 +107,26 @@ def test_yearly_results_come_from_annual_reports_the_latest_filing_winning() -> 
     # The company is found by its ticker, and every request says who is asking, as EDGAR requires.
     assert seen[1].url.path == "/api/xbrl/companyfacts/CIK0001045810.json"
     assert {request.headers["User-Agent"] for request in seen} == {CONTACT}
+
+
+def test_a_share_count_older_than_the_last_fiscal_year_is_not_used() -> None:
+    # As for companies with several share classes, whose cover page counts stopped long ago (Berkshire's in 2011).
+    stale = {
+        **FACTS,
+        "facts": {
+            **FACTS["facts"],
+            "dei": {
+                "EntityCommonStockSharesOutstanding": {"units": {"shares": [{"end": "2011-04-29", "val": 941481, "filed": "2011-05-06"}]}}
+            },
+        },
+    }
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        return httpx2.Response(200, text=json.dumps(TICKERS if request.url.path.endswith("company_tickers.json") else stale))
+
+    fundamentals = SecEdgarCompanyData(CONTACT, FixedClock(NOW), transport=httpx2.MockTransport(handler)).fundamentals("NVDA")
+
+    assert fundamentals is not None and (fundamentals.shares_outstanding, fundamentals.shares_as_of) == (None, None)
 
 
 def test_a_share_class_is_found_with_edgars_dash() -> None:

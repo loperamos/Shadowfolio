@@ -55,8 +55,8 @@ function FundamentalsBody({ symbol, state }: { symbol: string; state: ReturnType
         <>
           <Text mb="sm">{company_name}</Text>
           <Group gap="xl" mb="md">
-            {figure("P/E", pe ?? "—", "Price against the last fiscal year's diluted EPS")}
-            {figure("Market cap", amount(market_cap))}
+            {figure("P/E", pe ?? "—", pe == null ? "No positive diluted EPS for the last fiscal year" : "Price against the last fiscal year's diluted EPS")}
+            {figure("Market cap", amount(market_cap), market_cap == null ? "No single, recent share count (e.g. several share classes)" : undefined)}
             {figure("Shares outstanding", shares_outstanding == null ? "—" : formatCompactAmount(shares_outstanding), shares_as_of ? `As of ${formatDate(shares_as_of)}` : undefined)}
             {latest && figure("Revenue", amount(latest.revenue), `Fiscal year to ${formatDate(latest.end)}`)}
             {latest && figure("Net income", amount(latest.net_income), `Fiscal year to ${formatDate(latest.end)}`)}
@@ -90,7 +90,8 @@ function FundamentalsBody({ symbol, state }: { symbol: string; state: ReturnType
             </Table.ScrollContainer>
           )}
           <Text c="dimmed" size="sm" mt="xs">
-            As reported to the US SEC in annual reports (10-K), through SEC EDGAR.
+            As reported to the US SEC in annual reports (10-K), through SEC EDGAR. EPS only for the years in the latest
+            report: earlier ones are not restated for later stock splits.
           </Text>
         </>
       );
