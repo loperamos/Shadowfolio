@@ -9,6 +9,7 @@ import { BenchmarkField } from "./BenchmarkField";
 import { PerformanceTable } from "./PerformanceTable";
 import type { DayRange } from "./period";
 import { usePerformance } from "./usePerformance";
+import { WalletContributions } from "./WalletContributions";
 
 type Props = {
   walletId: string;
@@ -46,7 +47,7 @@ function PerformanceBody({ state, currency }: { state: ReturnType<typeof usePerf
         </Alert>
       );
     case "loaded": {
-      const { wallet, benchmark, benchmark_symbol, trading } = state.comparison;
+      const { wallet, benchmark, benchmark_symbol, trading, contributions, other_gain } = state.comparison;
       if (wallet === null) {
         return <Text c="dimmed">Nothing could be valued in this period.</Text>;
       }
@@ -65,6 +66,7 @@ function PerformanceBody({ state, currency }: { state: ReturnType<typeof usePerf
             ]}
           />
           <Trading trading={trading} currency={currency} />
+          <WalletContributions contributions={contributions} otherGain={other_gain} currency={currency} />
         </>
       );
     }

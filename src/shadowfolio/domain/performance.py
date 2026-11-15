@@ -9,12 +9,12 @@ Both run from the value at the end of the day before the period (or its first va
 Days that could not be valued are skipped: money moved on them counts at the next valued day.
 """
 
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, date, timedelta
 from decimal import Decimal
 
-from shadowfolio.domain.operations import Buy, Fee, Operation, Sell
+from shadowfolio.domain.operations import Buy, Dividend, Fee, ImportedDividend, Operation, Sell, SharesReceived
 
 DAYS_PER_YEAR = 365
 # Bounds for the daily money-weighted rate (-99% to +100% a day) and how closely it is solved.
@@ -170,3 +170,46 @@ def trading_activity(operations: Iterable[Operation], values: Sequence[DayValue]
     valued = [point.value for point in values if start <= point.day <= end and point.value is not None]
     average = sum(valued, Decimal(0)) / len(valued) if valued else None
     return TradingActivity(bought, sold, fees, average)
+
+
+@dataclass(frozen=True)
+class Contribution:
+    """What one holding brought to the wallet's gain over a period, in the wallet's currency."""
+
+    symbol: str
+    start_value: Decimal  # at the end of the day the period starts from; 0 when not held then
+    end_value: Decimal  # at the end of its last day; 0 when sold out by then
+    gain: Decimal  # end value - start value, plus what it paid in (sells, dividends) less what it cost (buys, fees)
+
+
+def contributions(
+    operations: Iterable[Operation], start_values: Mapping[str, Decimal], end_values: Mapping[str, Decimal], start_day: date, end_day: date
+) -> tuple[Contribution, ...]:
+    """Each holding's gain from the end of `start_day` to the end of `end_day`, given each holding's value then, and
+    the operations between: largest first. Together they make the wallet's gain, but for what no holding brought (e.g.
+    fees charged on their own)."""
+    moved: dict[str, Decimal] = {}
+    for op in operations:
+        symbol = _symbol(op)
+        if symbol is not None and start_day < op.timestamp.astimezone(UTC).date() <= end_day:
+            moved[symbol] = moved.get(symbol, Decimal(0)) + op.cash_delta
+    symbols = start_values.keys() | end_values.keys() | moved.keys()
+    found = (
+        Contribution(
+            symbol,
+            start_values.get(symbol, Decimal(0)),
+            end_values.get(symbol, Decimal(0)),
+            end_values.get(symbol, Decimal(0)) - start_values.get(symbol, Decimal(0)) + moved.get(symbol, Decimal(0)),
+        )
+        for symbol in symbols
+    )
+    return tuple(sorted(found, key=lambda contribution: (-contribution.gain, contribution.symbol)))
+
+
+def _symbol(op: Operation) -> str | None:
+    """The holding an operation moves money or shares for; None for one tied to no holding (deposits, fees, ...)."""
+    if isinstance(op, Buy | Sell):
+        return op.trade.symbol
+    if isinstance(op, Dividend | ImportedDividend | SharesReceived):
+        return op.symbol
+    return None

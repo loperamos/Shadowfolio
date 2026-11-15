@@ -488,6 +488,16 @@ class TradingActivityResponse(BaseModel):
         )
 
 
+class ContributionResponse(BaseModel):
+    """What one holding brought to the wallet's gain over the period, in the wallet's currency."""
+
+    symbol: str
+    start_value: Decimal  # 0 when not held at the start
+    end_value: Decimal  # 0 when sold out by the end
+    gain: Decimal
+    gain_percent: Decimal | None  # of the wallet's average value over the period
+
+
 class PerformanceComparisonResponse(BaseModel):
     """How the wallet did over a period next to `benchmark_symbol` with the same deposits; null when nothing in the
     period could be valued."""
@@ -499,6 +509,8 @@ class PerformanceComparisonResponse(BaseModel):
     wallet_returns: list[DailyReturnResponse]
     benchmark_returns: list[DailyReturnResponse]
     trading: TradingActivityResponse
+    contributions: list[ContributionResponse]  # largest gain first; empty when nothing could be valued
+    other_gain: Decimal | None  # the wallet's gain no holding brought, e.g. fees charged on their own
 
     @classmethod
     def from_comparison(cls, comparison: PerformanceComparison) -> "PerformanceComparisonResponse":
@@ -509,6 +521,17 @@ class PerformanceComparisonResponse(BaseModel):
             wallet_returns=_daily_returns(comparison.wallet_returns),
             benchmark_returns=_daily_returns(comparison.benchmark_returns),
             trading=TradingActivityResponse.from_activity(comparison.trading),
+            contributions=[
+                ContributionResponse(
+                    symbol=c.symbol,
+                    start_value=_cents(c.start_value),
+                    end_value=_cents(c.end_value),
+                    gain=_cents(c.gain),
+                    gain_percent=_ratio_percent(c.gain / average) if (average := comparison.trading.average_value) else None,
+                )
+                for c in comparison.contributions
+            ],
+            other_gain=_optional_cents(comparison.other_gain),
         )
 
 
