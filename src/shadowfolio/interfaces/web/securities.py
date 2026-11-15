@@ -6,7 +6,13 @@ from fastapi import APIRouter, HTTPException
 
 from shadowfolio.domain.errors import DomainError
 from shadowfolio.interfaces.web.errors import INVALID, NOT_FOUND, rule_violation
-from shadowfolio.interfaces.web.schemas import ArticleResponse, FundamentalsResponse, SecurityRangesResponse
+from shadowfolio.interfaces.web.schemas import (
+    ArticleResponse,
+    CalendarResponse,
+    DividendResponse,
+    FundamentalsResponse,
+    SecurityRangesResponse,
+)
 from shadowfolio.usecases.securities import Securities
 
 
@@ -37,6 +43,21 @@ def securities_router(securities: Securities) -> APIRouter:
             ArticleResponse(headline=a.headline, summary=a.summary, source=a.source, url=a.url, published_at=a.published_at)
             for a in articles
         ]
+
+    @router.get("/securities/{symbol}/calendar", responses=INVALID)
+    def security_calendar(symbol: str) -> CalendarResponse:
+        """What is announced ahead: the next dividend whose ex-date is still to come."""
+        try:
+            dividend = securities.next_ex_dividend(symbol.strip().upper())
+        except DomainError as error:
+            raise rule_violation(error) from error
+        if dividend is None:
+            return CalendarResponse(next_ex_dividend=None)
+        return CalendarResponse(
+            next_ex_dividend=DividendResponse(
+                ex_date=dividend.ex_date, payable_date=dividend.payable_date, per_share=dividend.per_share, currency=dividend.currency
+            )
+        )
 
     @router.get("/securities/{symbol}/ranges", responses=INVALID)
     def security_ranges(symbol: str, start: date | None = None, end: date | None = None) -> SecurityRangesResponse:

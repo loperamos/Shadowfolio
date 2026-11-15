@@ -96,6 +96,15 @@ export type BuyEdit = {
 };
 
 /**
+ * CalendarResponse
+ *
+ * What is announced ahead for a security.
+ */
+export type CalendarResponse = {
+    next_ex_dividend: DividendResponse | null;
+};
+
+/**
  * CashMovementRequest
  *
  * A deposit or a withdrawal.
@@ -259,6 +268,25 @@ export type DepositEdit = {
      * Type
      */
     type: 'deposit';
+};
+
+/**
+ * DividendResponse
+ */
+export type DividendResponse = {
+    /**
+     * Ex Date
+     */
+    ex_date: string;
+    /**
+     * Payable Date
+     */
+    payable_date: string | null;
+    /**
+     * Per Share
+     */
+    per_share: string;
+    currency: Currency;
 };
 
 /**
@@ -2385,6 +2413,36 @@ export type SecurityNewsResponses = {
 };
 
 export type SecurityNewsResponse = SecurityNewsResponses[keyof SecurityNewsResponses];
+
+export type SecurityCalendarData = {
+    body?: never;
+    path: {
+        /**
+         * Symbol
+         */
+        symbol: string;
+    };
+    query?: never;
+    url: '/api/securities/{symbol}/calendar';
+};
+
+export type SecurityCalendarErrors = {
+    /**
+     * Malformed request or broken business rule
+     */
+    422: ErrorResponse;
+};
+
+export type SecurityCalendarError = SecurityCalendarErrors[keyof SecurityCalendarErrors];
+
+export type SecurityCalendarResponses = {
+    /**
+     * Successful Response
+     */
+    200: CalendarResponse;
+};
+
+export type SecurityCalendarResponse = SecurityCalendarResponses[keyof SecurityCalendarResponses];
 
 export type SecurityRangesData = {
     body?: never;
