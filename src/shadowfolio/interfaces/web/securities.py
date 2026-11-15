@@ -12,6 +12,7 @@ from shadowfolio.interfaces.web.schemas import (
     DividendResponse,
     FundamentalsResponse,
     SecurityRangesResponse,
+    SecurityStatisticsResponse,
 )
 from shadowfolio.usecases.securities import Securities
 
@@ -43,6 +44,16 @@ def securities_router(securities: Securities) -> APIRouter:
             ArticleResponse(headline=a.headline, summary=a.summary, source=a.source, url=a.url, published_at=a.published_at)
             for a in articles
         ]
+
+    @router.get("/securities/{symbol}/statistics", responses=INVALID)
+    def security_statistics(symbol: str, start: date | None = None, end: date | None = None) -> SecurityStatisticsResponse:
+        """How the price moved: its trend over the last 3, 6 and 12 months, and from `start` to `end` (as for the
+        closes) its volatility, deepest fall and beta against the market. A description of the past, not a signal."""
+        try:
+            statistics = securities.statistics(symbol.strip().upper(), start, end)
+        except DomainError as error:
+            raise rule_violation(error) from error
+        return SecurityStatisticsResponse.from_statistics(statistics)
 
     @router.get("/securities/{symbol}/calendar", responses=INVALID)
     def security_calendar(symbol: str) -> CalendarResponse:

@@ -1824,6 +1824,80 @@
         }
       }
     },
+    "/api/securities/{symbol}/statistics": {
+      "get": {
+        "summary": "Security Statistics",
+        "description": "How the price moved: its trend over the last 3, 6 and 12 months, and from `start` to `end` (as for the\ncloses) its volatility, deepest fall and beta against the market. A description of the past, not a signal.",
+        "operationId": "security_statistics",
+        "parameters": [
+          {
+            "name": "symbol",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Symbol"
+            }
+          },
+          {
+            "name": "start",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start"
+            }
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SecurityStatisticsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Malformed request or broken business rule",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/securities/{symbol}/calendar": {
       "get": {
         "summary": "Security Calendar",
@@ -3820,6 +3894,92 @@
         ],
         "title": "SecurityRangesResponse",
         "description": "Where the price and the P/E stand within their lows and highs over a period; null without them."
+      },
+      "SecurityStatisticsResponse": {
+        "properties": {
+          "three_month_return": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Three Month Return"
+          },
+          "six_month_return": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Six Month Return"
+          },
+          "one_year_return": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "One Year Return"
+          },
+          "volatility_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Volatility Percent"
+          },
+          "max_drawdown_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Drawdown Percent"
+          },
+          "beta": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Beta"
+          },
+          "benchmark_symbol": {
+            "type": "string",
+            "title": "Benchmark Symbol"
+          }
+        },
+        "type": "object",
+        "required": [
+          "three_month_return",
+          "six_month_return",
+          "one_year_return",
+          "volatility_percent",
+          "max_drawdown_percent",
+          "beta",
+          "benchmark_symbol"
+        ],
+        "title": "SecurityStatisticsResponse",
+        "description": "How the price moved, in percent: its trend back from today, and over the period asked for its volatility (over\na year), deepest fall and beta against `benchmark_symbol`. Each null without enough closes."
       },
       "SellEdit": {
         "properties": {

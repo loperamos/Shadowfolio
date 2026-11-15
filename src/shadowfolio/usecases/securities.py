@@ -8,6 +8,7 @@ from shadowfolio.domain.company import Fundamentals, ValueRange, pe_by_day
 from shadowfolio.domain.corporate_actions import DividendEvent
 from shadowfolio.domain.errors import CompanyDataUnavailableNowError, CorporateActionsUnavailableNowError, NewsUnavailableNowError
 from shadowfolio.domain.news import Article
+from shadowfolio.domain.statistics import beta, change_since, max_drawdown, volatility
 from shadowfolio.domain.valuation import Quote
 from shadowfolio.ports.clock import Clock
 from shadowfolio.ports.company_data import CompanyData, CompanyDataUnavailableError
@@ -31,6 +32,25 @@ class CompanyFigures:
 NEWS_LIMIT = 10
 # How far ahead announced dividends are looked for: companies announce them weeks, at most months, before.
 DIVIDENDS_AHEAD = timedelta(days=365)
+# The trend: the change over each of these, back from today; and the benchmark that beta is measured against.
+THREE_MONTHS, SIX_MONTHS, ONE_YEAR = timedelta(days=91), timedelta(days=182), timedelta(days=365)
+# A few days more than a year of closes, so the close a year back is there even after a weekend or a holiday.
+TREND_HISTORY = ONE_YEAR + timedelta(days=7)
+BETA_BENCHMARK = "SPY"
+
+
+@dataclass(frozen=True)
+class SecurityStatistics:
+    """How the price moved: its trend back from today, and over a period how much it swung, its deepest fall and its
+    beta against `benchmark_symbol`. Ratios (0.27 for +27%); None when there are not enough closes."""
+
+    three_months: Decimal | None
+    six_months: Decimal | None
+    one_year: Decimal | None
+    volatility: Decimal | None
+    max_drawdown: Decimal | None
+    beta: Decimal | None
+    benchmark_symbol: str
 
 
 @dataclass(frozen=True)
@@ -51,6 +71,23 @@ class Securities:
         self._market = market
         self._corporate_actions = corporate_actions
         self._clock = clock
+
+    def statistics(self, symbol: str, start: date | None = None, end: date | None = None) -> SecurityStatistics:
+        """The trend over the last 3, 6 and 12 months, and from `start` to `end` (as for its closes) the volatility, the
+        deepest fall and the beta against the benchmark (see domain.statistics)."""
+        today = self._clock.now().date()
+        closes = _days(self._market.closes(symbol, start, end))
+        benchmark = _days(self._market.closes(BETA_BENCHMARK, start, end))
+        recent = _days(self._market.closes(symbol, today - TREND_HISTORY, today))
+        return SecurityStatistics(
+            three_months=change_since(recent, today - THREE_MONTHS),
+            six_months=change_since(recent, today - SIX_MONTHS),
+            one_year=change_since(recent, today - ONE_YEAR),
+            volatility=volatility(closes),
+            max_drawdown=max_drawdown(closes),
+            beta=beta(closes, benchmark),
+            benchmark_symbol=BETA_BENCHMARK,
+        )
 
     def next_ex_dividend(self, symbol: str) -> DividendEvent | None:
         """The next dividend announced whose ex-date is still ahead (from today on): shares held before it starts
@@ -97,3 +134,7 @@ class Securities:
         if quote is None or quote.currency is not fundamentals.currency:
             return CompanyFigures(fundamentals, quote, None, None)
         return CompanyFigures(fundamentals, quote, fundamentals.pe(quote.price), fundamentals.market_cap(quote.price))
+
+
+def _days(closes: list[Quote]) -> list[tuple[date, Decimal]]:
+    return [(close.as_of.date(), close.price) for close in closes]

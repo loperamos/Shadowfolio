@@ -984,6 +984,43 @@ export type SecurityRangesResponse = {
 };
 
 /**
+ * SecurityStatisticsResponse
+ *
+ * How the price moved, in percent: its trend back from today, and over the period asked for its volatility (over
+ * a year), deepest fall and beta against `benchmark_symbol`. Each null without enough closes.
+ */
+export type SecurityStatisticsResponse = {
+    /**
+     * Three Month Return
+     */
+    three_month_return: string | null;
+    /**
+     * Six Month Return
+     */
+    six_month_return: string | null;
+    /**
+     * One Year Return
+     */
+    one_year_return: string | null;
+    /**
+     * Volatility Percent
+     */
+    volatility_percent: string | null;
+    /**
+     * Max Drawdown Percent
+     */
+    max_drawdown_percent: string | null;
+    /**
+     * Beta
+     */
+    beta: string | null;
+    /**
+     * Benchmark Symbol
+     */
+    benchmark_symbol: string;
+};
+
+/**
  * SellEdit
  */
 export type SellEdit = {
@@ -2413,6 +2450,45 @@ export type SecurityNewsResponses = {
 };
 
 export type SecurityNewsResponse = SecurityNewsResponses[keyof SecurityNewsResponses];
+
+export type SecurityStatisticsData = {
+    body?: never;
+    path: {
+        /**
+         * Symbol
+         */
+        symbol: string;
+    };
+    query?: {
+        /**
+         * Start
+         */
+        start?: string | null;
+        /**
+         * End
+         */
+        end?: string | null;
+    };
+    url: '/api/securities/{symbol}/statistics';
+};
+
+export type SecurityStatisticsErrors = {
+    /**
+     * Malformed request or broken business rule
+     */
+    422: ErrorResponse;
+};
+
+export type SecurityStatisticsError = SecurityStatisticsErrors[keyof SecurityStatisticsErrors];
+
+export type SecurityStatisticsResponses = {
+    /**
+     * Successful Response
+     */
+    200: SecurityStatisticsResponse;
+};
+
+export type SecurityStatisticsResponse2 = SecurityStatisticsResponses[keyof SecurityStatisticsResponses];
 
 export type SecurityCalendarData = {
     body?: never;

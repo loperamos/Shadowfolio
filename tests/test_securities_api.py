@@ -184,3 +184,48 @@ def test_the_calendar_gives_the_next_ex_dividend_date_announced() -> None:
         "next_ex_dividend": {"ex_date": "2026-11-19", "payable_date": "2026-12-10", "per_share": "0.98", "currency": "USD"}
     }
     assert client.get("/api/securities/NVDA/calendar").json() == {"next_ex_dividend": None}
+
+
+def test_statistics_describe_the_trend_and_how_much_the_price_swings() -> None:
+    """Over the period chosen: volatility (daily moves, a year's worth), the deepest fall from a high, and beta against
+    SPY (how much it moves when the market does). The trend is the change over the last 3, 6 and 12 months, whatever
+    the period."""
+    prices = InMemoryPriceData()
+
+    def close(symbol: str, day: date, price: str) -> None:
+        prices.add_close(symbol, Quote(Decimal(price), Currency.USD, datetime(day.year, day.month, day.day, 21, 0, tzinfo=UTC)))
+
+    week = [date(2026, 3, 2), date(2026, 3, 3), date(2026, 3, 4), date(2026, 3, 5)]
+    # SPY moves +1%, -1%, +1%; the stock exactly twice as much each day: +2%, -2%, +2%.
+    for day, spy, stock in zip(week, ["100", "101", "99.99", "100.9899"], ["100", "102", "99.96", "101.9592"], strict=True):
+        close("SPY", day, spy)
+        close("ACME", day, stock)
+    close("ACME", date(2025, 9, 5), "50")  # 6 months before
+    close("ACME", date(2025, 12, 5), "80")  # 3 months before
+    clock = FixedClock(datetime(2026, 3, 6, 12, 0, tzinfo=UTC))
+    client = TestClient(build_test_app(clock=clock, prices=prices))
+
+    result = client.get("/api/securities/acme/statistics", params={"start": "2026-03-02"}).json()
+
+    # Daily moves of +2%, -2%, +2%: a standard deviation of 2.31%, times the square root of 252 trading days.
+    assert (result["volatility_percent"], result["max_drawdown_percent"], result["beta"], result["benchmark_symbol"]) == (
+        "36.66",
+        "-2.00",  # from 102 down to 99.96
+        "2.00",
+        "SPY",
+    )
+    # 101.9592 against 80 three months before and 50 six months before; nothing a year before.
+    assert (result["three_month_return"], result["six_month_return"], result["one_year_return"]) == ("27.45", "103.92", None)
+
+
+def test_without_enough_closes_the_statistics_are_unknown() -> None:
+    client = TestClient(build_test_app(prices=InMemoryPriceData()))
+
+    result = client.get("/api/securities/ZZZZ/statistics").json()
+
+    assert (result["volatility_percent"], result["max_drawdown_percent"], result["beta"], result["three_month_return"]) == (
+        None,
+        None,
+        None,
+        None,
+    )

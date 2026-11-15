@@ -33,7 +33,7 @@ from shadowfolio.domain.wallet import Wallet
 from shadowfolio.usecases.comparison import PerformanceComparison
 from shadowfolio.usecases.imports import ImportReport
 from shadowfolio.usecases.orders import OrderEstimate, OrderOutcome
-from shadowfolio.usecases.securities import CompanyFigures, SecurityRanges
+from shadowfolio.usecases.securities import CompanyFigures, SecurityRanges, SecurityStatistics
 
 
 class CreateWalletRequest(BaseModel):
@@ -820,3 +820,28 @@ class CalendarResponse(BaseModel):
     """What is announced ahead for a security."""
 
     next_ex_dividend: DividendResponse | None  # null when none is announced
+
+
+class SecurityStatisticsResponse(BaseModel):
+    """How the price moved, in percent: its trend back from today, and over the period asked for its volatility (over
+    a year), deepest fall and beta against `benchmark_symbol`. Each null without enough closes."""
+
+    three_month_return: Decimal | None
+    six_month_return: Decimal | None
+    one_year_return: Decimal | None
+    volatility_percent: Decimal | None
+    max_drawdown_percent: Decimal | None  # negative, or 0 when it never fell
+    beta: Decimal | None
+    benchmark_symbol: str
+
+    @classmethod
+    def from_statistics(cls, statistics: SecurityStatistics) -> "SecurityStatisticsResponse":
+        return cls(
+            three_month_return=_ratio_percent(statistics.three_months),
+            six_month_return=_ratio_percent(statistics.six_months),
+            one_year_return=_ratio_percent(statistics.one_year),
+            volatility_percent=_ratio_percent(statistics.volatility),
+            max_drawdown_percent=_ratio_percent(statistics.max_drawdown),
+            beta=None if statistics.beta is None else statistics.beta.quantize(CENT, rounding=ROUND_HALF_EVEN),
+            benchmark_symbol=statistics.benchmark_symbol,
+        )
