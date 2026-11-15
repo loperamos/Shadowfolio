@@ -21,9 +21,7 @@ def market_router(market: Market) -> APIRouter:
             raise rule_violation(error) from error
         if quote is None:
             raise HTTPException(status_code=404, detail=f"no price for {symbol}")
-        return QuoteResponse(
-            symbol=symbol, price=quote.price, currency=quote.currency, as_of=quote.as_of, previous_close=quote.previous_close
-        )
+        return QuoteResponse.from_quote(symbol, quote)
 
     @router.get("/market/closes/{symbol}", responses=INVALID)
     def daily_closes(symbol: str, start: date | None = None, end: date | None = None) -> list[DailyCloseResponse]:

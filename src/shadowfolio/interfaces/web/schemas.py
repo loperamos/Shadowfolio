@@ -26,7 +26,7 @@ from shadowfolio.domain.operations import (
 )
 from shadowfolio.domain.orders import Order, OrderSide, OrderStatus
 from shadowfolio.domain.performance import Performance
-from shadowfolio.domain.valuation import DailyValue, WalletValuation
+from shadowfolio.domain.valuation import DailyValue, Quote, WalletValuation
 from shadowfolio.domain.wallet import Wallet
 from shadowfolio.usecases.comparison import PerformanceComparison
 from shadowfolio.usecases.imports import ImportReport
@@ -543,6 +543,20 @@ class QuoteResponse(BaseModel):
     currency: Currency
     as_of: AwareDatetime
     previous_close: Decimal | None
+    day_change: Decimal | None  # since the previous close; null without one
+    day_change_percent: Decimal | None
+
+    @classmethod
+    def from_quote(cls, symbol: str, quote: Quote) -> "QuoteResponse":
+        return cls(
+            symbol=symbol,
+            price=quote.price,
+            currency=quote.currency,
+            as_of=quote.as_of,
+            previous_close=quote.previous_close,
+            day_change=quote.change,
+            day_change_percent=_ratio_percent(quote.change_ratio),
+        )
 
 
 class DailyCloseResponse(BaseModel):

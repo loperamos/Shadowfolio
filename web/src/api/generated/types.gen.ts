@@ -125,6 +125,21 @@ export const Currency = { USD: 'USD', EUR: 'EUR' } as const;
 export type Currency = typeof Currency[keyof typeof Currency];
 
 /**
+ * DailyCloseResponse
+ */
+export type DailyCloseResponse = {
+    /**
+     * Day
+     */
+    day: string;
+    /**
+     * Close
+     */
+    close: string;
+    currency: Currency;
+};
+
+/**
  * DailyReturnResponse
  */
 export type DailyReturnResponse = {
@@ -661,6 +676,14 @@ export type QuoteResponse = {
      * Previous Close
      */
     previous_close: string | null;
+    /**
+     * Day Change
+     */
+    day_change: string | null;
+    /**
+     * Day Change Percent
+     */
+    day_change_percent: string | null;
 };
 
 /**
@@ -1485,6 +1508,47 @@ export type LatestQuoteResponses = {
 };
 
 export type LatestQuoteResponse = LatestQuoteResponses[keyof LatestQuoteResponses];
+
+export type DailyClosesData = {
+    body?: never;
+    path: {
+        /**
+         * Symbol
+         */
+        symbol: string;
+    };
+    query?: {
+        /**
+         * Start
+         */
+        start?: string | null;
+        /**
+         * End
+         */
+        end?: string | null;
+    };
+    url: '/api/market/closes/{symbol}';
+};
+
+export type DailyClosesErrors = {
+    /**
+     * Malformed request or broken business rule
+     */
+    422: ErrorResponse;
+};
+
+export type DailyClosesError = DailyClosesErrors[keyof DailyClosesErrors];
+
+export type DailyClosesResponses = {
+    /**
+     * Response Daily Closes
+     *
+     * Successful Response
+     */
+    200: Array<DailyCloseResponse>;
+};
+
+export type DailyClosesResponse = DailyClosesResponses[keyof DailyClosesResponses];
 
 export type SyncAllWalletsData = {
     body?: never;

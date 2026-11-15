@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { BenchmarkDailyData, BenchmarkDailyErrors, BenchmarkDailyResponses, CancelOrderData, CancelOrderErrors, CancelOrderResponses, CopyWalletData, CopyWalletErrors, CopyWalletResponses, CreateWalletData, CreateWalletErrors, CreateWalletResponses, DailyValuationData, DailyValuationErrors, DailyValuationResponses, DeleteOperationData, DeleteOperationErrors, DeleteOperationResponses, DeleteWalletData, DeleteWalletErrors, DeleteWalletResponses, DepositData, DepositErrors, DepositResponses, EditOperationData, EditOperationErrors, EditOperationResponses, FillAllOrdersData, FillAllOrdersResponses, GetWalletData, GetWalletErrors, GetWalletResponses, ImportDegiroData, ImportDegiroErrors, ImportDegiroResponses, LatestQuoteData, LatestQuoteErrors, LatestQuoteResponses, ListOperationsData, ListOperationsErrors, ListOperationsResponses, ListOrdersData, ListOrdersErrors, ListOrdersResponses, ListWalletsData, ListWalletsResponses, PlaceOrderData, PlaceOrderErrors, PlaceOrderResponses, PreviewDegiroImportData, PreviewDegiroImportErrors, PreviewDegiroImportResponses, RecordBuyData, RecordBuyErrors, RecordBuyResponses, RecordSellData, RecordSellErrors, RecordSellResponses, SyncAllWalletsData, SyncAllWalletsErrors, SyncAllWalletsResponses, UpdateWalletData, UpdateWalletErrors, UpdateWalletResponses, WalletPerformanceData, WalletPerformanceErrors, WalletPerformanceResponses, WalletValuationData, WalletValuationErrors, WalletValuationResponses, WithdrawData, WithdrawErrors, WithdrawResponses } from './types.gen';
+import type { BenchmarkDailyData, BenchmarkDailyErrors, BenchmarkDailyResponses, CancelOrderData, CancelOrderErrors, CancelOrderResponses, CopyWalletData, CopyWalletErrors, CopyWalletResponses, CreateWalletData, CreateWalletErrors, CreateWalletResponses, DailyClosesData, DailyClosesErrors, DailyClosesResponses, DailyValuationData, DailyValuationErrors, DailyValuationResponses, DeleteOperationData, DeleteOperationErrors, DeleteOperationResponses, DeleteWalletData, DeleteWalletErrors, DeleteWalletResponses, DepositData, DepositErrors, DepositResponses, EditOperationData, EditOperationErrors, EditOperationResponses, FillAllOrdersData, FillAllOrdersResponses, GetWalletData, GetWalletErrors, GetWalletResponses, ImportDegiroData, ImportDegiroErrors, ImportDegiroResponses, LatestQuoteData, LatestQuoteErrors, LatestQuoteResponses, ListOperationsData, ListOperationsErrors, ListOperationsResponses, ListOrdersData, ListOrdersErrors, ListOrdersResponses, ListWalletsData, ListWalletsResponses, PlaceOrderData, PlaceOrderErrors, PlaceOrderResponses, PreviewDegiroImportData, PreviewDegiroImportErrors, PreviewDegiroImportResponses, RecordBuyData, RecordBuyErrors, RecordBuyResponses, RecordSellData, RecordSellErrors, RecordSellResponses, SyncAllWalletsData, SyncAllWalletsErrors, SyncAllWalletsResponses, UpdateWalletData, UpdateWalletErrors, UpdateWalletResponses, WalletPerformanceData, WalletPerformanceErrors, WalletPerformanceResponses, WalletValuationData, WalletValuationErrors, WalletValuationResponses, WithdrawData, WithdrawErrors, WithdrawResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -157,6 +157,14 @@ export const dailyValuation = <ThrowOnError extends boolean = false>(options: Op
  * Latest Quote
  */
 export const latestQuote = <ThrowOnError extends boolean = false>(options: Options<LatestQuoteData, ThrowOnError>): RequestResult<LatestQuoteResponses, LatestQuoteErrors, ThrowOnError> => (options.client ?? client).get<LatestQuoteResponses, LatestQuoteErrors, ThrowOnError>({ url: '/api/market/quotes/{symbol}', ...options });
+
+/**
+ * Daily Closes
+ *
+ * The symbol's close on each trading day from `start` (default: ten years before `end`) to `end` (default:
+ * today); empty when market data has none.
+ */
+export const dailyCloses = <ThrowOnError extends boolean = false>(options: Options<DailyClosesData, ThrowOnError>): RequestResult<DailyClosesResponses, DailyClosesErrors, ThrowOnError> => (options.client ?? client).get<DailyClosesResponses, DailyClosesErrors, ThrowOnError>({ url: '/api/market/closes/{symbol}', ...options });
 
 /**
  * Sync All Wallets

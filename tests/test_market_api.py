@@ -25,6 +25,8 @@ def test_latest_quote_for_a_symbol() -> None:
         "currency": "USD",
         "as_of": "2026-03-02T20:59:00Z",
         "previous_close": "133.04",
+        "day_change": "2.46",  # 135.50 - 133.04
+        "day_change_percent": "1.85",
     }
 
 
