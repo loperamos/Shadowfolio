@@ -3,7 +3,7 @@ import { IconSearch } from "@tabler/icons-react";
 import { type FormEvent, useState } from "react";
 import { Link, NavLink, useNavigate } from "react-router";
 
-import { securityPath, WALLETS_PATH } from "./routes";
+import { SECURITIES_COMPARE_PATH, securityPath, WALLETS_PATH } from "./routes";
 import { ICON_SIZE, SEARCH_INPUT_WIDTH } from "./ui/theme";
 
 /**
@@ -34,6 +34,9 @@ export function AppHeader() {
         {/* The current section reads as active (aria-current), as NavLink marks it. */}
         <Anchor component={NavLink} to={WALLETS_PATH} fw={500}>
           Wallets
+        </Anchor>
+        <Anchor component={NavLink} to={SECURITIES_COMPARE_PATH} fw={500}>
+          Compare securities
         </Anchor>
       </Group>
       <form onSubmit={lookUp} role="search">

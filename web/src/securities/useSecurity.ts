@@ -211,3 +211,24 @@ export function useEarnings(symbol: string): EarningsState {
   }, [symbol]);
   return state;
 }
+
+/** Several symbols' closes from `start` to `end` (as `useCloses`), each loading on its own, by symbol. */
+export function useClosesOf(symbols: readonly string[], start: string | null, end: string | null): Record<string, ClosesState> {
+  const [states, setStates] = useState<Record<string, ClosesState>>({});
+  const key = symbols.join();
+  useEffect(() => {
+    let current = true; // ignore answers for symbols or a period we have moved away from
+    const wanted = key ? key.split(",") : [];
+    setStates(Object.fromEntries(wanted.map((symbol) => [symbol, { status: "loading" }])));
+    const settle = (symbol: string, state: ClosesState) => current && setStates((all) => ({ ...all, [symbol]: state }));
+    for (const symbol of wanted) {
+      dailyCloses({ path: { symbol }, query: { start, end } })
+        .then(({ data, error }) => settle(symbol, data ? { status: "loaded", closes: data } : { status: "error", message: apiErrorMessage(error) }))
+        .catch(() => settle(symbol, { status: "error", message: "Could not reach the backend." }));
+    }
+    return () => {
+      current = false;
+    };
+  }, [key, start, end]);
+  return states;
+}
