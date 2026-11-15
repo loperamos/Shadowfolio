@@ -35,6 +35,13 @@ FISCAL_YEAR_DAYS = range(350, 380)
 # The reported concepts read, in US GAAP's taxonomy; revenue under either name, as companies switch.
 REVENUE_CONCEPTS = ("Revenues", "RevenueFromContractWithCustomerExcludingAssessedTax")
 NET_INCOME_CONCEPT = "NetIncomeLoss"
+OPERATING_CASH_FLOW_CONCEPT = "NetCashProvidedByUsedInOperatingActivities"
+# Capital spending, cash and debt also come under more than one name; the first wins for a year both report. Cash
+# with restricted cash is the only one some companies (e.g. Berkshire) report; debt is long-term debt, the part due
+# within a year included.
+CAPITAL_SPENDING_CONCEPTS = ("PaymentsToAcquirePropertyPlantAndEquipment", "PaymentsToAcquireProductiveAssets")
+CASH_CONCEPTS = ("CashAndCashEquivalentsAtCarryingValue", "CashCashEquivalentsRestrictedCashAndRestrictedCashEquivalents")
+DEBT_CONCEPTS = ("LongTermDebt",)
 EPS_DILUTED_CONCEPT = "EarningsPerShareDiluted"
 SHARES_CONCEPT = "EntityCommonStockSharesOutstanding"
 US_GAAP = "us-gaap"
@@ -82,14 +89,27 @@ class SecEdgarCompanyData(CompanyData):
 
 def _fundamentals(facts: dict[str, Any]) -> Fundamentals:
     gaap = facts["facts"].get(US_GAAP, {})
-    revenue: dict[tuple[date, date], Decimal] = {}
-    for concept in REVENUE_CONCEPTS:  # the first concept wins for a year both report
-        revenue = _yearly(gaap, concept, USD) | revenue
+    revenue = _first_reported(gaap, REVENUE_CONCEPTS)
     net_income = _yearly(gaap, NET_INCOME_CONCEPT, USD)
     eps = _yearly(gaap, EPS_DILUTED_CONCEPT, USD_PER_SHARE, latest_report_only=True)
-    periods = sorted(revenue.keys() | net_income.keys() | eps.keys())
+    operating_cash_flow = _yearly(gaap, OPERATING_CASH_FLOW_CONCEPT, USD)
+    capital_spending = _first_reported(gaap, CAPITAL_SPENDING_CONCEPTS)
+    cash = _first_at_year_end(gaap, CASH_CONCEPTS)
+    debt = _first_at_year_end(gaap, DEBT_CONCEPTS)
+    periods = sorted(revenue.keys() | net_income.keys() | eps.keys() | operating_cash_flow.keys() | capital_spending.keys())
     years = tuple(
-        FiscalYear(start, end, revenue.get((start, end)), net_income.get((start, end)), eps.get((start, end))) for start, end in periods
+        FiscalYear(
+            start,
+            end,
+            revenue.get((start, end)),
+            net_income.get((start, end)),
+            eps.get((start, end)),
+            operating_cash_flow.get((start, end)),
+            capital_spending.get((start, end)),
+            cash.get(end),
+            debt.get(end),
+        )
+        for start, end in periods
     )
     shares = sorted(
         facts["facts"].get(DEI, {}).get(SHARES_CONCEPT, {}).get("units", {}).get(SHARES, []), key=lambda fact: (fact["end"], fact["filed"])
@@ -106,6 +126,28 @@ def _fundamentals(facts: dict[str, Any]) -> Fundamentals:
         shares_outstanding=None if latest is None else Decimal(latest["val"]),
         shares_as_of=None if latest is None else date.fromisoformat(latest["end"]),
     )
+
+
+def _first_reported(gaap: dict[str, Any], concepts: tuple[str, ...]) -> dict[tuple[date, date], Decimal]:
+    """A yearly amount companies report under one of `concepts`: the first wins for a year both report."""
+    values: dict[tuple[date, date], Decimal] = {}
+    for concept in concepts:
+        values = _yearly(gaap, concept, USD) | values
+    return values
+
+
+def _first_at_year_end(gaap: dict[str, Any], concepts: tuple[str, ...]) -> dict[date, Decimal]:
+    """A balance sheet amount at each fiscal year's end, from annual reports, under one of `concepts`: the first wins
+    for a date both report, and the latest filing for a date reported again."""
+    values: dict[date, Decimal] = {}
+    for concept in concepts:
+        at_end: dict[date, Decimal] = {}
+        facts = gaap.get(concept, {}).get("units", {}).get(USD, [])
+        for fact in sorted(facts, key=lambda fact: fact["filed"]):
+            if fact.get("form") == ANNUAL_FORM and fact.get("fp") == ANNUAL_PERIOD and "start" not in fact:
+                at_end[date.fromisoformat(fact["end"])] = Decimal(fact["val"])
+        values = at_end | values
+    return values
 
 
 def _yearly(gaap: dict[str, Any], concept: str, unit: str, latest_report_only: bool = False) -> dict[tuple[date, date], Decimal]:

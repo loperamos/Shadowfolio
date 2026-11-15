@@ -2499,6 +2499,61 @@
               }
             ],
             "title": "Net Margin"
+          },
+          "operating_cash_flow": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operating Cash Flow"
+          },
+          "capital_spending": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capital Spending"
+          },
+          "free_cash_flow": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Free Cash Flow"
+          },
+          "cash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cash"
+          },
+          "debt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Debt"
           }
         },
         "type": "object",
@@ -2509,7 +2564,12 @@
           "net_income",
           "eps_diluted",
           "revenue_growth",
-          "net_margin"
+          "net_margin",
+          "operating_cash_flow",
+          "capital_spending",
+          "free_cash_flow",
+          "cash",
+          "debt"
         ],
         "title": "FiscalYearResponse"
       },

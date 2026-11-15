@@ -98,6 +98,53 @@ function FundamentalsBody({ symbol, state }: { symbol: string; state: ReturnType
               </Table>
             </Table.ScrollContainer>
           )}
+          {years.length > 0 && (
+            <>
+              <Title order={3} mt="lg" mb="xs">
+                Cash and debt
+              </Title>
+              <Table.ScrollContainer minWidth={TABLE_MIN_WIDTH}>
+                <Table striped>
+                  <Table.Thead>
+                    <Table.Tr>
+                      <Table.Th>Fiscal year to</Table.Th>
+                      <Table.Th ta="right">
+                        <HeaderWithInfo label="Operating cash flow" explanation={EXPLANATIONS.operatingCashFlow} />
+                      </Table.Th>
+                      <Table.Th ta="right">
+                        <HeaderWithInfo label="Capital spending" explanation={EXPLANATIONS.capitalSpending} />
+                      </Table.Th>
+                      <Table.Th ta="right">
+                        <HeaderWithInfo label="Free cash flow" explanation={EXPLANATIONS.freeCashFlow} />
+                      </Table.Th>
+                      <Table.Th ta="right">
+                        <HeaderWithInfo label="Cash" explanation={EXPLANATIONS.cash} />
+                      </Table.Th>
+                      <Table.Th ta="right">
+                        <HeaderWithInfo label="Debt" explanation={EXPLANATIONS.debt} />
+                      </Table.Th>
+                    </Table.Tr>
+                  </Table.Thead>
+                  <Table.Tbody>
+                    {/* Newest first, the same years as above. */}
+                    {years
+                      .slice(-YEARS_SHOWN)
+                      .reverse()
+                      .map((year) => (
+                        <Table.Tr key={year.end}>
+                          <Table.Td>{formatDate(year.end)}</Table.Td>
+                          <Table.Td ta="right">{amount(year.operating_cash_flow)}</Table.Td>
+                          <Table.Td ta="right">{amount(year.capital_spending)}</Table.Td>
+                          <Table.Td ta="right">{amount(year.free_cash_flow)}</Table.Td>
+                          <Table.Td ta="right">{amount(year.cash)}</Table.Td>
+                          <Table.Td ta="right">{amount(year.debt)}</Table.Td>
+                        </Table.Tr>
+                      ))}
+                  </Table.Tbody>
+                </Table>
+              </Table.ScrollContainer>
+            </>
+          )}
           <Text c="dimmed" size="sm" mt="xs">
             As reported to the US SEC in annual reports (10-K), through SEC EDGAR. EPS only for the years in the latest
             report: earlier ones are not restated for later stock splits.
