@@ -32,7 +32,7 @@ from shadowfolio.domain.valuation import DailyValue, Quote, WalletValuation
 from shadowfolio.domain.wallet import Wallet
 from shadowfolio.usecases.comparison import PerformanceComparison
 from shadowfolio.usecases.imports import ImportReport
-from shadowfolio.usecases.orders import OrderEstimate
+from shadowfolio.usecases.orders import OrderEstimate, OrderOutcome
 from shadowfolio.usecases.securities import CompanyFigures, SecurityRanges
 
 
@@ -484,6 +484,30 @@ class OrderResponse(BaseModel):
             price=None if trade is None else trade.price,
             price_currency=None if trade is None else trade.price_currency,
             rejection=order.rejection,
+        )
+
+
+class OrderOutcomeResponse(BaseModel):
+    """How a filled order turned out since: returns in percent, each in its own currency; null without a price."""
+
+    order_id: UUID
+    price: Decimal | None  # the symbol's latest
+    currency: Currency | None
+    as_of: AwareDatetime | None
+    return_percent: Decimal | None  # from the fill price to the latest
+    benchmark_symbol: str
+    benchmark_return_percent: Decimal | None  # from its first price at or after the fill to its latest
+
+    @classmethod
+    def from_outcome(cls, outcome: OrderOutcome) -> "OrderOutcomeResponse":
+        return cls(
+            order_id=outcome.order_id,
+            price=None if outcome.latest is None else outcome.latest.price,
+            currency=None if outcome.latest is None else outcome.latest.currency,
+            as_of=None if outcome.latest is None else outcome.latest.as_of,
+            return_percent=_ratio_percent(outcome.since_fill),
+            benchmark_symbol=outcome.benchmark_symbol,
+            benchmark_return_percent=_ratio_percent(outcome.benchmark_since_fill),
         )
 
 

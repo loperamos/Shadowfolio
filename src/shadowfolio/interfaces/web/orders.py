@@ -8,7 +8,14 @@ from fastapi import APIRouter
 from shadowfolio.domain.errors import DomainError, OrderNotFoundError
 from shadowfolio.domain.orders import OrderSide
 from shadowfolio.interfaces.web.errors import INVALID, NOT_FOUND, order_not_found, rule_violation, wallet_not_found
-from shadowfolio.interfaces.web.schemas import FillSummaryResponse, OrderEstimateResponse, OrderResponse, PlaceOrderRequest
+from shadowfolio.interfaces.web.schemas import (
+    FillSummaryResponse,
+    OrderEstimateResponse,
+    OrderOutcomeResponse,
+    OrderResponse,
+    PlaceOrderRequest,
+)
+from shadowfolio.usecases.comparison import DEFAULT_BENCHMARK
 from shadowfolio.usecases.orders import Orders
 
 
@@ -41,6 +48,18 @@ def orders_router(orders: Orders) -> APIRouter:
         if estimate is None:
             raise wallet_not_found()
         return OrderEstimateResponse.from_estimate(estimate)
+
+    @router.get("/wallets/{wallet_id}/orders/outcomes", responses=NOT_FOUND | INVALID)
+    def order_outcomes(wallet_id: UUID, benchmark: str = DEFAULT_BENCHMARK) -> list[OrderOutcomeResponse]:
+        """How each filled order turned out: its symbol's return from the fill price to the latest, next to the
+        benchmark's over the same time. Apart from the orders, so a slow price never holds them up."""
+        try:
+            outcomes = orders.outcomes(wallet_id, benchmark)
+        except DomainError as error:
+            raise rule_violation(error) from error
+        if outcomes is None:
+            raise wallet_not_found()
+        return [OrderOutcomeResponse.from_outcome(outcome) for outcome in outcomes]
 
     @router.get("/wallets/{wallet_id}/orders", responses=NOT_FOUND)
     def list_orders(wallet_id: UUID) -> list[OrderResponse]:
