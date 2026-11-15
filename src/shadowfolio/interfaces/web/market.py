@@ -31,6 +31,8 @@ def market_router(market: Market) -> APIRouter:
             closes = market.closes(symbol.strip().upper(), start, end)
         except DomainError as error:
             raise rule_violation(error) from error
-        return [DailyCloseResponse(day=close.as_of.date(), close=close.price, currency=close.currency) for close in closes]
+        return [
+            DailyCloseResponse(day=close.as_of.date(), close=close.price, currency=close.currency, volume=close.volume) for close in closes
+        ]
 
     return router

@@ -14,11 +14,14 @@ import pytest
 from dotenv import load_dotenv
 
 from shadowfolio.adapters.alpaca_price_data import BASE_URL, AlpacaConfig, AlpacaPriceData
+from shadowfolio.adapters.fixed_clock import FixedClock
 from shadowfolio.domain.money import Currency
 from shadowfolio.domain.valuation import Quote
 from shadowfolio.ports.price_data import PriceDataUnavailableError
 
 CONFIG = AlpacaConfig(key_id="test-key", secret_key="test-secret")
+NOW = datetime(2026, 3, 2, 15, 0, tzinfo=UTC)
+CLOCK = FixedClock(NOW)
 
 
 def adapter_answering(status: int, body: str, seen: list[httpx2.Request] | None = None) -> AlpacaPriceData:
@@ -27,7 +30,7 @@ def adapter_answering(status: int, body: str, seen: list[httpx2.Request] | None 
             seen.append(request)
         return httpx2.Response(status, text=body)
 
-    return AlpacaPriceData(CONFIG, transport=httpx2.MockTransport(handler))
+    return AlpacaPriceData(CONFIG, CLOCK, transport=httpx2.MockTransport(handler))
 
 
 # What the fakes answer, as Alpaca does (trimmed to the fields the adapter reads).
@@ -83,7 +86,7 @@ def test_a_batch_with_a_symbol_alpaca_cannot_read_asks_for_each_one() -> None:
             return httpx2.Response(400, text='{"message":"invalid symbol: 9MD.XGAT"}')
         return httpx2.Response(200, text=SNAPSHOT_BODY)
 
-    quotes = AlpacaPriceData(CONFIG, transport=httpx2.MockTransport(handler)).latest_prices(["NVDA", "9MD.XGAT"])
+    quotes = AlpacaPriceData(CONFIG, CLOCK, transport=httpx2.MockTransport(handler)).latest_prices(["NVDA", "9MD.XGAT"])
 
     assert list(quotes) == ["NVDA"]
     assert len(seen) == 3  # the batch, then each symbol
@@ -115,20 +118,32 @@ DAILY_BARS_BODY = (
 )
 
 
-def test_close_on_a_day_is_the_close_of_the_last_daily_bar_up_to_its_end() -> None:
+def test_close_on_a_day_is_the_official_close_of_the_last_daily_bar_up_to_its_end_with_its_volume() -> None:
+    """Daily bars come from the consolidated feed (every US exchange, as the free plan allows for past data): the
+    official close, and the whole day's volume rather than one exchange's share of it."""
     seen: list[httpx2.Request] = []
 
     quote = adapter_answering(200, DAILY_BARS_BODY, seen).close_on("NVDA", date(2024, 6, 30))
 
-    assert quote == Quote(Decimal("123.54"), Currency.USD, datetime(2024, 6, 28, 4, 0, tzinfo=UTC))
+    assert quote == Quote(Decimal("123.54"), Currency.USD, datetime(2024, 6, 28, 4, 0, tzinfo=UTC), volume=Decimal("31005"))
     params = seen[0].url.params
-    assert (params["timeframe"], params["end"], params["limit"], params["sort"], params["adjustment"]) == (
+    assert (params["timeframe"], params["end"], params["limit"], params["sort"], params["adjustment"], params["feed"]) == (
         "1Day",
         "2024-06-30T23:59:59.999999Z",
         "1",
         "desc",
         "raw",
+        "sip",
     )
+
+
+def test_daily_bars_are_never_asked_for_the_last_15_minutes() -> None:
+    # The free plan refuses the consolidated feed's latest 15 minutes: today's bar is asked for up to then.
+    seen: list[httpx2.Request] = []
+
+    adapter_answering(200, DAILY_BARS_BODY, seen).closes_between("NVDA", date(2026, 2, 27), NOW.date())
+
+    assert seen[0].url.params["end"] == "2026-03-02T14:45:00Z"
 
 
 def test_closes_between_follow_every_page() -> None:
@@ -142,7 +157,7 @@ def test_closes_between_follow_every_page() -> None:
         seen.append(request)
         return httpx2.Response(200, text=pages[len(seen) - 1])
 
-    adapter = AlpacaPriceData(CONFIG, transport=httpx2.MockTransport(handler))
+    adapter = AlpacaPriceData(CONFIG, CLOCK, transport=httpx2.MockTransport(handler))
     closes = adapter.closes_between("NVDA", date(2024, 6, 27), date(2024, 6, 30))
 
     assert [(day.isoformat(), close.price) for day, close in closes.items()] == [

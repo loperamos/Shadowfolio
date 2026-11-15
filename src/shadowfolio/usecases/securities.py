@@ -8,7 +8,7 @@ from shadowfolio.domain.company import Fundamentals, ValueRange, pe_by_day
 from shadowfolio.domain.corporate_actions import DividendEvent
 from shadowfolio.domain.errors import CompanyDataUnavailableNowError, CorporateActionsUnavailableNowError, NewsUnavailableNowError
 from shadowfolio.domain.news import Article
-from shadowfolio.domain.statistics import beta, change_since, max_drawdown, volatility
+from shadowfolio.domain.statistics import average_daily_value, average_daily_volume, beta, change_since, max_drawdown, volatility
 from shadowfolio.domain.valuation import Quote
 from shadowfolio.ports.clock import Clock
 from shadowfolio.ports.company_data import CompanyData, CompanyDataUnavailableError
@@ -66,6 +66,8 @@ class SecurityStatistics:
     max_drawdown: Decimal | None
     beta: Decimal | None
     benchmark_symbol: str
+    average_daily_volume: Decimal | None  # shares, over the period
+    average_daily_value: Decimal | None  # in the price's currency, over the period
 
 
 @dataclass(frozen=True)
@@ -89,9 +91,11 @@ class Securities:
 
     def statistics(self, symbol: str, start: date | None = None, end: date | None = None) -> SecurityStatistics:
         """The trend over the last 3, 6 and 12 months, and from `start` to `end` (as for its closes) the volatility, the
-        deepest fall and the beta against the benchmark (see domain.statistics)."""
+        deepest fall, the beta against the benchmark and how much trades on an average day (see domain.statistics)."""
         today = self._clock.now().date()
-        closes = _days(self._market.closes(symbol, start, end))
+        quotes = self._market.closes(symbol, start, end)
+        closes = _days(quotes)
+        traded = [(quote.price, quote.volume) for quote in quotes if quote.volume is not None]
         benchmark = _days(self._market.closes(BETA_BENCHMARK, start, end))
         recent = _days(self._market.closes(symbol, today - TREND_HISTORY, today))
         return SecurityStatistics(
@@ -102,6 +106,8 @@ class Securities:
             max_drawdown=max_drawdown(closes),
             beta=beta(closes, benchmark),
             benchmark_symbol=BETA_BENCHMARK,
+            average_daily_volume=average_daily_volume([volume for _, volume in traded]),
+            average_daily_value=average_daily_value(traded),
         )
 
     def dividends(self, symbol: str) -> Dividends:

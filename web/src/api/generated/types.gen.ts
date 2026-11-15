@@ -191,6 +191,10 @@ export type DailyCloseResponse = {
      */
     close: string;
     currency: Currency;
+    /**
+     * Volume
+     */
+    volume: string | null;
 };
 
 /**
@@ -1038,6 +1042,14 @@ export type SecurityStatisticsResponse = {
      * Benchmark Symbol
      */
     benchmark_symbol: string;
+    /**
+     * Average Daily Volume
+     */
+    average_daily_volume: string | null;
+    /**
+     * Average Daily Value
+     */
+    average_daily_value: string | null;
 };
 
 /**
