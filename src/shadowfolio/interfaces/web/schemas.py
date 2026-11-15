@@ -7,6 +7,7 @@ from uuid import UUID
 
 from pydantic import AwareDatetime, BaseModel, Field
 
+from shadowfolio.domain.company import ValueRange
 from shadowfolio.domain.comparison import Benchmark
 from shadowfolio.domain.money import Currency
 from shadowfolio.domain.operations import (
@@ -30,7 +31,7 @@ from shadowfolio.domain.valuation import DailyValue, Quote, WalletValuation
 from shadowfolio.domain.wallet import Wallet
 from shadowfolio.usecases.comparison import PerformanceComparison
 from shadowfolio.usecases.imports import ImportReport
-from shadowfolio.usecases.securities import CompanyFigures
+from shadowfolio.usecases.securities import CompanyFigures, SecurityRanges
 
 
 class CreateWalletRequest(BaseModel):
@@ -566,6 +567,8 @@ class FiscalYearResponse(BaseModel):
     revenue: Decimal | None
     net_income: Decimal | None
     eps_diluted: Decimal | None
+    revenue_growth: Decimal | None  # on the year before, in percent; null without it
+    net_margin: Decimal | None  # net income as a share of revenue, in percent
 
 
 class FundamentalsResponse(BaseModel):
@@ -588,7 +591,15 @@ class FundamentalsResponse(BaseModel):
             company_name=fundamentals.company_name,
             currency=fundamentals.currency,
             years=[
-                FiscalYearResponse(start=y.start, end=y.end, revenue=y.revenue, net_income=y.net_income, eps_diluted=y.eps_diluted)
+                FiscalYearResponse(
+                    start=y.start,
+                    end=y.end,
+                    revenue=y.revenue,
+                    net_income=y.net_income,
+                    eps_diluted=y.eps_diluted,
+                    revenue_growth=_ratio_percent(fundamentals.revenue_growth(y)),
+                    net_margin=_ratio_percent(y.net_margin),
+                )
                 for y in fundamentals.years
             ],
             shares_outstanding=fundamentals.shares_outstanding,
@@ -605,6 +616,43 @@ class ArticleResponse(BaseModel):
     source: str
     url: str
     published_at: AwareDatetime
+
+
+class ValueRangeResponse(BaseModel):
+    low: Decimal
+    high: Decimal
+    current: Decimal  # the latest day's
+    start: date  # the first and last days it covers
+    end: date
+
+    @classmethod
+    def from_range(cls, value_range: ValueRange, places: Decimal | None = None) -> "ValueRangeResponse":
+        """Rounded to `places` (e.g. CENT for a ratio), or as they are."""
+
+        def shown(value: Decimal) -> Decimal:
+            return value if places is None else value.quantize(places, rounding=ROUND_HALF_EVEN)
+
+        return cls(
+            low=shown(value_range.low),
+            high=shown(value_range.high),
+            current=shown(value_range.current),
+            start=value_range.start,
+            end=value_range.end,
+        )
+
+
+class SecurityRangesResponse(BaseModel):
+    """Where the price and the P/E stand within their lows and highs over a period; null without them."""
+
+    price: ValueRangeResponse | None
+    pe: ValueRangeResponse | None
+
+    @classmethod
+    def from_ranges(cls, ranges: SecurityRanges) -> "SecurityRangesResponse":
+        return cls(
+            price=None if ranges.price is None else ValueRangeResponse.from_range(ranges.price),
+            pe=None if ranges.pe is None else ValueRangeResponse.from_range(ranges.pe, CENT),
+        )
 
 
 class DailyCloseResponse(BaseModel):

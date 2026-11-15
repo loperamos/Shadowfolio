@@ -51,14 +51,15 @@ def build_local_app(config: LocalConfig) -> FastAPI:
     fx_rates = CachedFxRates(EcbFxRates(clock), FX_SOURCE, market_cache, clock)
     corporate_actions = AlpacaCorporateActions(config.alpaca)
     sync = Sync(wallet_repository, clock, corporate_actions, fx_rates)
+    market = Market(prices, clock, corporate_actions)
     return create_app(
         wallets=Wallets(wallet_repository, clock),
         history=History(wallet_repository, clock, prices, fx_rates, sync),
         valuation=Valuation(wallet_repository, clock, prices, fx_rates),
         comparison=Comparison(wallet_repository, clock, prices, fx_rates, corporate_actions),
         orders=Orders(wallet_repository, clock, prices, WalletChanges(clock, prices, fx_rates, sync)),
-        securities=Securities(SecEdgarCompanyData(config.edgar_contact, clock), prices, AlpacaNews(config.alpaca)),
-        market=Market(prices, clock),
+        securities=Securities(SecEdgarCompanyData(config.edgar_contact, clock), prices, AlpacaNews(config.alpaca), market),
+        market=market,
         sync=sync,
         imports=Imports(wallet_repository, WalletChanges(clock, prices, fx_rates, sync), OpenFigiSecurityLookup(), DegiroStatementReader()),
     )

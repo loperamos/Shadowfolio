@@ -10,6 +10,8 @@ import {
   type QuoteResponse,
   securityFundamentals,
   securityNews,
+  securityRanges,
+  type SecurityRangesResponse,
 } from "../api/generated";
 
 const NOT_FOUND_STATUS = 404;
@@ -113,5 +115,27 @@ export function useNews(symbol: string): NewsState {
       current = false;
     };
   }, [symbol]);
+  return state;
+}
+
+export type RangesState = { status: "loading" } | { status: "error"; message: string } | { status: "loaded"; ranges: SecurityRangesResponse };
+
+/** Where the price and the P/E stand within their lows and highs from `start` to `end` (as for the closes). */
+export function useRanges(symbol: string, start: string | null, end: string | null): RangesState {
+  const [state, setState] = useState<RangesState>({ status: "loading" });
+  useEffect(() => {
+    let current = true;
+    setState({ status: "loading" });
+    securityRanges({ path: { symbol }, query: { start, end } })
+      .then(({ data, error }) => {
+        if (current) {
+          setState(data ? { status: "loaded", ranges: data } : { status: "error", message: apiErrorMessage(error) });
+        }
+      })
+      .catch(() => current && setState({ status: "error", message: "Could not reach the backend." }));
+    return () => {
+      current = false;
+    };
+  }, [symbol, start, end]);
   return state;
 }

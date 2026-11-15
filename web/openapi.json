@@ -1594,6 +1594,80 @@
           }
         }
       }
+    },
+    "/api/securities/{symbol}/ranges": {
+      "get": {
+        "summary": "Security Ranges",
+        "description": "Where the price and the P/E stand within their lows and highs from `start` to `end` (as for the closes).",
+        "operationId": "security_ranges",
+        "parameters": [
+          {
+            "name": "symbol",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Symbol"
+            }
+          },
+          {
+            "name": "start",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start"
+            }
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SecurityRangesResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Malformed request or broken business rule",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -2133,6 +2207,28 @@
               }
             ],
             "title": "Eps Diluted"
+          },
+          "revenue_growth": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revenue Growth"
+          },
+          "net_margin": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Net Margin"
           }
         },
         "type": "object",
@@ -2141,7 +2237,9 @@
           "end",
           "revenue",
           "net_income",
-          "eps_diluted"
+          "eps_diluted",
+          "revenue_growth",
+          "net_margin"
         ],
         "title": "FiscalYearResponse"
       },
@@ -2998,6 +3096,37 @@
         ],
         "title": "QuoteResponse"
       },
+      "SecurityRangesResponse": {
+        "properties": {
+          "price": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ValueRangeResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "pe": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ValueRangeResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "price",
+          "pe"
+        ],
+        "title": "SecurityRangesResponse",
+        "description": "Where the price and the P/E stand within their lows and highs over a period; null without them."
+      },
       "SellEdit": {
         "properties": {
           "symbol": {
@@ -3378,6 +3507,41 @@
           "total"
         ],
         "title": "ValuationResponse"
+      },
+      "ValueRangeResponse": {
+        "properties": {
+          "low": {
+            "type": "string",
+            "title": "Low"
+          },
+          "high": {
+            "type": "string",
+            "title": "High"
+          },
+          "current": {
+            "type": "string",
+            "title": "Current"
+          },
+          "start": {
+            "type": "string",
+            "format": "date",
+            "title": "Start"
+          },
+          "end": {
+            "type": "string",
+            "format": "date",
+            "title": "End"
+          }
+        },
+        "type": "object",
+        "required": [
+          "low",
+          "high",
+          "current",
+          "start",
+          "end"
+        ],
+        "title": "ValueRangeResponse"
       },
       "WalletResponse": {
         "properties": {

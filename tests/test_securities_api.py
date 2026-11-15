@@ -7,6 +7,7 @@ from decimal import Decimal
 
 from fastapi.testclient import TestClient
 
+from shadowfolio.adapters.fixed_clock import FixedClock
 from shadowfolio.adapters.in_memory_company_data import InMemoryCompanyData
 from shadowfolio.adapters.in_memory_news import InMemoryNews
 from shadowfolio.adapters.in_memory_price_data import InMemoryPriceData
@@ -46,6 +47,42 @@ def test_fundamentals_come_with_the_pe_and_market_cap_at_the_latest_price() -> N
     ]
     # At 161.87 USD: 161.87 / 4.90 (the last fiscal year's diluted EPS), and 161.87 x 24.1 billion shares.
     assert (result["price"], result["pe"], result["market_cap"]) == ("161.87", "33.03", "3901067000000.00")
+
+
+def test_each_year_says_how_revenue_grew_and_how_much_of_it_was_kept_as_profit() -> None:
+    years = client_with(InMemoryCompanyData({"NVDA": NVDA})).get("/api/securities/NVDA/fundamentals").json()["years"]
+
+    # 2026: 215.938 / 130.497 = +65.47%; 120.067 / 215.938 = 55.60% kept. The first year has no year before it.
+    assert [(y["end"], y["revenue_growth"], y["net_margin"]) for y in years] == [
+        ("2025-01-26", None, "55.85"),
+        ("2026-01-25", "65.47", "55.60"),
+    ]
+
+
+def test_the_price_and_pe_ranges_over_a_period_place_the_latest_between_their_lows_and_highs() -> None:
+    prices = InMemoryPriceData()
+    for day, close in [(date(2026, 1, 20), "147"), (date(2026, 1, 27), "147"), (date(2026, 1, 28), "196")]:
+        prices.add_close("NVDA", Quote(Decimal(close), Currency.USD, datetime(day.year, day.month, day.day, 5, 0, tzinfo=UTC)))
+    clock = FixedClock(datetime(2026, 1, 29, 12, 0, tzinfo=UTC))
+    client = TestClient(build_test_app(clock=clock, prices=prices, company_data=InMemoryCompanyData({"NVDA": NVDA})))
+
+    ranges = client.get("/api/securities/NVDA/ranges", params={"start": "2026-01-19"}).json()
+
+    assert ranges["price"] == {"low": "147", "high": "196", "current": "196", "start": "2026-01-20", "end": "2026-01-28"}
+    # Before the fiscal year ending 25 January 2026, the one before's EPS (2.94): 147 / 2.94 = 50. Then 4.90:
+    # 147 / 4.90 = 30, and 196 / 4.90 = 40.
+    assert ranges["pe"] == {"low": "30.00", "high": "50.00", "current": "40.00", "start": "2026-01-20", "end": "2026-01-28"}
+
+
+def test_without_fundamentals_there_is_a_price_range_but_no_pe_range() -> None:
+    prices = InMemoryPriceData()
+    prices.add_close("NNND.XGAT", Quote(Decimal("50"), Currency.EUR, datetime(2026, 1, 20, 5, 0, tzinfo=UTC)))
+    clock = FixedClock(datetime(2026, 1, 29, 12, 0, tzinfo=UTC))
+    client = TestClient(build_test_app(clock=clock, prices=prices, company_data=InMemoryCompanyData({})))
+
+    ranges = client.get("/api/securities/NNND.XGAT/ranges", params={"start": "2026-01-19"}).json()
+
+    assert (ranges["price"]["current"], ranges["pe"]) == ("50", None)
 
 
 def test_a_symbol_without_fundamentals_returns_404() -> None:

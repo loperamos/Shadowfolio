@@ -53,14 +53,15 @@ def build_test_app(
     corporate_actions = corporate_actions or InMemoryCorporateActions()
     wallet_repository = wallet_repository or InMemoryWalletRepository()
     sync = Sync(wallet_repository, clock, corporate_actions, fx_rates)
+    market = Market(prices, clock, corporate_actions)
     return create_app(
         wallets=Wallets(wallet_repository, clock),
         history=History(wallet_repository, clock, prices, fx_rates, sync),
         valuation=Valuation(wallet_repository, clock, prices, fx_rates),
         comparison=Comparison(wallet_repository, clock, prices, fx_rates, corporate_actions),
         orders=Orders(wallet_repository, clock, prices, WalletChanges(clock, prices, fx_rates, sync)),
-        securities=Securities(company_data or InMemoryCompanyData(), prices, news or InMemoryNews()),
-        market=Market(prices, clock),
+        securities=Securities(company_data or InMemoryCompanyData(), prices, news or InMemoryNews(), market),
+        market=market,
         sync=sync,
         imports=Imports(
             wallet_repository,

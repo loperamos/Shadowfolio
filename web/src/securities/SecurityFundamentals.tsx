@@ -1,7 +1,10 @@
 import { Alert, Group, Skeleton, Table, Text, Title } from "@mantine/core";
 
-import { formatAmount, formatCompactAmount, formatDate } from "../ui/format";
+import { formatAmount, formatCompactAmount, formatDate, formatPercent } from "../ui/format";
+import { ReturnText } from "../ui/GainText";
+import { InfoTip } from "../ui/InfoTip";
 import { CHART_HEIGHT, TABLE_MIN_WIDTH } from "../ui/theme";
+import { EXPLANATIONS } from "./explanations";
 import { useFundamentals } from "./useSecurity";
 
 // The most recent fiscal years shown in the table.
@@ -36,11 +39,14 @@ function FundamentalsBody({ symbol, state }: { symbol: string; state: ReturnType
       const { company_name, currency, years, shares_outstanding, shares_as_of, pe, market_cap } = state.fundamentals;
       const latest = years.at(-1);
       const amount = (value: string | null | undefined) => (value == null ? "—" : `${formatCompactAmount(value)} ${currency}`);
-      const figure = (label: string, value: string, note?: string) => (
+      const figure = (label: string, explanation: string, value: string, note?: string) => (
         <div>
-          <Text c="dimmed" size="sm">
-            {label}
-          </Text>
+          <Group gap={4} wrap="nowrap">
+            <Text c="dimmed" size="sm">
+              {label}
+            </Text>
+            <InfoTip topic={label}>{explanation}</InfoTip>
+          </Group>
           <Text size="xl" fw={600}>
             {value}
           </Text>
@@ -54,12 +60,13 @@ function FundamentalsBody({ symbol, state }: { symbol: string; state: ReturnType
       return (
         <>
           <Text mb="sm">{company_name}</Text>
-          <Group gap="xl" mb="md">
-            {figure("P/E", pe ?? "—", pe == null ? "No positive diluted EPS for the last fiscal year" : "Price against the last fiscal year's diluted EPS")}
-            {figure("Market cap", amount(market_cap), market_cap == null ? "No single, recent share count (e.g. several share classes)" : undefined)}
-            {figure("Shares outstanding", shares_outstanding == null ? "—" : formatCompactAmount(shares_outstanding), shares_as_of ? `As of ${formatDate(shares_as_of)}` : undefined)}
-            {latest && figure("Revenue", amount(latest.revenue), `Fiscal year to ${formatDate(latest.end)}`)}
-            {latest && figure("Net income", amount(latest.net_income), `Fiscal year to ${formatDate(latest.end)}`)}
+          {/* Top-aligned, so each label, value and note sits on the same line as the others'. */}
+          <Group gap="xl" mb="md" align="flex-start">
+            {figure("P/E", EXPLANATIONS.pe, pe ?? "—", pe == null ? "No positive diluted EPS for the last fiscal year" : "Price against the last fiscal year's diluted EPS")}
+            {figure("Market cap", EXPLANATIONS.marketCap, amount(market_cap), market_cap == null ? "No single, recent share count (e.g. several share classes)" : undefined)}
+            {figure("Shares outstanding", EXPLANATIONS.sharesOutstanding, shares_outstanding == null ? "—" : formatCompactAmount(shares_outstanding), shares_as_of ? `As of ${formatDate(shares_as_of)}` : undefined)}
+            {latest && figure("Revenue", EXPLANATIONS.revenue, amount(latest.revenue), `Fiscal year to ${formatDate(latest.end)}`)}
+            {latest && figure("Net income", EXPLANATIONS.netIncome, amount(latest.net_income), `Fiscal year to ${formatDate(latest.end)}`)}
           </Group>
           {years.length > 0 && (
             <Table.ScrollContainer minWidth={TABLE_MIN_WIDTH}>
@@ -67,9 +74,21 @@ function FundamentalsBody({ symbol, state }: { symbol: string; state: ReturnType
                 <Table.Thead>
                   <Table.Tr>
                     <Table.Th>Fiscal year to</Table.Th>
-                    <Table.Th ta="right">Revenue</Table.Th>
-                    <Table.Th ta="right">Net income</Table.Th>
-                    <Table.Th ta="right">EPS (diluted)</Table.Th>
+                    <Table.Th ta="right">
+                      <HeaderWithInfo label="Revenue" explanation={EXPLANATIONS.revenue} />
+                    </Table.Th>
+                    <Table.Th ta="right">
+                      <HeaderWithInfo label="Growth" explanation={EXPLANATIONS.revenueGrowth} />
+                    </Table.Th>
+                    <Table.Th ta="right">
+                      <HeaderWithInfo label="Net income" explanation={EXPLANATIONS.netIncome} />
+                    </Table.Th>
+                    <Table.Th ta="right">
+                      <HeaderWithInfo label="Net margin" explanation={EXPLANATIONS.netMargin} />
+                    </Table.Th>
+                    <Table.Th ta="right">
+                      <HeaderWithInfo label="EPS (diluted)" explanation={EXPLANATIONS.eps} />
+                    </Table.Th>
                   </Table.Tr>
                 </Table.Thead>
                 <Table.Tbody>
@@ -81,7 +100,9 @@ function FundamentalsBody({ symbol, state }: { symbol: string; state: ReturnType
                       <Table.Tr key={year.end}>
                         <Table.Td>{formatDate(year.end)}</Table.Td>
                         <Table.Td ta="right">{amount(year.revenue)}</Table.Td>
+                        <Table.Td ta="right">{year.revenue_growth == null ? "—" : <ReturnText percent={year.revenue_growth} />}</Table.Td>
                         <Table.Td ta="right">{amount(year.net_income)}</Table.Td>
+                        <Table.Td ta="right">{year.net_margin == null ? "—" : `${formatPercent(year.net_margin)}%`}</Table.Td>
                         <Table.Td ta="right">{year.eps_diluted == null ? "—" : `${formatAmount(year.eps_diluted)} ${currency}`}</Table.Td>
                       </Table.Tr>
                     ))}
@@ -97,4 +118,14 @@ function FundamentalsBody({ symbol, state }: { symbol: string; state: ReturnType
       );
     }
   }
+}
+
+/** A right-aligned column heading with its ⓘ. */
+function HeaderWithInfo({ label, explanation }: { label: string; explanation: string }) {
+  return (
+    <Group gap={4} justify="flex-end" wrap="nowrap">
+      {label}
+      <InfoTip topic={label}>{explanation}</InfoTip>
+    </Group>
+  );
 }

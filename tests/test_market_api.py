@@ -1,10 +1,12 @@
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from decimal import Decimal
 
 from fastapi.testclient import TestClient
 
 from shadowfolio.adapters.fixed_clock import FixedClock
+from shadowfolio.adapters.in_memory_corporate_actions import InMemoryCorporateActions
 from shadowfolio.adapters.in_memory_price_data import InMemoryPriceData
+from shadowfolio.domain.corporate_actions import SplitEvent
 from shadowfolio.domain.money import Currency
 from shadowfolio.domain.valuation import Quote
 from shadowfolio.ports.price_data import PriceDataUnavailableError
@@ -71,3 +73,19 @@ def test_a_symbol_without_prices_has_no_closes() -> None:
     client = TestClient(build_test_app(clock=FixedClock(datetime(2024, 7, 2, 15, 0, tzinfo=UTC))))
 
     assert client.get("/api/market/closes/ZZZZ", params={"start": "2024-06-28"}).json() == []
+
+
+def test_a_symbols_closes_are_adjusted_for_its_later_splits() -> None:
+    prices = InMemoryPriceData()
+    for day, close in [(7, "1208.88"), (10, "121.79")]:
+        prices.add_close("NVDA", Quote(Decimal(close), Currency.USD, datetime(2024, 6, day, 4, 0, tzinfo=UTC)))
+    actions = InMemoryCorporateActions(SplitEvent("NVDA", date(2024, 6, 10), Decimal(1), Decimal(10), "nvda-2024-split"))
+    client = TestClient(
+        build_test_app(clock=FixedClock(datetime(2024, 6, 11, 15, 0, tzinfo=UTC)), prices=prices, corporate_actions=actions)
+    )
+
+    closes = client.get("/api/market/closes/NVDA", params={"start": "2024-06-07"}).json()
+
+    # Before the 10-for-1 split on 10 June, a share was ten of today's: its close counts as a tenth, so the history
+    # reads continuously (as finance sites show it).
+    assert [(c["day"], c["close"]) for c in closes] == [("2024-06-07", "120.888"), ("2024-06-10", "121.79")]
