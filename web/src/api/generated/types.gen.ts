@@ -376,6 +376,10 @@ export type FundamentalsResponse = {
      */
     years: Array<FiscalYearResponse>;
     /**
+     * Quarters
+     */
+    quarters: Array<FiscalYearResponse>;
+    /**
      * Shares Outstanding
      */
     shares_outstanding: string | null;
