@@ -3,6 +3,7 @@
 from collections.abc import Callable
 from dataclasses import replace
 from datetime import UTC, date, datetime, time, timedelta
+from decimal import Decimal
 from uuid import UUID
 
 from shadowfolio.domain.errors import FutureTimestampError, FxRateUnavailableError, InvalidPeriodError, PriceUnavailableError
@@ -14,7 +15,7 @@ from shadowfolio.domain.valuation import (
     Quote,
     WalletValuation,
     estimated_price,
-    holdings_value,
+    holding_values,
     reserved_for_orders,
     value_wallet,
 )
@@ -135,8 +136,9 @@ class Valuation:
             missing = [symbol for symbol in sorted(state.holdings) if symbol not in day_closes]
             currencies = sorted({close.currency for close in day_closes.values()} - {wallet.currency} - set(day_rates))
             missing += [f"{currency}→{wallet.currency}" for currency in currencies]
-            total = None if missing else state.cash + holdings_value(state.holdings, day_closes, day_rates, wallet.currency)
-            values.append(DailyValue(day, total, state.cash, state.net_deposits, tuple(missing), tuple(estimated)))
+            worth = {} if missing else holding_values(state.holdings, day_closes, day_rates, wallet.currency)
+            total = None if missing else state.cash + sum(worth.values(), Decimal(0))
+            values.append(DailyValue(day, total, state.cash, state.net_deposits, tuple(missing), tuple(estimated), worth))
         return values
 
     def _value(

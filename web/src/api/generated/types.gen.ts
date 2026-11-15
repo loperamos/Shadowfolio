@@ -112,6 +112,34 @@ export type CashMovementRequest = {
 };
 
 /**
+ * ContributionResponse
+ *
+ * What one holding brought to the wallet's gain over the period, in the wallet's currency.
+ */
+export type ContributionResponse = {
+    /**
+     * Symbol
+     */
+    symbol: string;
+    /**
+     * Start Value
+     */
+    start_value: string;
+    /**
+     * End Value
+     */
+    end_value: string;
+    /**
+     * Gain
+     */
+    gain: string;
+    /**
+     * Gain Percent
+     */
+    gain_percent: string | null;
+};
+
+/**
  * CopyWalletRequest
  */
 export type CopyWalletRequest = {
@@ -684,6 +712,14 @@ export type PerformanceComparisonResponse = {
      */
     benchmark_returns: Array<DailyReturnResponse>;
     trading: TradingActivityResponse;
+    /**
+     * Contributions
+     */
+    contributions: Array<ContributionResponse>;
+    /**
+     * Other Gain
+     */
+    other_gain: string | null;
 };
 
 /**

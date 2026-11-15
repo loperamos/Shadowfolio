@@ -116,3 +116,42 @@ def test_a_period_says_how_much_was_traded_and_paid_in_fees(client: TestClient, 
         "turnover_percent": "5.46",
         "fees_percent": "0.04",
     }
+
+
+def test_each_holding_says_how_much_of_the_gain_it_brought(client: TestClient, prices: InMemoryPriceData) -> None:
+    wallet_id: str = client.post("/api/wallets", json={"name": "W", "currency": "USD", "cash": "0"}).json()["id"]
+    client.post(f"/api/wallets/{wallet_id}/deposits", json={"amount": "10000", "timestamp": "2024-06-01T09:00:00Z"})
+    for kind, day, symbol, quantity, price in [
+        ("buys", "2024-06-03", "AAPL", "10", "100"),
+        ("buys", "2024-06-03", "MSFT", "4", "50"),
+        ("sells", "2024-06-04", "MSFT", "4", "55"),  # sold out in the period: still part of what drove it
+    ]:
+        body = {
+            "symbol": symbol,
+            "quantity": quantity,
+            "price": price,
+            "price_currency": "USD",
+            "fees": "1",
+            "timestamp": f"{day}T14:00:00Z",
+        }
+        assert client.post(f"/api/wallets/{wallet_id}/{kind}", json=body).status_code == 200
+    closes: list[tuple[str, date, str]] = [
+        ("AAPL", MONDAY, "100"),
+        ("AAPL", TUESDAY, "104"),
+        ("MSFT", MONDAY, "50"),
+        ("MSFT", TUESDAY, "55"),
+    ]
+    for symbol, close_day, close in closes:
+        at = datetime(close_day.year, close_day.month, close_day.day, 20, 0, tzinfo=UTC)
+        prices.add_close(symbol, Quote(Decimal(close), Currency.USD, at))
+
+    result = client.get(f"/api/wallets/{wallet_id}/performance", params={"start": "2024-06-04", "end": "2024-06-04"}).json()
+
+    # From Monday's end: AAPL 1000 to 1040; MSFT 200, sold for 220 less a fee of 1. Together the wallet's gain of 59, on
+    # an average value of 10057.
+    assert result["wallet"]["gain"] == "59.00"
+    assert [(c["symbol"], c["start_value"], c["end_value"], c["gain"], c["gain_percent"]) for c in result["contributions"]] == [
+        ("AAPL", "1000.00", "1040.00", "40.00", "0.40"),
+        ("MSFT", "200.00", "0.00", "19.00", "0.19"),
+    ]
+    assert result["other_gain"] == "0.00"  # nothing outside the holdings, e.g. fees charged on their own

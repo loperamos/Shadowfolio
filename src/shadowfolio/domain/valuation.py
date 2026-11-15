@@ -1,7 +1,7 @@
 """Valuation: what a wallet is worth, in its own currency, given market prices and exchange rates."""
 
 from collections.abc import Iterable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
 from decimal import Decimal
 
@@ -158,6 +158,7 @@ class DailyValue:
     net_deposits: Decimal
     missing: tuple[str, ...] = ()
     estimated: tuple[str, ...] = ()
+    holdings: Mapping[str, Decimal] = field(default_factory=dict)  # each holding's value; empty when `total` is None
 
 
 def estimated_price(operations: Iterable[Operation], symbol: str, day: date) -> Quote | None:
@@ -170,17 +171,17 @@ def estimated_price(operations: Iterable[Operation], symbol: str, day: date) -> 
     return None if nearest is None else Quote(nearest.trade.price, nearest.trade.price_currency, nearest.timestamp)
 
 
-def holdings_value(
+def holding_values(
     holdings: Mapping[str, Decimal], quotes: Mapping[str, Quote], rates: Mapping[Currency, FxRate], currency: Currency
-) -> Decimal:
-    """What `holdings` (shares per symbol) are worth in `currency`, each rounded to cents as in a valuation (see
+) -> dict[str, Decimal]:
+    """What each of `holdings` (shares per symbol) is worth in `currency`, rounded to cents as in a valuation (see
     HoldingValue). `quotes` must have every symbol, and `rates` every other currency they are quoted in."""
-    total = Decimal(0)
+    values = {}
     for symbol, quantity in holdings.items():
         quote = quotes[symbol]
         value = quantity * quote.price
-        total += to_cents(value if quote.currency is currency else value * rates[quote.currency].rate)
-    return total
+        values[symbol] = to_cents(value if quote.currency is currency else value * rates[quote.currency].rate)
+    return values
 
 
 def value_wallet(wallet: Wallet, quotes: Mapping[str, Quote], rates: Mapping[Currency, FxRate]) -> WalletValuation:

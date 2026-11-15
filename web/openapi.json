@@ -1977,6 +1977,47 @@
         "title": "CashMovementRequest",
         "description": "A deposit or a withdrawal."
       },
+      "ContributionResponse": {
+        "properties": {
+          "symbol": {
+            "type": "string",
+            "title": "Symbol"
+          },
+          "start_value": {
+            "type": "string",
+            "title": "Start Value"
+          },
+          "end_value": {
+            "type": "string",
+            "title": "End Value"
+          },
+          "gain": {
+            "type": "string",
+            "title": "Gain"
+          },
+          "gain_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gain Percent"
+          }
+        },
+        "type": "object",
+        "required": [
+          "symbol",
+          "start_value",
+          "end_value",
+          "gain",
+          "gain_percent"
+        ],
+        "title": "ContributionResponse",
+        "description": "What one holding brought to the wallet's gain over the period, in the wallet's currency."
+      },
       "CopyWalletRequest": {
         "properties": {
           "name": {
@@ -3029,6 +3070,24 @@
           },
           "trading": {
             "$ref": "#/components/schemas/TradingActivityResponse"
+          },
+          "contributions": {
+            "items": {
+              "$ref": "#/components/schemas/ContributionResponse"
+            },
+            "type": "array",
+            "title": "Contributions"
+          },
+          "other_gain": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Other Gain"
           }
         },
         "type": "object",
@@ -3038,7 +3097,9 @@
           "benchmark",
           "wallet_returns",
           "benchmark_returns",
-          "trading"
+          "trading",
+          "contributions",
+          "other_gain"
         ],
         "title": "PerformanceComparisonResponse",
         "description": "How the wallet did over a period next to `benchmark_symbol` with the same deposits; null when nothing in the\nperiod could be valued."
