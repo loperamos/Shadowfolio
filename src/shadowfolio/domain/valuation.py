@@ -216,11 +216,20 @@ def reserved_for_orders(
         quote = quotes.get(order.symbol)
         if quote is None:
             return None
-        cost = order.quantity * (quote.price if order.limit_price is None else order.limit_price)
-        if quote.currency is not currency:
-            rate = rates.get(quote.currency)
-            if rate is None:
-                return None
-            cost *= rate.rate
-        total += to_cents(cost)
+        rate = None if quote.currency is currency else rates.get(quote.currency)
+        if quote.currency is not currency and rate is None:
+            return None
+        total += order_amount(order, quote, rate)
     return total
+
+
+def order_price(order: Order, quote: Quote) -> Decimal:
+    """The price an order is counted at before it fills: its limit, or for a market order the latest price `quote`."""
+    return quote.price if order.limit_price is None else order.limit_price
+
+
+def order_amount(order: Order, quote: Quote, rate: FxRate | None) -> Decimal:
+    """What `order` would come to at `order_price`, in the wallet's currency, rounded to cents as a fill would be.
+    `rate` converts the quote's currency into the wallet's; None when they are the same."""
+    amount = order.quantity * order_price(order, quote)
+    return to_cents(amount if rate is None else amount * rate.rate)

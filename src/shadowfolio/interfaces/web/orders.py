@@ -1,12 +1,14 @@
 """Routes for orders placed now: placing, listing (which fills the due ones first), cancelling, and the fill job."""
 
+from decimal import Decimal
 from uuid import UUID
 
 from fastapi import APIRouter
 
 from shadowfolio.domain.errors import DomainError, OrderNotFoundError
+from shadowfolio.domain.orders import OrderSide
 from shadowfolio.interfaces.web.errors import INVALID, NOT_FOUND, order_not_found, rule_violation, wallet_not_found
-from shadowfolio.interfaces.web.schemas import FillSummaryResponse, OrderResponse, PlaceOrderRequest
+from shadowfolio.interfaces.web.schemas import FillSummaryResponse, OrderEstimateResponse, OrderResponse, PlaceOrderRequest
 from shadowfolio.usecases.orders import Orders
 
 
@@ -25,6 +27,20 @@ def orders_router(orders: Orders) -> APIRouter:
             raise wallet_not_found()
         wallet, order = placed
         return OrderResponse.from_order(order, wallet)
+
+    @router.get("/wallets/{wallet_id}/orders/estimate", responses=NOT_FOUND | INVALID)
+    def estimate_order(
+        wallet_id: UUID, side: OrderSide, symbol: str, quantity: Decimal, limit_price: Decimal | None = None
+    ) -> OrderEstimateResponse:
+        """What an order would come to if placed now, in the wallet's currency: at its limit price, or a market order at
+        the latest price, at the latest exchange rate, as the buying power counts open orders. A fill may differ."""
+        try:
+            estimate = orders.estimate(wallet_id, side, symbol, quantity, limit_price)
+        except DomainError as error:
+            raise rule_violation(error) from error
+        if estimate is None:
+            raise wallet_not_found()
+        return OrderEstimateResponse.from_estimate(estimate)
 
     @router.get("/wallets/{wallet_id}/orders", responses=NOT_FOUND)
     def list_orders(wallet_id: UUID) -> list[OrderResponse]:

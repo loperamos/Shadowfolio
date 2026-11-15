@@ -31,6 +31,7 @@ from shadowfolio.domain.valuation import DailyValue, Quote, WalletValuation
 from shadowfolio.domain.wallet import Wallet
 from shadowfolio.usecases.comparison import PerformanceComparison
 from shadowfolio.usecases.imports import ImportReport
+from shadowfolio.usecases.orders import OrderEstimate
 from shadowfolio.usecases.securities import CompanyFigures, SecurityRanges
 
 
@@ -406,6 +407,22 @@ class PlaceOrderRequest(BaseModel):
     quantity: Decimal
     reason: str = ""  # why it is placed, kept as a decision log
     limit_price: Decimal | None = None  # the most a buy pays or the least a sell takes, in the symbol's currency
+
+
+class OrderEstimateResponse(BaseModel):
+    price: Decimal  # what the order is counted at: its limit, or the latest price for a market order
+    currency: Currency  # the price's
+    fx_rate: FxRateResponse | None  # into the wallet's currency; null when it is the same
+    amount: Decimal  # what the order would come to in the wallet's currency
+
+    @classmethod
+    def from_estimate(cls, estimate: OrderEstimate) -> "OrderEstimateResponse":
+        return cls(
+            price=estimate.price,
+            currency=estimate.currency,
+            fx_rate=FxRateResponse(rate=estimate.fx_rate.rate, as_of=estimate.fx_rate.as_of) if estimate.fx_rate else None,
+            amount=estimate.amount,
+        )
 
 
 class OrderResponse(BaseModel):

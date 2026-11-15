@@ -577,6 +577,22 @@ export const OperationType = {
 export type OperationType = typeof OperationType[keyof typeof OperationType];
 
 /**
+ * OrderEstimateResponse
+ */
+export type OrderEstimateResponse = {
+    /**
+     * Price
+     */
+    price: string;
+    currency: Currency;
+    fx_rate: FxRateResponse | null;
+    /**
+     * Amount
+     */
+    amount: string;
+};
+
+/**
  * OrderResponse
  */
 export type OrderResponse = {
@@ -1956,6 +1972,54 @@ export type PlaceOrderResponses = {
 };
 
 export type PlaceOrderResponse = PlaceOrderResponses[keyof PlaceOrderResponses];
+
+export type EstimateOrderData = {
+    body?: never;
+    path: {
+        /**
+         * Wallet Id
+         */
+        wallet_id: string;
+    };
+    query: {
+        side: OrderSide;
+        /**
+         * Symbol
+         */
+        symbol: string;
+        /**
+         * Quantity
+         */
+        quantity: number | string;
+        /**
+         * Limit Price
+         */
+        limit_price?: number | string | null;
+    };
+    url: '/api/wallets/{wallet_id}/orders/estimate';
+};
+
+export type EstimateOrderErrors = {
+    /**
+     * Not found
+     */
+    404: ErrorResponse;
+    /**
+     * Malformed request or broken business rule
+     */
+    422: ErrorResponse;
+};
+
+export type EstimateOrderError = EstimateOrderErrors[keyof EstimateOrderErrors];
+
+export type EstimateOrderResponses = {
+    /**
+     * Successful Response
+     */
+    200: OrderEstimateResponse;
+};
+
+export type EstimateOrderResponse = EstimateOrderResponses[keyof EstimateOrderResponses];
 
 export type CancelOrderData = {
     body?: never;
