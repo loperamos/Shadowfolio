@@ -20,6 +20,8 @@ PORT_ENV = "SHADOWFOLIO_PORT"
 # Optional: who SEC EDGAR is told is asking (an app name and a contact email); without it, no fundamentals.
 SEC_EDGAR_CONTACT_ENV = "SEC_EDGAR_CONTACT"
 FINNHUB_API_KEY_ENV = "FINNHUB_API_KEY"
+MCP_ALLOWED_HOSTS_ENV = "SHADOWFOLIO_MCP_ALLOWED_HOSTS"
+LIST_SEPARATOR = ","
 
 
 class Environment(StrEnum):
@@ -49,6 +51,9 @@ def _build_app(environment: Environment, config_dir: Path) -> FastAPI:
                     alpaca=alpaca,
                     edgar_contact=os.environ.get(SEC_EDGAR_CONTACT_ENV),
                     finnhub_key=os.environ.get(FINNHUB_API_KEY_ENV),
+                    mcp_allowed_hosts=tuple(
+                        host.strip() for host in os.environ.get(MCP_ALLOWED_HOSTS_ENV, "").split(LIST_SEPARATOR) if host.strip()
+                    ),
                 )
             )
 

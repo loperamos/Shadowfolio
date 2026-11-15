@@ -1,5 +1,6 @@
 """Wiring for tests: fakes for every port, nothing persisted."""
 
+from collections.abc import Sequence
 from datetime import UTC, datetime
 
 from fastapi import FastAPI
@@ -47,6 +48,7 @@ def build_test_app(
     security_lookup: SecurityLookup | None = None,
     company_data: CompanyData | None = None,
     news: News | None = None,
+    mcp_allowed_hosts: Sequence[str] = (),
 ) -> FastAPI:
     """Pass fakes to control them (or to prepare stored data); otherwise "now" is DEFAULT_NOW, storage is empty and there
     are no prices, rates or corporate actions."""
@@ -80,4 +82,5 @@ def build_test_app(
             security_lookup or InMemorySecurityLookup({}),
             DegiroStatementReader(),
         ),
+        mcp_allowed_hosts=mcp_allowed_hosts,
     )

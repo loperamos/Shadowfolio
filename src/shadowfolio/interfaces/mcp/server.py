@@ -6,12 +6,14 @@ each with its time and, where it applies, what could not be fetched. Read-only f
 trading scope (see SPEC.md).
 """
 
+from collections.abc import Sequence
 from datetime import date
 from decimal import Decimal
 from uuid import UUID
 
 from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
+from mcp.server.transport_security import TransportSecuritySettings
 from mcp.types import ToolAnnotations
 from pydantic import BaseModel
 
@@ -31,6 +33,9 @@ from shadowfolio.usecases.valuation import Valuation
 from shadowfolio.usecases.wallets import Wallets
 
 MCP_PATH = "/mcp"
+# The addresses always allowed to reach it, as host names and as browsers' origins (the SDK's own for localhost).
+LOCAL_HOSTS = ("127.0.0.1:*", "localhost:*", "[::1]:*")
+ORIGIN_SCHEMES = ("http", "https")
 SERVER_NAME = "Shadowfolio"
 # As many securities as the web comparison takes.
 MAX_COMPARED = 6
@@ -127,3 +132,14 @@ def mcp_server(wallets: Wallets, valuation: Valuation, orders: Orders, compariso
         return [SecuritySummaryResponse.from_summary(securities.summary(symbol.strip().upper(), start, end)) for symbol in symbols]
 
     return server
+
+
+def transport_security(allowed_hosts: Sequence[str]) -> TransportSecuritySettings:
+    """Against DNS rebinding (a web page making the browser talk to a server on the user's network), only requests
+    addressed to localhost or to one of `allowed_hosts` (e.g. "192.168.1.75:8000", or a domain once hosted) reach it."""
+    hosts = [*LOCAL_HOSTS, *allowed_hosts]
+    return TransportSecuritySettings(
+        enable_dns_rebinding_protection=True,
+        allowed_hosts=hosts,
+        allowed_origins=[f"{scheme}://{host}" for host in hosts for scheme in ORIGIN_SCHEMES],
+    )

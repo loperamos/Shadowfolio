@@ -1,11 +1,11 @@
 """The HTTP app: one router per area, each calling its use cases and nothing more."""
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from shadowfolio.interfaces.mcp.server import MCP_PATH, mcp_server
+from shadowfolio.interfaces.mcp.server import MCP_PATH, mcp_server, transport_security
 from shadowfolio.interfaces.web.comparison import comparison_router
 from shadowfolio.interfaces.web.history import history_router
 from shadowfolio.interfaces.web.imports import imports_router
@@ -39,12 +39,15 @@ def create_app(
     comparison: Comparison,
     orders: Orders,
     securities: Securities,
+    mcp_allowed_hosts: Sequence[str] = (),  # besides localhost, the addresses agents may reach the MCP server at
 ) -> FastAPI:
     # The MCP server for agents, on the same app and use cases; its sessions run while the app does.
     mcp = mcp_server(wallets, valuation, orders, comparison, securities)
     # Stateless, answering in plain JSON: every request stands alone, as on the REST API, so any instance (or a fresh
     # serverless one) can answer it. The tools need no session: they never stream, push or ask anything back.
-    mcp_app = mcp.streamable_http_app(streamable_http_path=MCP_PATH, stateless_http=True, json_response=True)
+    mcp_app = mcp.streamable_http_app(
+        streamable_http_path=MCP_PATH, stateless_http=True, json_response=True, transport_security=transport_security(mcp_allowed_hosts)
+    )
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
