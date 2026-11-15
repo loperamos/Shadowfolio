@@ -31,6 +31,10 @@ export const FILTER_INPUT_WIDTH = rem(200);
 // Colours of the wallets drawn side by side in a comparison, in order (theme colours; repeated past the last).
 export const COMPARISON_COLORS = ["teal.6", "orange.6", "grape.6", "cyan.6", "red.6", "lime.7"];
 
+// A range bar's track height and its dot's size, in px.
+export const RANGE_BAR_HEIGHT = 6;
+export const RANGE_DOT_SIZE = 14;
+
 // Height of time-series charts, in px.
 export const CHART_HEIGHT = 280;
 // How strongly the days being selected by dragging across a chart are shaded (0 to 1).

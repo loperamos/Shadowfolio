@@ -1,4 +1,4 @@
-import { Alert, Anchor, Group, Loader, Skeleton, Stack, Table, Text, Title } from "@mantine/core";
+import { Alert, Anchor, Box, Group, Loader, Skeleton, Stack, Table, Text, Title } from "@mantine/core";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router";
 
@@ -16,6 +16,7 @@ import { describeRange, isEverything, usePeriod } from "../wallets/period";
 import { type ValuationState, useWalletValuations } from "../wallets/useWalletValuation";
 import { SecurityFundamentals } from "./SecurityFundamentals";
 import { SecurityNews } from "./SecurityNews";
+import { SecurityRanges } from "./SecurityRanges";
 import { useCloses, useQuote } from "./useSecurity";
 
 const CLOSE_LINE = "close";
@@ -97,6 +98,9 @@ function PriceChart({ symbol }: { symbol: string }) {
             onSelect={(start, end) => choose({ start, end })}
           />
         ))}
+      <Box mt="lg">
+        <SecurityRanges symbol={symbol} start={range.start} end={range.end} currency={state.status === "loaded" ? (state.closes[0]?.currency ?? null) : null} />
+      </Box>
     </div>
   );
 }

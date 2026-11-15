@@ -1,5 +1,6 @@
 """What a company reported about itself: yearly results and shares outstanding, and the ratios they give at a price."""
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date, timedelta
 from decimal import Decimal
@@ -50,3 +51,34 @@ class Fundamentals:
     def market_cap(self, price: Decimal) -> Decimal | None:
         """What all the shares outstanding are worth at `price`; None without the share count."""
         return None if self.shares_outstanding is None else price * self.shares_outstanding
+
+
+@dataclass(frozen=True)
+class ValueRange:
+    """The lowest and highest of a series of daily values, and its latest one, with the days it covers."""
+
+    low: Decimal
+    high: Decimal
+    current: Decimal
+    start: date
+    end: date
+
+    @classmethod
+    def of(cls, daily: Sequence[tuple[date, Decimal]]) -> "ValueRange | None":
+        """The range of `daily` (oldest first); None when it is empty."""
+        if not daily:
+            return None
+        values = [value for _, value in daily]
+        return cls(min(values), max(values), values[-1], daily[0][0], daily[-1][0])
+
+
+def pe_by_day(closes: Sequence[tuple[date, Decimal]], years: Sequence[FiscalYear]) -> list[tuple[date, Decimal]]:
+    """Each day's P/E: its close against the diluted EPS of the last fiscal year ended by then. Days without a
+    positive one are left out."""
+    with_eps = sorted((year for year in years if year.eps_diluted is not None and year.eps_diluted > 0), key=lambda year: year.end)
+    daily = []
+    for day, close in closes:
+        latest = next((year for year in reversed(with_eps) if year.end <= day), None)
+        if latest is not None and latest.eps_diluted is not None:
+            daily.append((day, close / latest.eps_diluted))
+    return daily

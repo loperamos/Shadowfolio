@@ -1,10 +1,12 @@
 """Routes for what is known about a listed company, beyond its price."""
 
+from datetime import date
+
 from fastapi import APIRouter, HTTPException
 
 from shadowfolio.domain.errors import DomainError
 from shadowfolio.interfaces.web.errors import INVALID, NOT_FOUND, rule_violation
-from shadowfolio.interfaces.web.schemas import ArticleResponse, FundamentalsResponse
+from shadowfolio.interfaces.web.schemas import ArticleResponse, FundamentalsResponse, SecurityRangesResponse
 from shadowfolio.usecases.securities import Securities
 
 
@@ -35,5 +37,14 @@ def securities_router(securities: Securities) -> APIRouter:
             ArticleResponse(headline=a.headline, summary=a.summary, source=a.source, url=a.url, published_at=a.published_at)
             for a in articles
         ]
+
+    @router.get("/securities/{symbol}/ranges", responses=INVALID)
+    def security_ranges(symbol: str, start: date | None = None, end: date | None = None) -> SecurityRangesResponse:
+        """Where the price and the P/E stand within their lows and highs from `start` to `end` (as for the closes)."""
+        try:
+            ranges = securities.ranges(symbol.strip().upper(), start, end)
+        except DomainError as error:
+            raise rule_violation(error) from error
+        return SecurityRangesResponse.from_ranges(ranges)
 
     return router

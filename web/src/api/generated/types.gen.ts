@@ -785,6 +785,16 @@ export type QuoteResponse = {
 };
 
 /**
+ * SecurityRangesResponse
+ *
+ * Where the price and the P/E stand within their lows and highs over a period; null without them.
+ */
+export type SecurityRangesResponse = {
+    price: ValueRangeResponse | null;
+    pe: ValueRangeResponse | null;
+};
+
+/**
  * SellEdit
  */
 export type SellEdit = {
@@ -980,6 +990,32 @@ export type ValuationResponse = {
      * Total
      */
     total: string;
+};
+
+/**
+ * ValueRangeResponse
+ */
+export type ValueRangeResponse = {
+    /**
+     * Low
+     */
+    low: string;
+    /**
+     * High
+     */
+    high: string;
+    /**
+     * Current
+     */
+    current: string;
+    /**
+     * Start
+     */
+    start: string;
+    /**
+     * End
+     */
+    end: string;
 };
 
 /**
@@ -2016,3 +2052,42 @@ export type SecurityNewsResponses = {
 };
 
 export type SecurityNewsResponse = SecurityNewsResponses[keyof SecurityNewsResponses];
+
+export type SecurityRangesData = {
+    body?: never;
+    path: {
+        /**
+         * Symbol
+         */
+        symbol: string;
+    };
+    query?: {
+        /**
+         * Start
+         */
+        start?: string | null;
+        /**
+         * End
+         */
+        end?: string | null;
+    };
+    url: '/api/securities/{symbol}/ranges';
+};
+
+export type SecurityRangesErrors = {
+    /**
+     * Malformed request or broken business rule
+     */
+    422: ErrorResponse;
+};
+
+export type SecurityRangesError = SecurityRangesErrors[keyof SecurityRangesErrors];
+
+export type SecurityRangesResponses = {
+    /**
+     * Successful Response
+     */
+    200: SecurityRangesResponse;
+};
+
+export type SecurityRangesResponse2 = SecurityRangesResponses[keyof SecurityRangesResponses];
