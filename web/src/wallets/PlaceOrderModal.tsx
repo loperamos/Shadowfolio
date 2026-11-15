@@ -3,6 +3,8 @@ import { type FormEvent, useState } from "react";
 
 import { apiErrorMessage } from "../api/errors";
 import { OrderSide, placeOrder, type WalletResponse } from "../api/generated";
+import { Money } from "../ui/Money";
+import type { ValuationState } from "./useWalletValuation";
 
 // Market orders fill at the next price; limit orders only at their limit price or better.
 enum OrderKind {
@@ -21,22 +23,23 @@ const KIND_OPTIONS = [
 
 type Props = {
   wallet: WalletResponse;
+  valuation: ValuationState;
   opened: boolean;
   onClose: () => void;
   onPlaced: () => void;
 };
 
 /** Place an order now (unlike a past operation): it fills later, at the first price after it, as the market allows. */
-export function PlaceOrderModal({ wallet, opened, onClose, onPlaced }: Props) {
+export function PlaceOrderModal({ wallet, valuation, opened, onClose, onPlaced }: Props) {
   return (
     <Modal opened={opened} onClose={onClose} title="Place order" size="lg">
       {/* Rendered only while open, so the form starts empty each time. */}
-      {opened && <OrderForm wallet={wallet} onClose={onClose} onPlaced={onPlaced} />}
+      {opened && <OrderForm wallet={wallet} valuation={valuation} onClose={onClose} onPlaced={onPlaced} />}
     </Modal>
   );
 }
 
-function OrderForm({ wallet, onClose, onPlaced }: Omit<Props, "opened">) {
+function OrderForm({ wallet, valuation, onClose, onPlaced }: Omit<Props, "opened">) {
   const [side, setSide] = useState<OrderSide>(OrderSide.BUY);
   const [kind, setKind] = useState(OrderKind.MARKET);
   // Amounts are kept as text and sent as strings, so they stay exact (never through a float).
@@ -94,6 +97,12 @@ function OrderForm({ wallet, onClose, onPlaced }: Omit<Props, "opened">) {
             ? `Fills at the first price after you place it; while the market is closed, at the next open. Cash and shares are checked when it fills.`
             : `Fills on the first minute after you place it that reaches your limit, at the limit or better; until then it stays open. Cash and shares are checked when it fills.`}
         </Text>
+        {side === OrderSide.BUY && valuation.status === "loaded" && valuation.valuation.buying_power != null && (
+          <Text size="sm">
+            Buying power: <Money amount={valuation.valuation.buying_power} currency={valuation.valuation.currency} fw={600} />, the cash
+            not yet committed to open buys.
+          </Text>
+        )}
         {error && <Alert color="red">{error}</Alert>}
         <Group justify="flex-end">
           <Button variant="default" onClick={onClose}>

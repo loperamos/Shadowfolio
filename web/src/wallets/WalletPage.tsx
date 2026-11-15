@@ -20,7 +20,7 @@ import { EditableTitle } from "../ui/EditableTitle";
 import { GainText } from "../ui/GainText";
 import { Money } from "../ui/Money";
 import { Figure } from "../ui/Figure";
-import { dateInputValueOf, formatDate, formatDateTime, formatPercent, shortDecimal, todayAsInputValue } from "../ui/format";
+import { dateInputValueOf, formatDate, formatAmount, formatDateTime, formatPercent, shortDecimal, todayAsInputValue } from "../ui/format";
 import { usePage } from "../ui/pagination";
 import { SortableTh } from "../ui/SortableTh";
 import { sorted, SortOrder, useSort } from "../ui/sorting";
@@ -84,6 +84,8 @@ export function WalletPage() {
   const [toImportInto, setToImportInto] = useState<WalletResponse | null>(null);
   const [toDelete, setToDelete] = useState<WalletResponse[]>([]);
   const [placingOrder, setPlacingOrder] = useState(false);
+  // Shared by the page and the order dialog, which shows the buying power.
+  const valuation = useWalletValuation(walletId, version);
 
   useEffect(() => {
     // Keep showing the wallet while it reloads; show the loader only when opening another one.
@@ -174,6 +176,7 @@ export function WalletPage() {
             operations={state.operations}
             orders={state.orders}
             version={version}
+            valuation={valuation}
             onOrdersChanged={reload}
             onEditOperation={(operation) => setOperationDialog({ operation })}
             onDeleteOperation={setOperationToDelete}
@@ -185,7 +188,7 @@ export function WalletPage() {
             onClose={() => setOperationDialog(null)}
             onSaved={reload}
           />
-          <PlaceOrderModal wallet={state.wallet} opened={placingOrder} onClose={() => setPlacingOrder(false)} onPlaced={reload} />
+          <PlaceOrderModal wallet={state.wallet} valuation={valuation} opened={placingOrder} onClose={() => setPlacingOrder(false)} onPlaced={reload} />
           <DeleteOperationModal wallet={state.wallet} operation={operationToDelete} onClose={() => setOperationToDelete(null)} onDeleted={reload} />
           {/* Duplicating opens the copy; deleting goes back to the list. */}
           <WalletSettingsModal wallet={toConfigure} onClose={() => setToConfigure(null)} onSaved={reload} />
@@ -199,12 +202,13 @@ export function WalletPage() {
 
 type DetailsProps = Loaded & {
   version: number;
+  valuation: ValuationState;
   onOrdersChanged: () => void;
   onEditOperation: (operation: OperationResponse) => void;
   onDeleteOperation: (operation: OperationResponse) => void;
 };
 
-function WalletDetails({ wallet, operations, orders, version, onOrdersChanged, onEditOperation, onDeleteOperation }: DetailsProps) {
+function WalletDetails({ wallet, operations, orders, version, valuation, onOrdersChanged, onEditOperation, onDeleteOperation }: DetailsProps) {
   // Splits that changed nothing (no shares held on their date) are left out: they only add noise.
   const effective = operations.filter((op) => op.had_effect !== false);
   const { period, range, choose, params } = usePeriod(todayAsInputValue());
@@ -218,7 +222,6 @@ function WalletDetails({ wallet, operations, orders, version, onOrdersChanged, o
   const symbols = [...new Set(effective.flatMap((op) => (op.symbol ? [op.symbol] : [])))].sort();
   // Newest first, as in a statement; a page at a time.
   const operationsPage = usePage([...shownOperations].reverse());
-  const valuation = useWalletValuation(wallet.id, version);
   const [holdingsSort, sortHoldings] = useSort(Object.values(HoldingColumn), HOLDINGS_DEFAULT_SORT);
   const holdings = sorted(Object.entries(wallet.holdings), holdingSortValue(holdingsSort.key, wallet, valuation), holdingsSort.order);
   const holdingTh = (column: HoldingColumn, label: string, firstOrder = SortOrder.DESCENDING, align: "left" | "right" = "right") => (
@@ -228,13 +231,14 @@ function WalletDetails({ wallet, operations, orders, version, onOrdersChanged, o
   );
   return (
     <Stack gap="xl">
-      <Group gap="xl">
+      <Group gap="xl" align="flex-start">
         <div>
           <Text c="dimmed" size="sm">
             Cash
           </Text>
           <Money amount={wallet.cash} currency={wallet.currency} size="xl" fw={600} />
         </div>
+        <BuyingPower valuation={valuation} />
         <div>
           <Text c="dimmed" size="sm">
             Value
@@ -517,5 +521,22 @@ function Concentration({ valuation }: { valuation: ValuationState }) {
         {shown(loaded?.effective_holdings, (v) => shortDecimal(v, EFFECTIVE_HOLDINGS_DECIMALS))}
       </Figure>
     </Group>
+  );
+}
+
+/** The cash left after what open buy orders would cost; shown only while some reserve cash, as it is the cash otherwise. */
+function BuyingPower({ valuation }: { valuation: ValuationState }) {
+  const loaded = valuation.status === "loaded" ? valuation.valuation : null;
+  if (!loaded?.buying_power || !loaded.reserved_for_orders || Number(loaded.reserved_for_orders) === 0) {
+    return null;
+  }
+  return (
+    <Figure
+      label="Buying power"
+      explanation="Cash not yet committed to open buy orders: what new buys can still spend. Each open buy counts at its limit price, or a market buy at the latest price, at the latest exchange rate."
+      note={`${formatAmount(loaded.reserved_for_orders)} ${loaded.currency} reserved for open buys`}
+    >
+      <Money amount={loaded.buying_power} currency={loaded.currency} />
+    </Figure>
   );
 }
