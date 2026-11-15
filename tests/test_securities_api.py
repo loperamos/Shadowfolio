@@ -266,3 +266,48 @@ def test_the_next_earnings_date_is_the_first_from_today() -> None:
 
     assert client.get("/api/securities/aapl/earnings").json() == {"next_date": "2027-01-28", "time": "after_close"}
     assert client.get("/api/securities/NNND.XGAT/earnings").json() == {"next_date": None, "time": None}
+
+
+def test_a_summary_gathers_what_compares_securities_and_says_what_could_not_be_fetched() -> None:
+    clock = FixedClock(datetime(2026, 11, 15, 12, 0, tzinfo=UTC))
+    prices = InMemoryPriceData({"NVDA": Quote(Decimal("161.87"), Currency.USD, datetime(2026, 11, 13, 21, 0, tzinfo=UTC))})
+    company_data = InMemoryCompanyData({"NVDA": NVDA})
+    dividends = InMemoryCorporateActions(
+        DividendEvent("NVDA", date(2026, 9, 10), date(2026, 10, 1), Decimal("0.25"), Currency.USD, "nvda-q3")
+    )
+    earnings = InMemoryEarningsCalendar(EarningsDate("NVDA", date(2026, 11, 17), EarningsTime.AFTER_CLOSE))
+    client = TestClient(
+        build_test_app(clock=clock, prices=prices, company_data=company_data, corporate_actions=dividends, earnings_calendar=earnings)
+    )
+
+    summary = client.get("/api/securities/nvda/summary", params={"start": "2025-11-15"}).json()
+
+    assert (summary["symbol"], summary["company_name"], summary["industry"], summary["price"], summary["currency"]) == (
+        "NVDA",
+        "NVIDIA CORP",
+        "Semiconductors & Related Devices",
+        "161.87",
+        "USD",
+    )
+    # As on the security page: the ratios at the latest price, and the last fiscal year's growth and margin.
+    assert [summary[key] for key in ("pe", "price_to_sales", "free_cash_flow_yield", "revenue_growth", "net_margin")] == [
+        "33.03",
+        "18.07",
+        "2.48",
+        "65.47",
+        "55.60",
+    ]
+    # 0.25 paid in the last year against 161.87; reporting on the 17th; no closes, so no trend or risk to tell.
+    assert (summary["dividend_yield"], summary["next_earnings"], summary["volatility"], summary["unavailable"]) == (
+        "0.15",
+        "2026-11-17",
+        None,
+        [],
+    )
+
+    company_data.fail_with(CompanyDataUnavailableError("SEC EDGAR: timed out"))
+    partial = client.get("/api/securities/NVDA/summary").json()
+
+    # What could not be fetched is said, and the rest still comes.
+    assert (partial["pe"], partial["dividend_yield"], partial["next_earnings"]) == (None, "0.15", "2026-11-17")
+    assert partial["unavailable"] == ["could not fetch the fundamentals of NVDA right now: SEC EDGAR: timed out"]

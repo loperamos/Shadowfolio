@@ -10,7 +10,8 @@ import { CHART_HEIGHT, COMPARISON_COLORS } from "../ui/theme";
 import { useUpdateQuery } from "../ui/url";
 import { PeriodControls } from "../wallets/PeriodControls";
 import { describeRange, isEverything, usePeriod } from "../wallets/period";
-import { type ClosesState, useClosesOf } from "./useSecurity";
+import { SecuritiesSideBySide } from "./SecuritiesSideBySide";
+import { type ClosesState, useClosesOf, useSummariesOf } from "./useSecurity";
 
 // As many securities as the chart has distinct colours for.
 const MAX_SYMBOLS = COMPARISON_COLORS.length;
@@ -21,6 +22,7 @@ export function SecuritiesComparePage() {
   const [symbols, setSymbols] = useComparedSymbols();
   const { period, range, choose } = usePeriod(todayAsInputValue());
   const closes = useClosesOf(symbols, range.start, range.end);
+  const summaries = useSummariesOf(symbols, range.start, range.end);
   // Lines switched off in the legend; every symbol's is drawn otherwise.
   const [hidden, setHidden] = useState<string[]>([]);
   const loaded = symbols.flatMap((symbol) => {
@@ -67,6 +69,7 @@ export function SecuritiesComparePage() {
           <Unavailable symbols={symbols} closes={closes} empty={isEverything(range) ? "" : ` ${describeRange(range)}`} />
         </div>
       )}
+      {symbols.length > 0 && <SecuritiesSideBySide symbols={symbols} summaries={summaries} />}
     </Stack>
   );
 }

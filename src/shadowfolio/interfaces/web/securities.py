@@ -13,6 +13,7 @@ from shadowfolio.interfaces.web.schemas import (
     FundamentalsResponse,
     SecurityRangesResponse,
     SecurityStatisticsResponse,
+    SecuritySummaryResponse,
 )
 from shadowfolio.usecases.securities import Securities
 
@@ -44,6 +45,12 @@ def securities_router(securities: Securities) -> APIRouter:
             ArticleResponse(headline=a.headline, summary=a.summary, source=a.source, url=a.url, published_at=a.published_at)
             for a in articles
         ]
+
+    @router.get("/securities/{symbol}/summary")
+    def security_summary(symbol: str, start: date | None = None, end: date | None = None) -> SecuritySummaryResponse:
+        """What compares securities, in one place: valuation, dividends, growth, trend and risk from `start` to `end`,
+        and the next earnings date. A part that cannot be fetched right now is left out, and `unavailable` says why."""
+        return SecuritySummaryResponse.from_summary(securities.summary(symbol.strip().upper(), start, end))
 
     @router.get("/securities/{symbol}/statistics", responses=INVALID)
     def security_statistics(symbol: str, start: date | None = None, end: date | None = None) -> SecurityStatisticsResponse:

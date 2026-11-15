@@ -34,7 +34,7 @@ from shadowfolio.domain.wallet import Wallet
 from shadowfolio.usecases.comparison import PerformanceComparison
 from shadowfolio.usecases.imports import ImportReport
 from shadowfolio.usecases.orders import OrderEstimate, OrderOutcome
-from shadowfolio.usecases.securities import CompanyFigures, Dividends, SecurityRanges, SecurityStatistics
+from shadowfolio.usecases.securities import CompanyFigures, Dividends, SecurityRanges, SecurityStatistics, SecuritySummary
 
 
 class CreateWalletRequest(BaseModel):
@@ -882,3 +882,64 @@ class EarningsResponse(BaseModel):
 
     next_date: date | None
     time: EarningsTime | None  # when in the day
+
+
+class SecuritySummaryResponse(BaseModel):
+    """What compares securities, in one place: each as on the security page, percentages in percent, and null when not
+    known. `unavailable` says what could not be fetched right now; the rest still comes."""
+
+    symbol: str
+    company_name: str | None
+    industry: str | None
+    price: Decimal | None  # the latest
+    currency: Currency | None  # of the price
+    pe: Decimal | None
+    price_to_sales: Decimal | None
+    free_cash_flow_yield: Decimal | None
+    market_cap: Decimal | None
+    revenue_growth: Decimal | None  # in the last fiscal year
+    net_margin: Decimal | None  # in the last fiscal year
+    dividend_yield: Decimal | None  # over the last 12 months
+    next_ex_dividend: date | None
+    three_month_return: Decimal | None
+    six_month_return: Decimal | None
+    one_year_return: Decimal | None
+    volatility: Decimal | None  # over a year, from the period's daily moves
+    max_drawdown: Decimal | None  # in the period
+    beta: Decimal | None  # against `benchmark_symbol`, in the period
+    benchmark_symbol: str | None
+    average_daily_value: Decimal | None  # in the period, in the price's currency
+    next_earnings: date | None
+    unavailable: list[str]
+
+    @classmethod
+    def from_summary(cls, summary: SecuritySummary) -> "SecuritySummaryResponse":
+        figures = FundamentalsResponse.from_figures(summary.figures) if summary.figures else None
+        last_year = figures.years[-1] if figures and figures.years else None
+        statistics = SecurityStatisticsResponse.from_statistics(summary.statistics) if summary.statistics else None
+        dividends = DividendsResponse.from_dividends(summary.dividends) if summary.dividends else None
+        return cls(
+            symbol=summary.symbol,
+            company_name=figures.company_name if figures else None,
+            industry=figures.industry if figures else None,
+            price=summary.price.price if summary.price else None,
+            currency=summary.price.currency if summary.price else None,
+            pe=figures.pe if figures else None,
+            price_to_sales=figures.price_to_sales if figures else None,
+            free_cash_flow_yield=figures.free_cash_flow_yield if figures else None,
+            market_cap=figures.market_cap if figures else None,
+            revenue_growth=last_year.revenue_growth if last_year else None,
+            net_margin=last_year.net_margin if last_year else None,
+            dividend_yield=dividends.yield_percent if dividends else None,
+            next_ex_dividend=dividends.next_ex_dividend.ex_date if dividends and dividends.next_ex_dividend else None,
+            three_month_return=statistics.three_month_return if statistics else None,
+            six_month_return=statistics.six_month_return if statistics else None,
+            one_year_return=statistics.one_year_return if statistics else None,
+            volatility=statistics.volatility_percent if statistics else None,
+            max_drawdown=statistics.max_drawdown_percent if statistics else None,
+            beta=statistics.beta if statistics else None,
+            benchmark_symbol=statistics.benchmark_symbol if statistics else None,
+            average_daily_value=statistics.average_daily_value if statistics else None,
+            next_earnings=summary.next_earnings.day if summary.next_earnings else None,
+            unavailable=list(summary.unavailable),
+        )

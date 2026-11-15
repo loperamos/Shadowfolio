@@ -1,5 +1,6 @@
 """Security use cases: what is known about a listed company, beyond its price."""
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date, timedelta
 from decimal import Decimal
@@ -10,6 +11,7 @@ from shadowfolio.domain.earnings import EarningsDate
 from shadowfolio.domain.errors import (
     CompanyDataUnavailableNowError,
     CorporateActionsUnavailableNowError,
+    DomainError,
     EarningsCalendarUnavailableNowError,
     NewsUnavailableNowError,
 )
@@ -80,6 +82,20 @@ class SecurityStatistics:
 
 
 @dataclass(frozen=True)
+class SecuritySummary:
+    """What compares securities, gathered from the parts the security page shows; a part that could not be fetched is
+    None, and `unavailable` says why, so the others still come."""
+
+    symbol: str
+    price: Quote | None
+    figures: CompanyFigures | None  # None too when the provider has no fundamentals for the symbol (e.g. a fund)
+    dividends: Dividends | None
+    statistics: SecurityStatistics | None
+    next_earnings: EarningsDate | None
+    unavailable: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class SecurityRanges:
     """Where the price and the P/E stand within their lows and highs over a period; None without them."""
 
@@ -105,6 +121,29 @@ class Securities:
         self._corporate_actions = corporate_actions
         self._earnings_calendar = earnings_calendar
         self._clock = clock
+
+    def summary(self, symbol: str, start: date | None = None, end: date | None = None) -> SecuritySummary:
+        """The latest price, the fundamentals' ratios, the dividends, the trend and risk from `start` to `end`, and the
+        next earnings date: each part as its own use case gives it, or None with the reason it could not be fetched."""
+        unavailable: list[str] = []
+
+        def fetched[T](part: Callable[[], T]) -> T | None:
+            try:
+                return part()
+            except DomainError as error:
+                unavailable.append(str(error))
+                return None
+
+        try:
+            price = self._prices.latest_price(symbol)
+        except PriceDataUnavailableError:
+            price = None
+            unavailable.append(f"could not fetch the price of {symbol} right now; try again later")
+        figures = fetched(lambda: self.fundamentals(symbol))
+        dividends = fetched(lambda: self.dividends(symbol))
+        statistics = fetched(lambda: self.statistics(symbol, start, end))
+        upcoming = fetched(lambda: self.next_earnings(symbol))
+        return SecuritySummary(symbol, price, figures, dividends, statistics, upcoming, tuple(unavailable))
 
     def next_earnings(self, symbol: str) -> EarningsDate | None:
         """The next day, from today on, the company reports results; None when none is known."""
