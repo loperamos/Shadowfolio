@@ -23,3 +23,13 @@ export function comparePath(walletIds: string[]): string {
   const query = new URLSearchParams({ [COMPARED_WALLETS_PARAM]: walletIds.join(COMPARED_WALLETS_SEPARATOR) });
   return `${COMPARE_PATH}?${query.toString()}`;
 }
+
+// Securities side by side: /securities/compare?symbols=NVDA,MSFT. A static path, so it wins over a security's page.
+export const SECURITIES_COMPARE_PATH = `${SECURITIES_PATH}/compare`;
+export const COMPARED_SYMBOLS_PARAM = "symbols";
+export const COMPARED_SYMBOLS_SEPARATOR = ",";
+
+export function securitiesComparePath(symbols: string[]): string {
+  const query = new URLSearchParams({ [COMPARED_SYMBOLS_PARAM]: symbols.join(COMPARED_SYMBOLS_SEPARATOR) });
+  return `${SECURITIES_COMPARE_PATH}?${query.toString()}`;
+}
