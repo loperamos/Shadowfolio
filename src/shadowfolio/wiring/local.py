@@ -12,6 +12,7 @@ from shadowfolio.adapters.cached_price_data import CachedPriceData
 from shadowfolio.adapters.degiro_statements import DegiroStatementReader
 from shadowfolio.adapters.ecb_fx_rates import EcbFxRates
 from shadowfolio.adapters.openfigi_security_lookup import OpenFigiSecurityLookup
+from shadowfolio.adapters.sec_edgar_company_data import SecEdgarCompanyData
 from shadowfolio.adapters.sqlite_wallet_repository import SqliteWalletRepository
 from shadowfolio.adapters.system_clock import SystemClock
 from shadowfolio.interfaces.web.app import create_app
@@ -20,6 +21,7 @@ from shadowfolio.usecases.history import History
 from shadowfolio.usecases.imports import Imports
 from shadowfolio.usecases.market import Market
 from shadowfolio.usecases.orders import Orders
+from shadowfolio.usecases.securities import Securities
 from shadowfolio.usecases.sync import Sync
 from shadowfolio.usecases.valuation import Valuation
 from shadowfolio.usecases.wallet_changes import WalletChanges
@@ -37,6 +39,7 @@ FX_SOURCE = "ecb"
 class LocalConfig:
     db_path: Path
     alpaca: AlpacaConfig
+    edgar_contact: str | None = None  # who SEC EDGAR is told is asking; without it, no fundamentals
 
 
 def build_local_app(config: LocalConfig) -> FastAPI:
@@ -53,6 +56,7 @@ def build_local_app(config: LocalConfig) -> FastAPI:
         valuation=Valuation(wallet_repository, clock, prices, fx_rates),
         comparison=Comparison(wallet_repository, clock, prices, fx_rates, corporate_actions),
         orders=Orders(wallet_repository, clock, prices, WalletChanges(clock, prices, fx_rates, sync)),
+        securities=Securities(SecEdgarCompanyData(config.edgar_contact, clock), prices),
         market=Market(prices, clock),
         sync=sync,
         imports=Imports(wallet_repository, WalletChanges(clock, prices, fx_rates, sync), OpenFigiSecurityLookup(), DegiroStatementReader()),

@@ -252,6 +252,70 @@ export type FillSummaryResponse = {
 };
 
 /**
+ * FiscalYearResponse
+ */
+export type FiscalYearResponse = {
+    /**
+     * Start
+     */
+    start: string;
+    /**
+     * End
+     */
+    end: string;
+    /**
+     * Revenue
+     */
+    revenue: string | null;
+    /**
+     * Net Income
+     */
+    net_income: string | null;
+    /**
+     * Eps Diluted
+     */
+    eps_diluted: string | null;
+};
+
+/**
+ * FundamentalsResponse
+ *
+ * A company's reported yearly results (amounts in `currency`, oldest first) and shares outstanding, with the P/E
+ * (against the last fiscal year's diluted EPS) and market cap at the latest price; those are null without one.
+ */
+export type FundamentalsResponse = {
+    /**
+     * Company Name
+     */
+    company_name: string;
+    currency: Currency;
+    /**
+     * Years
+     */
+    years: Array<FiscalYearResponse>;
+    /**
+     * Shares Outstanding
+     */
+    shares_outstanding: string | null;
+    /**
+     * Shares As Of
+     */
+    shares_as_of: string | null;
+    /**
+     * Price
+     */
+    price: string | null;
+    /**
+     * Pe
+     */
+    pe: string | null;
+    /**
+     * Market Cap
+     */
+    market_cap: string | null;
+};
+
+/**
  * FxRateResponse
  */
 export type FxRateResponse = {
@@ -1852,3 +1916,37 @@ export type FillAllOrdersResponses = {
 };
 
 export type FillAllOrdersResponse = FillAllOrdersResponses[keyof FillAllOrdersResponses];
+
+export type SecurityFundamentalsData = {
+    body?: never;
+    path: {
+        /**
+         * Symbol
+         */
+        symbol: string;
+    };
+    query?: never;
+    url: '/api/securities/{symbol}/fundamentals';
+};
+
+export type SecurityFundamentalsErrors = {
+    /**
+     * Not found
+     */
+    404: ErrorResponse;
+    /**
+     * Malformed request or broken business rule
+     */
+    422: ErrorResponse;
+};
+
+export type SecurityFundamentalsError = SecurityFundamentalsErrors[keyof SecurityFundamentalsErrors];
+
+export type SecurityFundamentalsResponses = {
+    /**
+     * Successful Response
+     */
+    200: FundamentalsResponse;
+};
+
+export type SecurityFundamentalsResponse = SecurityFundamentalsResponses[keyof SecurityFundamentalsResponses];

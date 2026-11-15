@@ -30,6 +30,7 @@ from shadowfolio.domain.valuation import DailyValue, Quote, WalletValuation
 from shadowfolio.domain.wallet import Wallet
 from shadowfolio.usecases.comparison import PerformanceComparison
 from shadowfolio.usecases.imports import ImportReport
+from shadowfolio.usecases.securities import CompanyFigures
 
 
 class CreateWalletRequest(BaseModel):
@@ -556,6 +557,45 @@ class QuoteResponse(BaseModel):
             previous_close=quote.previous_close,
             day_change=quote.change,
             day_change_percent=_ratio_percent(quote.change_ratio),
+        )
+
+
+class FiscalYearResponse(BaseModel):
+    start: date
+    end: date
+    revenue: Decimal | None
+    net_income: Decimal | None
+    eps_diluted: Decimal | None
+
+
+class FundamentalsResponse(BaseModel):
+    """A company's reported yearly results (amounts in `currency`, oldest first) and shares outstanding, with the P/E
+    (against the last fiscal year's diluted EPS) and market cap at the latest price; those are null without one."""
+
+    company_name: str
+    currency: Currency
+    years: list[FiscalYearResponse]
+    shares_outstanding: Decimal | None
+    shares_as_of: date | None
+    price: Decimal | None
+    pe: Decimal | None
+    market_cap: Decimal | None
+
+    @classmethod
+    def from_figures(cls, figures: CompanyFigures) -> "FundamentalsResponse":
+        fundamentals = figures.fundamentals
+        return cls(
+            company_name=fundamentals.company_name,
+            currency=fundamentals.currency,
+            years=[
+                FiscalYearResponse(start=y.start, end=y.end, revenue=y.revenue, net_income=y.net_income, eps_diluted=y.eps_diluted)
+                for y in fundamentals.years
+            ],
+            shares_outstanding=fundamentals.shares_outstanding,
+            shares_as_of=fundamentals.shares_as_of,
+            price=None if figures.price is None else figures.price.price,
+            pe=None if figures.pe is None else figures.pe.quantize(CENT, rounding=ROUND_HALF_EVEN),
+            market_cap=_optional_cents(figures.market_cap),
         )
 
 
