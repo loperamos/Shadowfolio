@@ -10,10 +10,12 @@ from fastapi.testclient import TestClient
 from shadowfolio.adapters.fixed_clock import FixedClock
 from shadowfolio.adapters.in_memory_company_data import InMemoryCompanyData
 from shadowfolio.adapters.in_memory_corporate_actions import InMemoryCorporateActions
+from shadowfolio.adapters.in_memory_earnings_calendar import InMemoryEarningsCalendar
 from shadowfolio.adapters.in_memory_news import InMemoryNews
 from shadowfolio.adapters.in_memory_price_data import InMemoryPriceData
 from shadowfolio.domain.company import FiscalYear, Fundamentals
 from shadowfolio.domain.corporate_actions import DividendEvent
+from shadowfolio.domain.earnings import EarningsDate, EarningsTime
 from shadowfolio.domain.money import Currency
 from shadowfolio.domain.news import Article
 from shadowfolio.domain.valuation import Quote
@@ -251,3 +253,16 @@ def test_without_enough_closes_the_statistics_are_unknown() -> None:
         None,
         None,
     )
+
+
+def test_the_next_earnings_date_is_the_first_from_today() -> None:
+    calendar = InMemoryEarningsCalendar(
+        EarningsDate("AAPL", date(2026, 10, 29), EarningsTime.AFTER_CLOSE),
+        EarningsDate("AAPL", date(2027, 1, 28), EarningsTime.AFTER_CLOSE),
+        EarningsDate("AAPL", date(2027, 4, 29), EarningsTime.UNKNOWN),
+    )
+    clock = FixedClock(datetime(2026, 11, 15, 12, 0, tzinfo=UTC))
+    client = TestClient(build_test_app(clock=clock, prices=InMemoryPriceData(), earnings_calendar=calendar))
+
+    assert client.get("/api/securities/aapl/earnings").json() == {"next_date": "2027-01-28", "time": "after_close"}
+    assert client.get("/api/securities/NNND.XGAT/earnings").json() == {"next_date": None, "time": None}

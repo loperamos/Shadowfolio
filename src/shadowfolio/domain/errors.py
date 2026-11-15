@@ -95,3 +95,7 @@ class InvalidRuleError(DomainError):
 
 class RuleBrokenError(DomainError):
     """An order would break one of the wallet's rules."""
+
+
+class EarningsCalendarUnavailableNowError(DomainError):
+    """When a company reports results could not be fetched right now; trying again later may work."""

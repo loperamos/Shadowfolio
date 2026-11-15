@@ -106,6 +106,7 @@ web/            the React frontend; its API client is generated from the backend
 | `CorporateActions` | Dividends and splits | Fake, real provider |
 | `CompanyData` | Reported yearly results and shares outstanding | Fake, SEC EDGAR (US filers) |
 | `News` | The latest articles about a security | Fake, Alpaca (development only) |
+| `EarningsCalendar` | When companies report results next | Fake, Finnhub (development only) |
 | `FxRates` | Daily rates | Fake, ECB, cache of past daily rates (SQLite file) |
 | `SecurityLookup` | ISIN (and trading venue) → ticker | Fake, OpenFIGI |
 | `StatementReader` | A broker's export → broker-neutral import records | DEGIRO (CSV) |
@@ -139,6 +140,7 @@ The key requirement is the right to **display data to your own paying users**; p
 | Twelve Data | External display tier | ~$499/mo | Global |
 | Tiingo | Redistribution sold separately | ~$250–500/mo (unconfirmed) | Cheap internal plans |
 | Alpaca | No: redistribution not allowed | — | Fine for development only |
+| Finnhub | To confirm: the free tier is for personal use | Free tier with an API key | Earnings calendar. The key is the server's for now; see Open questions |
 | ECB, OpenFIGI | Free | Free | FX and identifiers |
 
 ## Market notes
@@ -190,6 +192,7 @@ No paid subscription is needed before the licensed-provider slice.
 - Withholding by the security's country (one rate per wallet while the MVP is US-only); dividend reinvestment option.
 - Comparison metrics and charts beyond the basics.
 - Plans, limits and pricing.
+- Users' own provider keys: some data needs a provider key (Finnhub for the earnings calendar, today the server's own `FINNHUB_API_KEY`). A free key may not allow showing its data to other users, so users may have to pass their own key (stored as a secret per user) instead of the server's.
 - Hosting provider.
 - Instrument identity: key holdings by ISIN rather than ticker, so one security bought on different exchanges (e.g. Tesla on NASDAQ in USD and on Tradegate in EUR) is one holding; store the venue; value each holding from one listing (the US one in the MVP), converted with `FxRates`. Decide with the import or valuation slice.
 - FX on real trades: the broker's settled amount is the source of truth for cash. Open: also accept an FX rate instead, and warn when a broker's rate is far from the market rate (brokers add a margin, e.g. DEGIRO's AutoFX).
