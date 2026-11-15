@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { apiErrorMessage } from "../api/errors";
-import { dailyCloses, type DailyCloseResponse, latestQuote, type QuoteResponse } from "../api/generated";
+import { dailyCloses, type DailyCloseResponse, type FundamentalsResponse, latestQuote, type QuoteResponse, securityFundamentals } from "../api/generated";
 
 const NOT_FOUND_STATUS = 404;
 
@@ -51,5 +51,36 @@ export function useCloses(symbol: string, start: string | null, end: string | nu
       current = false;
     };
   }, [symbol, start, end]);
+  return state;
+}
+
+export type FundamentalsState =
+  | { status: "loading" }
+  | { status: "error"; message: string }
+  | { status: "none" }
+  | { status: "loaded"; fundamentals: FundamentalsResponse };
+
+/** The company's reported results and ratios, or "none" when it does not report to the source (e.g. a non-US listing). */
+export function useFundamentals(symbol: string): FundamentalsState {
+  const [state, setState] = useState<FundamentalsState>({ status: "loading" });
+  useEffect(() => {
+    let current = true;
+    setState({ status: "loading" });
+    securityFundamentals({ path: { symbol } })
+      .then(({ data, error, response }) => {
+        if (!current) {
+          return;
+        }
+        if (data) {
+          setState({ status: "loaded", fundamentals: data });
+        } else {
+          setState(response?.status === NOT_FOUND_STATUS ? { status: "none" } : { status: "error", message: apiErrorMessage(error) });
+        }
+      })
+      .catch(() => current && setState({ status: "error", message: "Could not reach the backend." }));
+    return () => {
+      current = false;
+    };
+  }, [symbol]);
   return state;
 }
