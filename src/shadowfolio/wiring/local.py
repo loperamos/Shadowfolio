@@ -44,6 +44,7 @@ class LocalConfig:
     alpaca: AlpacaConfig
     edgar_contact: str | None = None  # who SEC EDGAR is told is asking; without it, no fundamentals
     finnhub_key: str | None = None  # for the earnings calendar; without it, no earnings dates
+    mcp_allowed_hosts: tuple[str, ...] = ()  # besides localhost, the addresses agents may reach the MCP server at
 
 
 def build_local_app(config: LocalConfig) -> FastAPI:
@@ -73,4 +74,5 @@ def build_local_app(config: LocalConfig) -> FastAPI:
         market=market,
         sync=sync,
         imports=Imports(wallet_repository, WalletChanges(clock, prices, fx_rates, sync), OpenFigiSecurityLookup(), DegiroStatementReader()),
+        mcp_allowed_hosts=config.mcp_allowed_hosts,
     )

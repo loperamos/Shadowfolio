@@ -67,12 +67,13 @@ async def call(app: Any, tool: str, **arguments: Any) -> Any:
 
 
 @pytest.mark.anyio
-async def test_the_read_tools_are_offered_each_described(app: Any) -> None:
+async def test_the_read_tools_are_offered_each_described_as_only_reading(app: Any) -> None:
     async with Client(app.state.mcp) as client:
-        tools = (await client.list_tools()).tools
+        tools = {tool.name: tool for tool in (await client.list_tools()).tools}
 
-    assert {tool.name for tool in tools} == {"list_wallets", "wallet_snapshot", "security_summary", "compare_securities"}
-    assert all(tool.description for tool in tools)
+    reading = {"list_wallets", "wallet_snapshot", "security_summary", "compare_securities", "preview_order", "list_orders"}
+    assert reading <= tools.keys()
+    assert all(tools[name].description and tools[name].annotations.read_only_hint for name in reading)  # type: ignore[union-attr]
 
 
 @pytest.mark.anyio
@@ -126,3 +127,17 @@ def test_each_request_stands_alone_as_on_the_rest_api(app: Any) -> None:
     assert (response.status_code, response.headers["content-type"]) == (200, "application/json")
     assert "mcp-session-id" not in response.headers
     assert response.json()["result"]["structuredContent"] == {"result": []}
+
+
+@pytest.mark.parametrize(("allowed", "status"), [((), 421), (("192.168.1.75:8000",), 200)])
+def test_only_the_host_names_allowed_reach_it(allowed: tuple[str, ...], status: int) -> None:
+    """Localhost always; another address (e.g. the machine's on a home network) only when configured, against DNS
+    rebinding (a web page making the browser talk to a server on the network)."""
+    app = build_test_app(mcp_allowed_hosts=allowed)
+    request = {"jsonrpc": "2.0", "id": 1, "method": "tools/list"}
+    headers = {"Accept": "application/json, text/event-stream", "Content-Type": "application/json"}
+
+    with TestClient(app, base_url="http://192.168.1.75:8000") as http:
+        response = http.post("/mcp", json=request, headers=headers)
+
+    assert response.status_code == status

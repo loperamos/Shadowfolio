@@ -49,7 +49,7 @@ Lingering is a setting for all your user services, not part of the timer, so uni
 
 ## Agents (MCP)
 
-The backend also serves an MCP server at `http://127.0.0.1:8000/mcp` (Streamable HTTP), so an agent can read your wallets and securities with the same figures as the web app. It is read-only for now, and has no sign-in yet: keep the backend on localhost. For example, with Claude Code:
+The backend also serves an MCP server at `http://127.0.0.1:8000/mcp` (Streamable HTTP), so an agent can read your wallets and securities with the same figures as the web app, and preview, place and cancel orders now (never back-dated), each with its reason. It has no sign-in yet, so it only answers on localhost, plus any address listed in `SHADOWFOLIO_MCP_ALLOWED_HOSTS` (see `.env.example`); anyone who can reach it can read and trade your wallets. For example, with Claude Code:
 
 ```bash
 claude mcp add --transport http shadowfolio http://127.0.0.1:8000/mcp
