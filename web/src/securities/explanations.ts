@@ -15,7 +15,9 @@ export const EXPLANATIONS = {
     "Large caps (hundreds of billions) are usually steadier; small caps can grow faster but swing more.",
   sharesOutstanding:
     "How many shares exist. Your share of the company is your shares divided by this. A count that rises over the years dilutes owners " +
-    "(each share owns less); a falling one (buybacks) does the opposite.",
+    "(each share owns less); a falling one (buybacks) does the opposite. When the company states no single count (some " +
+    "with several share classes), every class together from its balance sheet is used, or else the diluted average shares of its " +
+    "latest quarter, which is a little higher than the real count.",
   revenue:
     "Revenue (sales): all the money the company took in from customers in the year, before any costs. Growing revenue shows a business " +
     "getting bigger; it says nothing yet about whether it is profitable.",

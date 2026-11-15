@@ -1,4 +1,6 @@
 import { Alert, Group, SegmentedControl, Skeleton, Table, Text, Title } from "@mantine/core";
+
+import { SharesSource } from "../api/generated";
 import { useSearchParams } from "react-router";
 
 import { formatAmount, formatCompactAmount, formatDate, formatPercent } from "../ui/format";
@@ -70,7 +72,7 @@ function FundamentalsBody({ symbol, state }: { symbol: string; state: ReturnType
     case "none":
       return <Text c="dimmed">No fundamentals for {symbol}: only companies that report to the US SEC are covered.</Text>;
     case "loaded": {
-      const { company_name, industry, currency, years, quarters, shares_outstanding, shares_as_of, pe, market_cap, price_to_sales, free_cash_flow_yield } =
+      const { company_name, industry, shares_source, currency, years, quarters, shares_outstanding, shares_as_of, pe, market_cap, price_to_sales, free_cash_flow_yield } =
         state.fundamentals;
       const latest = years.at(-1);
       const quarterly = view === ResultsView.QUARTERLY;
@@ -106,8 +108,22 @@ function FundamentalsBody({ symbol, state }: { symbol: string; state: ReturnType
               free_cash_flow_yield == null ? "—" : `${formatPercent(free_cash_flow_yield)}%`,
               free_cash_flow_yield == null ? undefined : "Last fiscal year's free cash flow against the market cap",
             )}
-            {figure("Market cap", EXPLANATIONS.marketCap, amount(market_cap), market_cap == null ? "No single, recent share count (e.g. several share classes)" : undefined)}
-            {figure("Shares outstanding", EXPLANATIONS.sharesOutstanding, shares_outstanding == null ? "—" : formatCompactAmount(shares_outstanding), shares_as_of ? `As of ${formatDate(shares_as_of)}` : undefined)}
+            {figure(
+              "Market cap",
+              EXPLANATIONS.marketCap,
+              amount(market_cap),
+              market_cap == null
+                ? "No recent share count reported"
+                : shares_source === SharesSource.DILUTED_AVERAGE
+                  ? "Approximate: from diluted average shares"
+                  : undefined,
+            )}
+            {figure(
+              "Shares outstanding",
+              EXPLANATIONS.sharesOutstanding,
+              shares_outstanding == null ? "—" : formatCompactAmount(shares_outstanding),
+              shares_as_of && shares_source ? sharesNote(shares_source, shares_as_of) : undefined,
+            )}
             {latest && figure("Revenue", EXPLANATIONS.revenue, amount(latest.revenue), `Fiscal year to ${formatDate(latest.end)}`)}
             {latest && figure("Net income", EXPLANATIONS.netIncome, amount(latest.net_income), `Fiscal year to ${formatDate(latest.end)}`)}
           </Group>
@@ -216,6 +232,18 @@ function FundamentalsBody({ symbol, state }: { symbol: string; state: ReturnType
         </>
       );
     }
+  }
+}
+
+/** Where the share count comes from, and as of when: the most exact source the company reported. */
+function sharesNote(source: SharesSource, asOf: string): string {
+  switch (source) {
+    case SharesSource.COVER:
+      return `As of ${formatDate(asOf)}`;
+    case SharesSource.BALANCE_SHEET:
+      return `All share classes, at ${formatDate(asOf)}`;
+    case SharesSource.DILUTED_AVERAGE:
+      return `Approximate: diluted average, quarter to ${formatDate(asOf)}`;
   }
 }
 

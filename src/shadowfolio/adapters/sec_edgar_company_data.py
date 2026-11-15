@@ -20,7 +20,7 @@ from typing import Any
 
 import httpx2
 
-from shadowfolio.domain.company import FiscalYear, Fundamentals
+from shadowfolio.domain.company import FiscalYear, Fundamentals, SharesSource
 from shadowfolio.domain.money import Currency
 from shadowfolio.ports.clock import Clock
 from shadowfolio.ports.company_data import CompanyData, CompanyDataUnavailableError
@@ -54,6 +54,10 @@ CASH_CONCEPTS = ("CashAndCashEquivalentsAtCarryingValue", "CashCashEquivalentsRe
 DEBT_CONCEPTS = ("LongTermDebt",)
 EPS_DILUTED_CONCEPT = "EarningsPerShareDiluted"
 SHARES_CONCEPT = "EntityCommonStockSharesOutstanding"
+# When the cover page gives no single count (companies with several share classes state one per class, which EDGAR's
+# summary leaves out): the balance sheet's count of every class, then the latest quarter's diluted average shares.
+BALANCE_SHEET_SHARES_CONCEPT = "CommonStockSharesOutstanding"
+DILUTED_SHARES_CONCEPT = "WeightedAverageNumberOfDilutedSharesOutstanding"
 US_GAAP = "us-gaap"
 DEI = "dei"  # the filing's cover page: who the company is, its shares outstanding
 USD = "USD"
@@ -132,22 +136,49 @@ def _fundamentals(facts: dict[str, Any]) -> Fundamentals:
         )
         for start, end in periods
     )
-    shares = sorted(
-        facts["facts"].get(DEI, {}).get(SHARES_CONCEPT, {}).get("units", {}).get(SHARES, []), key=lambda fact: (fact["end"], fact["filed"])
-    )
-    latest = shares[-1] if shares else None
-    # A count from before the last fiscal year is stale: companies with several share classes stop reporting a single
-    # one on the cover page (Berkshire's ends in 2011), and an old count would give a wrong market cap.
-    if latest is not None and years and date.fromisoformat(latest["end"]) < years[-1].start:
-        latest = None
+    shares = _shares(facts["facts"], years[-1].start if years else None)
     return Fundamentals(
         company_name=facts["entityName"],
         currency=Currency.USD,
         years=years,
-        shares_outstanding=None if latest is None else Decimal(latest["val"]),
-        shares_as_of=None if latest is None else date.fromisoformat(latest["end"]),
+        shares_outstanding=None if shares is None else shares[0],
+        shares_as_of=None if shares is None else shares[1],
+        shares_source=None if shares is None else shares[2],
         quarters=quarters,
     )
+
+
+def _shares(facts: dict[str, Any], last_year_start: date | None) -> tuple[Decimal, date, SharesSource] | None:
+    """The share count, its date and where it comes from: the cover page's, else the balance sheet's (every class),
+    else the latest quarter's diluted average. A count from before the last fiscal year is stale and skipped:
+    companies with several share classes stop stating a single one (Berkshire's ends in 2011)."""
+
+    def latest(found: list[dict[str, Any]]) -> dict[str, Any] | None:
+        fresh = [fact for fact in found if last_year_start is None or date.fromisoformat(fact["end"]) >= last_year_start]
+        return max(fresh, key=lambda fact: (fact["end"], fact["filed"]), default=None)
+
+    def reported(taxonomy: str, concept: str) -> list[dict[str, Any]]:
+        return list(facts.get(taxonomy, {}).get(concept, {}).get("units", {}).get(SHARES, []))
+
+    gaap_forms = (ANNUAL_FORM, QUARTERLY_FORM)
+    balance_sheet = [f for f in reported(US_GAAP, BALANCE_SHEET_SHARES_CONCEPT) if f.get("form") in gaap_forms and "start" not in f]
+    diluted = [
+        f for f in reported(US_GAAP, DILUTED_SHARES_CONCEPT) if f.get("form") in gaap_forms and "start" in f and _days(f) in QUARTER_DAYS
+    ]
+    for found, source in (
+        (reported(DEI, SHARES_CONCEPT), SharesSource.COVER),
+        (balance_sheet, SharesSource.BALANCE_SHEET),
+        (diluted, SharesSource.DILUTED_AVERAGE),
+    ):
+        fact = latest(found)
+        if fact is not None:
+            return Decimal(fact["val"]), date.fromisoformat(fact["end"]), source
+    return None
+
+
+def _days(fact: dict[str, Any]) -> int:
+    """How many days a reported period lasts."""
+    return (date.fromisoformat(fact["end"]) - date.fromisoformat(fact["start"])).days
 
 
 def _quarters(gaap: dict[str, Any], fiscal_years: list[tuple[date, date]]) -> tuple[FiscalYear, ...]:
