@@ -305,6 +305,8 @@ class ValuationResponse(BaseModel):
     cash_weight_percent: Decimal | None  # cash's share of the whole value
     largest_weight_percent: Decimal | None  # the largest holding's share of the whole value
     effective_holdings: Decimal | None  # how many equal-sized holdings the holdings spread risk like
+    reserved_for_orders: Decimal | None  # what open buy orders would cost; null when unknown, or for a past day
+    buying_power: Decimal | None  # cash less what open buy orders would cost
 
     @classmethod
     def from_valuation(cls, valuation: WalletValuation) -> "ValuationResponse":
@@ -342,6 +344,8 @@ class ValuationResponse(BaseModel):
             effective_holdings=None
             if valuation.effective_holdings is None
             else valuation.effective_holdings.quantize(CENT, rounding=ROUND_HALF_EVEN),
+            reserved_for_orders=_optional_cents(valuation.reserved_for_orders),
+            buying_power=_optional_cents(valuation.buying_power),
         )
 
 

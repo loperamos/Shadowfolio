@@ -1006,6 +1006,14 @@ export type ValuationResponse = {
      * Effective Holdings
      */
     effective_holdings: string | null;
+    /**
+     * Reserved For Orders
+     */
+    reserved_for_orders: string | null;
+    /**
+     * Buying Power
+     */
+    buying_power: string | null;
 };
 
 /**

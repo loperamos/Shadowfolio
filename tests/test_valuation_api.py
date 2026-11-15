@@ -78,6 +78,8 @@ def test_cash_only_wallet_is_worth_its_cash(client: TestClient) -> None:
         "cash_weight_percent": "100.00",
         "largest_weight_percent": None,
         "effective_holdings": None,
+        "reserved_for_orders": "0.00",
+        "buying_power": "3000.00",
     }
 
 
@@ -134,6 +136,44 @@ def test_each_holding_has_its_weight_and_the_wallet_its_concentration(
     assert (valuation["cash_weight_percent"], valuation["largest_weight_percent"]) == ("19.47", "49.37")
     # Two holdings of 38.7% and 61.3% of what is invested spread risk like 1.90 equal ones: 1 / (0.387² + 0.613²).
     assert valuation["effective_holdings"] == "1.90"
+
+
+def order(client: TestClient, wallet_id: str, side: str, symbol: str, quantity: str, limit: str | None = None) -> str:
+    body = {"side": side, "symbol": symbol, "quantity": quantity, "limit_price": limit}
+    response = client.post(f"/api/wallets/{wallet_id}/orders", json=body)
+    assert response.status_code == 201, response.json()
+    order_id: str = response.json()["id"]
+    return order_id
+
+
+def test_buying_power_is_the_cash_left_after_what_open_buy_orders_would_cost(
+    client: TestClient, prices: InMemoryPriceData, fx_rates: InMemoryFxRates
+) -> None:
+    wallet_id = wallet_holding(client, NVDA_BUY)  # 2090.32 EUR cash
+    prices.set("NVDA", Quote(Decimal("135.50"), Currency.USD, QUOTE_TIME))
+    prices.set("TSLA", Quote(Decimal("310.00"), Currency.EUR, QUOTE_TIME))
+    fx_rates.set(FxRate(Currency.USD, Currency.EUR, Decimal("0.9025"), date(2026, 3, 2)))
+    order(client, wallet_id, "buy", "NVDA", "2", limit="130")  # at its limit: 260 USD = 234.65 EUR
+    order(client, wallet_id, "buy", "TSLA", "3")  # at market, so at the latest price: 930.00 EUR
+    order(client, wallet_id, "sell", "NVDA", "1", limit="200")  # sells bring cash in: not reserved
+    cancelled = order(client, wallet_id, "buy", "NVDA", "5")
+    client.post(f"/api/wallets/{wallet_id}/orders/{cancelled}/cancel")
+
+    valuation = client.get(f"/api/wallets/{wallet_id}/valuation").json()
+
+    assert (valuation["cash"], valuation["reserved_for_orders"], valuation["buying_power"]) == ("2090.32", "1164.65", "925.67")
+    assert [h["symbol"] for h in valuation["holdings"]] == ["NVDA"]  # an order's symbol is not a holding
+
+
+def test_buying_power_is_unknown_when_an_open_buy_has_no_price(client: TestClient, prices: InMemoryPriceData) -> None:
+    wallet_id = wallet_holding(client, TSLA_BUY)
+    prices.set("TSLA", Quote(Decimal("310.00"), Currency.EUR, QUOTE_TIME))
+    order(client, wallet_id, "buy", "ZZZZ", "1")
+
+    response = client.get(f"/api/wallets/{wallet_id}/valuation")
+
+    assert response.status_code == 200
+    assert (response.json()["total"], response.json()["reserved_for_orders"], response.json()["buying_power"]) == ("3070.85", None, None)
 
 
 def test_day_change_is_the_price_move_since_the_previous_close(

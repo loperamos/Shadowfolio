@@ -7,6 +7,7 @@ from decimal import Decimal
 
 from shadowfolio.domain.money import Currency, FxRate, to_cents
 from shadowfolio.domain.operations import Buy, Operation, Sell
+from shadowfolio.domain.orders import Order, OrderSide
 from shadowfolio.domain.wallet import Wallet
 
 
@@ -78,6 +79,8 @@ class WalletValuation:
     currency: Currency
     cash: Decimal
     holdings: tuple[HoldingValue, ...]  # sorted by symbol
+    # What open buy orders would cost (see `reserved_for_orders`); None when unknown, or for a past day.
+    reserved_for_orders: Decimal | None = None
 
     @property
     def cost(self) -> Decimal:
@@ -110,6 +113,11 @@ class WalletValuation:
     def total(self) -> Decimal:
         """Cash plus all holdings, in the wallet's currency."""
         return self.cash + sum((h.value_in_wallet_currency for h in self.holdings), Decimal(0))
+
+    @property
+    def buying_power(self) -> Decimal | None:
+        """Cash not yet committed to open buy orders: what new buys can still spend. None when that is unknown."""
+        return None if self.reserved_for_orders is None else self.cash - self.reserved_for_orders
 
     def weight(self, holding: HoldingValue) -> Decimal | None:
         """The holding's share of the wallet's whole value, cash included (0.31 for 31%); None for an empty wallet."""
@@ -193,3 +201,26 @@ def value_wallet(wallet: Wallet, quotes: Mapping[str, Quote], rates: Mapping[Cur
         for symbol, quantity in sorted(wallet.holdings.items())
     )
     return WalletValuation(currency=wallet.currency, cash=wallet.cash, holdings=holdings)
+
+
+def reserved_for_orders(
+    orders: Iterable[Order], quotes: Mapping[str, Quote], rates: Mapping[Currency, FxRate], currency: Currency
+) -> Decimal | None:
+    """What the open buy orders among `orders` would cost, in `currency`: each at its limit price, or a market order at
+    its symbol's quote, converted at `rates` and rounded to cents per order, as a fill would be. None when an order's
+    symbol has no quote, or its currency no rate."""
+    total = Decimal(0)
+    for order in orders:
+        if not order.is_open or order.side is not OrderSide.BUY:
+            continue
+        quote = quotes.get(order.symbol)
+        if quote is None:
+            return None
+        cost = order.quantity * (quote.price if order.limit_price is None else order.limit_price)
+        if quote.currency is not currency:
+            rate = rates.get(quote.currency)
+            if rate is None:
+                return None
+            cost *= rate.rate
+        total += to_cents(cost)
+    return total

@@ -3537,6 +3537,28 @@
               }
             ],
             "title": "Effective Holdings"
+          },
+          "reserved_for_orders": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reserved For Orders"
+          },
+          "buying_power": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Buying Power"
           }
         },
         "type": "object",
@@ -3552,7 +3574,9 @@
           "total",
           "cash_weight_percent",
           "largest_weight_percent",
-          "effective_holdings"
+          "effective_holdings",
+          "reserved_for_orders",
+          "buying_power"
         ],
         "title": "ValuationResponse"
       },
