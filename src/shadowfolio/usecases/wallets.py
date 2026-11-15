@@ -1,5 +1,6 @@
 """Wallet use cases: creating, changing settings (name, withholding tax, rules), copying, deleting and reading wallets."""
 
+from dataclasses import replace
 from datetime import datetime
 from decimal import Decimal
 from uuid import UUID, uuid4
@@ -42,11 +43,13 @@ class Wallets:
         return updated
 
     def set_rules(self, wallet_id: UUID, rules: Rules) -> Wallet | None:
-        """Replace the wallet's rules for orders. Returns None if the wallet does not exist."""
+        """Replace the wallet's rules for orders, its allowed symbols as market data writes them, once each. Returns
+        None if the wallet does not exist."""
         wallet = self._repo.get(wallet_id)
         if wallet is None:
             return None
-        updated = wallet.set_rules(rules)
+        symbols = tuple(dict.fromkeys(symbol.strip().upper() for symbol in rules.allowed_symbols))
+        updated = wallet.set_rules(replace(rules, allowed_symbols=symbols))
         self._repo.update(updated)
         return updated
 

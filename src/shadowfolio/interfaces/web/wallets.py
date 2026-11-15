@@ -56,7 +56,10 @@ def wallets_router(wallets: Wallets) -> APIRouter:
     def set_wallet_rules(wallet_id: UUID, request: RulesRequest) -> WalletResponse:
         """Replace the wallet's rules, checked when an order is placed: a buy that would break one is refused."""
         try:
-            wallet = wallets.set_rules(wallet_id, Rules(request.max_position_weight, request.min_cash_weight))
+            wallet = wallets.set_rules(
+                wallet_id,
+                Rules(request.max_position_weight, request.min_cash_weight, tuple(request.allowed_symbols), request.max_orders_per_month),
+            )
         except DomainError as error:
             raise rule_violation(error) from error
         if wallet is None:

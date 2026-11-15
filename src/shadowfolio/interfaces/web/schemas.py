@@ -27,6 +27,7 @@ from shadowfolio.domain.operations import (
 )
 from shadowfolio.domain.orders import Order, OrderSide, OrderStatus
 from shadowfolio.domain.performance import Performance, TradingActivity
+from shadowfolio.domain.rules import Rules
 from shadowfolio.domain.valuation import DailyValue, Quote, WalletValuation
 from shadowfolio.domain.wallet import Wallet
 from shadowfolio.usecases.comparison import PerformanceComparison
@@ -54,11 +55,24 @@ class RulesRequest(BaseModel):
 
     max_position_weight: Decimal | None  # the most one holding may reach after a buy
     min_cash_weight: Decimal | None  # what to keep in cash after a buy
+    allowed_symbols: list[str]  # the only symbols it may buy; any when empty (any can be sold)
+    max_orders_per_month: int | None  # orders placed in a calendar month (UTC), buys and sells
 
 
 class RulesResponse(BaseModel):
     max_position_weight: Decimal | None
     min_cash_weight: Decimal | None
+    allowed_symbols: list[str]
+    max_orders_per_month: int | None
+
+    @classmethod
+    def from_rules(cls, rules: Rules) -> "RulesResponse":
+        return cls(
+            max_position_weight=rules.max_position_weight,
+            min_cash_weight=rules.min_cash_weight,
+            allowed_symbols=list(rules.allowed_symbols),
+            max_orders_per_month=rules.max_orders_per_month,
+        )
 
 
 class CopyWalletRequest(BaseModel):
@@ -174,7 +188,7 @@ class WalletResponse(BaseModel):
             realized_gain=_cents(ledger.realized_gain),
             hindsight=wallet.hindsight,
             splits_checked_through=_checked_through(wallet),
-            rules=RulesResponse(max_position_weight=wallet.rules.max_position_weight, min_cash_weight=wallet.rules.min_cash_weight),
+            rules=RulesResponse.from_rules(wallet.rules),
             uncredited_dividends=[
                 UncreditedDividendResponse(symbol=e.symbol, ex_date=e.ex_date, per_share=e.per_share, currency=e.currency)
                 for e in wallet.uncredited_dividends

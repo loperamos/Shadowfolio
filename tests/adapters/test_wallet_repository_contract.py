@@ -136,7 +136,7 @@ def test_rules_round_trip_and_change(make_repository: RepositoryFactory) -> None
     make_repository().add(wallet)
     assert make_repository().get(wallet.id) == wallet
 
-    changed = wallet.set_rules(Rules(min_cash_weight=Decimal("0.05")))
+    changed = wallet.set_rules(Rules(min_cash_weight=Decimal("0.05"), allowed_symbols=("NVDA", "BRK.B"), max_orders_per_month=10))
     make_repository().update(changed)
 
     assert make_repository().get(wallet.id) == changed

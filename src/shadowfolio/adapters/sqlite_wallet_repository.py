@@ -38,7 +38,9 @@ CREATE TABLE IF NOT EXISTS wallets (
     currency TEXT NOT NULL,
     withholding_rate TEXT NOT NULL DEFAULT '0',
     max_position_weight TEXT,
-    min_cash_weight TEXT
+    min_cash_weight TEXT,
+    allowed_symbols TEXT,
+    max_orders_per_month INTEGER
 );
 CREATE TABLE IF NOT EXISTS operations (
     id TEXT PRIMARY KEY,
@@ -97,8 +99,17 @@ CREATE TABLE IF NOT EXISTS dividend_events (
 # Columns added after a database may already exist, with what existing rows get. Trades stored before
 # price_source existed were all typed in from a broker; split and dividend columns only apply to those, added later.
 # Wallets stored before withholding existed paid dividends gross.
+# Allowed symbols are kept in one column, joined by this: symbols never contain it.
+SYMBOL_SEPARATOR = ","
+
 _ADDED_COLUMNS = {
-    "wallets": {"withholding_rate": "TEXT NOT NULL DEFAULT '0'", "max_position_weight": "TEXT", "min_cash_weight": "TEXT"},
+    "wallets": {
+        "withholding_rate": "TEXT NOT NULL DEFAULT '0'",
+        "max_position_weight": "TEXT",
+        "min_cash_weight": "TEXT",
+        "allowed_symbols": "TEXT",
+        "max_orders_per_month": "INTEGER",
+    },
     "operations": {
         "price_source": "TEXT DEFAULT 'entered'",
         "split_old_rate": "TEXT",
@@ -124,8 +135,8 @@ class SqliteWalletRepository(WalletRepository):
     def add(self, wallet: Wallet) -> None:
         with closing(self._connect()) as conn, conn:
             conn.execute(
-                "INSERT INTO wallets (id, owner_id, name, currency, withholding_rate, max_position_weight, min_cash_weight) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                "INSERT INTO wallets (id, owner_id, name, currency, withholding_rate, max_position_weight, min_cash_weight, "
+                "allowed_symbols, max_orders_per_month) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     str(wallet.id),
                     wallet.owner_id,
@@ -144,7 +155,7 @@ class SqliteWalletRepository(WalletRepository):
         with closing(self._connect()) as conn, conn:
             conn.execute(
                 "UPDATE wallets SET owner_id = ?, name = ?, currency = ?, withholding_rate = ?, max_position_weight = ?, "
-                "min_cash_weight = ? WHERE id = ?",
+                "min_cash_weight = ?, allowed_symbols = ?, max_orders_per_month = ? WHERE id = ?",
                 (
                     wallet.owner_id,
                     wallet.name,
@@ -167,7 +178,8 @@ class SqliteWalletRepository(WalletRepository):
     def get(self, wallet_id: UUID) -> Wallet | None:
         with closing(self._connect()) as conn:
             row = conn.execute(
-                "SELECT id, owner_id, name, currency, withholding_rate, max_position_weight, min_cash_weight FROM wallets WHERE id = ?",
+                "SELECT id, owner_id, name, currency, withholding_rate, max_position_weight, min_cash_weight, "
+                "allowed_symbols, max_orders_per_month FROM wallets WHERE id = ?",
                 (str(wallet_id),),
             ).fetchone()
             if row is None:
@@ -198,7 +210,9 @@ class SqliteWalletRepository(WalletRepository):
             checked={symbol: CheckedPeriod(date.fromisoformat(start), date.fromisoformat(end)) for symbol, start, end in period_rows},
             dividend_events=tuple(_dividend_from_row(row) for row in dividend_rows),
             withholding_rate=Decimal(row[4]),
-            rules=Rules(_optional_decimal(row[5]), _optional_decimal(row[6])),
+            rules=Rules(
+                _optional_decimal(row[5]), _optional_decimal(row[6]), tuple(row[7].split(SYMBOL_SEPARATOR)) if row[7] else (), row[8]
+            ),
             orders=tuple(_order_from_row(order) for order in order_rows),
         )
 
@@ -431,8 +445,13 @@ def _add_missing_columns(conn: sqlite3.Connection) -> None:
                 conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {definition}")
 
 
-def _rules_row(rules: Rules) -> tuple[str | None, str | None]:
-    return _optional_text(rules.max_position_weight), _optional_text(rules.min_cash_weight)
+def _rules_row(rules: Rules) -> tuple[str | None, str | None, str | None, int | None]:
+    return (
+        _optional_text(rules.max_position_weight),
+        _optional_text(rules.min_cash_weight),
+        SYMBOL_SEPARATOR.join(rules.allowed_symbols) or None,
+        rules.max_orders_per_month,
+    )
 
 
 def _optional_text(value: Decimal | None) -> str | None:
