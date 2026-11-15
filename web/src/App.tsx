@@ -1,6 +1,7 @@
 import { Anchor, Container, Stack, Text, Title } from "@mantine/core";
 import { Link, Navigate, Route, Routes } from "react-router";
 
+import { AppHeader } from "./AppHeader";
 import { COMPARE_PATH, SECURITY_PATH, WALLET_PATH, WALLETS_PATH } from "./routes";
 import { SecurityPage } from "./securities/SecurityPage";
 import { ComparePage } from "./wallets/ComparePage";
@@ -10,6 +11,7 @@ import { WalletsPage } from "./wallets/WalletsPage";
 export function App() {
   return (
     <Container size="xl" py="xl">
+      <AppHeader />
       <Routes>
         <Route path="/" element={<Navigate to={WALLETS_PATH} replace />} />
         <Route path={WALLETS_PATH} element={<WalletsPage />} />

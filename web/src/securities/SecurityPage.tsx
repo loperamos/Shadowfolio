@@ -1,10 +1,10 @@
-import { Alert, Anchor, Breadcrumbs, Group, Loader, Skeleton, Stack, Table, Text, Title } from "@mantine/core";
+import { Alert, Anchor, Group, Loader, Skeleton, Stack, Table, Text, Title } from "@mantine/core";
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router";
 
 import { apiErrorMessage } from "../api/errors";
 import { listWallets, type WalletResponse } from "../api/generated";
-import { walletPath, WALLETS_PATH } from "../routes";
+import { walletPath } from "../routes";
 import { GainText } from "../ui/GainText";
 import { Money } from "../ui/Money";
 import { formatDateTime, todayAsInputValue } from "../ui/format";
@@ -24,22 +24,15 @@ const CLOSE_LINE = "close";
 export function SecurityPage() {
   const { symbol: raw = "" } = useParams();
   const symbol = raw.toUpperCase();
+  // No breadcrumbs: a security does not sit inside a section (it is reached from the header's lookup, or a holding).
   return (
-    <>
-      <Breadcrumbs mb="md">
-        <Anchor component={Link} to={WALLETS_PATH}>
-          Wallets
-        </Anchor>
-        <Text>{symbol}</Text>
-      </Breadcrumbs>
-      <Stack gap="xl">
-        <Header symbol={symbol} />
-        <PriceChart symbol={symbol} />
-        <SecurityFundamentals symbol={symbol} />
-        <Positions symbol={symbol} />
-        <SecurityNews symbol={symbol} />
-      </Stack>
-    </>
+    <Stack gap="xl">
+      <Header symbol={symbol} />
+      <PriceChart symbol={symbol} />
+      <SecurityFundamentals symbol={symbol} />
+      <Positions symbol={symbol} />
+      <SecurityNews symbol={symbol} />
+    </Stack>
   );
 }
 
