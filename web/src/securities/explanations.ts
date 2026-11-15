@@ -75,6 +75,9 @@ export const EXPLANATIONS = {
   beta:
     "How much the price tends to move when the market (SPY) moves, over the selected period: 1 moves with it, 2 twice as much, 0.5 half, " +
     "and near 0 or below barely or against it. It describes market risk; it has done little to explain which stocks earn more.",
+  averageVolume:
+    "How many shares trade on an average day in the selected period, and what they are worth. The more trades, the more easily a " +
+    "position can be bought or sold without moving the price; thinly traded shares cost more to trade than their fees show.",
   priceRange:
     "The lowest and highest closing price over the period you selected, with today's price as the dot. Near the top means it trades close " +
     "to its recent highs; near the bottom, close to its lows. It shows where the price is, not whether it is cheap.",
