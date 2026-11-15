@@ -27,6 +27,21 @@ export const EXPLANATIONS = {
   netMargin:
     "Net income as a share of revenue: of every dollar of sales, how many cents the company keeps as profit. Margins differ a lot by " +
     "sector (software is often above 20%, retail a few percent), so compare with similar companies and with the company's own past.",
+  operatingCashFlow:
+    "The cash the business itself brought in over the year: net income with non-cash items (like depreciation) added back and the cash " +
+    "tied up in stock and unpaid bills taken into account. Profit backed by cash is more trustworthy than profit on paper.",
+  capitalSpending:
+    "Cash spent on buildings, factories, equipment and the like, to keep the business running and growing. Heavy industries spend a lot " +
+    "every year; software companies little.",
+  freeCashFlow:
+    "Operating cash flow less capital spending: the cash left over to pay dividends, buy back shares, pay down debt or save. Free cash " +
+    "flow close to or above net income says the profits are real cash; far below it, year after year, is a warning sign.",
+  cash:
+    "Cash and cash equivalents (such as short-term deposits) at the fiscal year's end: money the company can use right away. For some " +
+    "companies it includes cash set aside for a purpose (restricted cash).",
+  debt:
+    "Long-term borrowing at the fiscal year's end, the part due within a year included. Compare it with cash and free cash flow: debt that " +
+    "a few years of free cash flow could repay is easy to carry; much more than that makes a company fragile when times are hard.",
   priceRange:
     "The lowest and highest closing price over the period you selected, with today's price as the dot. Near the top means it trades close " +
     "to its recent highs; near the bottom, close to its lows. It shows where the price is, not whether it is cheap.",
