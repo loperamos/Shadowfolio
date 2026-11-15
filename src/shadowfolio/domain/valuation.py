@@ -111,6 +111,31 @@ class WalletValuation:
         """Cash plus all holdings, in the wallet's currency."""
         return self.cash + sum((h.value_in_wallet_currency for h in self.holdings), Decimal(0))
 
+    def weight(self, holding: HoldingValue) -> Decimal | None:
+        """The holding's share of the wallet's whole value, cash included (0.31 for 31%); None for an empty wallet."""
+        return holding.value_in_wallet_currency / self.total if self.total else None
+
+    @property
+    def cash_weight(self) -> Decimal | None:
+        """Cash's share of the wallet's whole value; None for an empty wallet."""
+        return self.cash / self.total if self.total else None
+
+    @property
+    def largest_weight(self) -> Decimal | None:
+        """The largest holding's share of the wallet's whole value; None without holdings."""
+        weights = [weight for holding in self.holdings if (weight := self.weight(holding)) is not None]
+        return max(weights) if weights else None
+
+    @property
+    def effective_holdings(self) -> Decimal | None:
+        """How many equal-sized holdings the holdings spread risk like: 1 / the sum of their squared shares of what is
+        invested (the inverse Herfindahl index). Ten equal holdings give 10; one at 90% and nine small ones about 1.2.
+        None without holdings worth anything."""
+        invested = sum((h.value_in_wallet_currency for h in self.holdings), Decimal(0))
+        if invested <= 0:
+            return None
+        return 1 / sum(((h.value_in_wallet_currency / invested) ** 2 for h in self.holdings), Decimal(0))
+
 
 @dataclass(frozen=True)
 class DailyValue:

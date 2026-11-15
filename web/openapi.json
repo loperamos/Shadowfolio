@@ -2446,6 +2446,17 @@
               }
             ],
             "title": "Day Change Percent"
+          },
+          "weight_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight Percent"
           }
         },
         "type": "object",
@@ -2463,7 +2474,8 @@
           "gain_percent",
           "previous_close",
           "day_change",
-          "day_change_percent"
+          "day_change_percent",
+          "weight_percent"
         ],
         "title": "HoldingValueResponse"
       },
@@ -3492,6 +3504,39 @@
           "total": {
             "type": "string",
             "title": "Total"
+          },
+          "cash_weight_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cash Weight Percent"
+          },
+          "largest_weight_percent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Largest Weight Percent"
+          },
+          "effective_holdings": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Effective Holdings"
           }
         },
         "type": "object",
@@ -3504,7 +3549,10 @@
           "gain_percent",
           "day_change",
           "day_change_percent",
-          "total"
+          "total",
+          "cash_weight_percent",
+          "largest_weight_percent",
+          "effective_holdings"
         ],
         "title": "ValuationResponse"
       },

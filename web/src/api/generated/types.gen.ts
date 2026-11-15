@@ -427,6 +427,10 @@ export type HoldingValueResponse = {
      * Day Change Percent
      */
     day_change_percent: string | null;
+    /**
+     * Weight Percent
+     */
+    weight_percent: string | null;
 };
 
 /**
@@ -990,6 +994,18 @@ export type ValuationResponse = {
      * Total
      */
     total: string;
+    /**
+     * Cash Weight Percent
+     */
+    cash_weight_percent: string | null;
+    /**
+     * Largest Weight Percent
+     */
+    largest_weight_percent: string | null;
+    /**
+     * Effective Holdings
+     */
+    effective_holdings: string | null;
 };
 
 /**

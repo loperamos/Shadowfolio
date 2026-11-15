@@ -289,6 +289,7 @@ class HoldingValueResponse(BaseModel):
     previous_close: Decimal | None  # in the price's currency
     day_change: Decimal | None  # since the previous close, in the wallet's currency (price only, not exchange rates)
     day_change_percent: Decimal | None  # the price's move since the previous close
+    weight_percent: Decimal | None  # its share of the wallet's whole value, cash included
 
 
 class ValuationResponse(BaseModel):
@@ -301,6 +302,9 @@ class ValuationResponse(BaseModel):
     day_change: Decimal | None  # of all holdings since the previous close; null if any holding has no previous close
     day_change_percent: Decimal | None  # of the holdings' value at the previous close
     total: Decimal  # cash plus holdings, in the wallet's currency
+    cash_weight_percent: Decimal | None  # cash's share of the whole value
+    largest_weight_percent: Decimal | None  # the largest holding's share of the whole value
+    effective_holdings: Decimal | None  # how many equal-sized holdings the holdings spread risk like
 
     @classmethod
     def from_valuation(cls, valuation: WalletValuation) -> "ValuationResponse":
@@ -323,6 +327,7 @@ class ValuationResponse(BaseModel):
                     previous_close=h.quote.previous_close,
                     day_change=_optional_cents(h.day_change),
                     day_change_percent=_ratio_percent(h.day_change_ratio),
+                    weight_percent=_ratio_percent(valuation.weight(h)),
                 )
                 for h in valuation.holdings
             ],
@@ -332,6 +337,11 @@ class ValuationResponse(BaseModel):
             day_change=_optional_cents(valuation.day_change),
             day_change_percent=_ratio_percent(valuation.day_change_ratio),
             total=valuation.total,
+            cash_weight_percent=_ratio_percent(valuation.cash_weight),
+            largest_weight_percent=_ratio_percent(valuation.largest_weight),
+            effective_holdings=None
+            if valuation.effective_holdings is None
+            else valuation.effective_holdings.quantize(CENT, rounding=ROUND_HALF_EVEN),
         )
 
 

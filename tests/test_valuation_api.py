@@ -75,6 +75,9 @@ def test_cash_only_wallet_is_worth_its_cash(client: TestClient) -> None:
         "day_change": None,
         "day_change_percent": None,
         "total": "3000",
+        "cash_weight_percent": "100.00",
+        "largest_weight_percent": None,
+        "effective_holdings": None,
     }
 
 
@@ -114,6 +117,23 @@ def test_values_in_the_wallets_own_currency_are_rounded_to_cents_too(client: Tes
     # 5 x 244.695 = 1223.475, and 5 x 0.6947 = 3.4735: amounts in the wallet's currency are in cents, as converted ones.
     assert [(h["value_in_wallet_currency"], h["day_change"]) for h in valuation["holdings"]] == [("1223.48", "3.47")]
     assert valuation["total"] == "3719.58"  # 2496.10 + 1223.48
+
+
+def test_each_holding_has_its_weight_and_the_wallet_its_concentration(
+    client: TestClient, prices: InMemoryPriceData, fx_rates: InMemoryFxRates
+) -> None:
+    wallet_id = wallet_holding(client, NVDA_BUY, TSLA_BUY)  # 611.17 EUR cash
+    prices.set("NVDA", Quote(Decimal("135.50"), Currency.USD, QUOTE_TIME))  # worth 978.31 EUR
+    prices.set("TSLA", Quote(Decimal("310.00"), Currency.EUR, QUOTE_TIME))  # worth 1550.00 EUR
+    fx_rates.set(FxRate(Currency.USD, Currency.EUR, Decimal("0.9025"), date(2026, 3, 2)))
+
+    valuation = client.get(f"/api/wallets/{wallet_id}/valuation").json()
+
+    # Of the 3139.48 EUR in all: NVDA 31.16%, TSLA 49.37%, cash 19.47%.
+    assert [(h["symbol"], h["weight_percent"]) for h in valuation["holdings"]] == [("NVDA", "31.16"), ("TSLA", "49.37")]
+    assert (valuation["cash_weight_percent"], valuation["largest_weight_percent"]) == ("19.47", "49.37")
+    # Two holdings of 38.7% and 61.3% of what is invested spread risk like 1.90 equal ones: 1 / (0.387² + 0.613²).
+    assert valuation["effective_holdings"] == "1.90"
 
 
 def test_day_change_is_the_price_move_since_the_previous_close(
