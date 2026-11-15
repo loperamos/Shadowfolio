@@ -3,11 +3,13 @@ import { useEffect, useState } from "react";
 import { apiErrorMessage } from "../api/errors";
 import {
   type ArticleResponse,
+  type CalendarResponse,
   dailyCloses,
   type DailyCloseResponse,
   type FundamentalsResponse,
   latestQuote,
   type QuoteResponse,
+  securityCalendar,
   securityFundamentals,
   securityNews,
   securityRanges,
@@ -137,5 +139,27 @@ export function useRanges(symbol: string, start: string | null, end: string | nu
       current = false;
     };
   }, [symbol, start, end]);
+  return state;
+}
+
+export type CalendarState = { status: "loading" } | { status: "error"; message: string } | { status: "loaded"; calendar: CalendarResponse };
+
+/** What is announced ahead for the symbol (its next ex-dividend date). Loads on its own, so it never holds up the page. */
+export function useCalendar(symbol: string): CalendarState {
+  const [state, setState] = useState<CalendarState>({ status: "loading" });
+  useEffect(() => {
+    let current = true;
+    setState({ status: "loading" });
+    securityCalendar({ path: { symbol } })
+      .then(({ data, error }) => {
+        if (current) {
+          setState(data ? { status: "loaded", calendar: data } : { status: "error", message: apiErrorMessage(error) });
+        }
+      })
+      .catch(() => current && setState({ status: "error", message: "Could not reach the backend." }));
+    return () => {
+      current = false;
+    };
+  }, [symbol]);
   return state;
 }

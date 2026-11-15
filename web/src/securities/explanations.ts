@@ -45,6 +45,10 @@ export const EXPLANATIONS = {
   debt:
     "Long-term borrowing at the fiscal year's end, the part due within a year included. Compare it with cash and free cash flow: debt that " +
     "a few years of free cash flow could repay is easy to carry; much more than that makes a company fragile when times are hard.",
+  exDividend:
+    "The first day the shares trade without their next dividend: you receive it only if you own the shares before that day starts. " +
+    "The price usually drops by about the dividend that morning, so buying just before it to collect the dividend gains nothing. The " +
+    "dividend is paid later, on the payment date.",
   priceRange:
     "The lowest and highest closing price over the period you selected, with today's price as the dot. Near the top means it trades close " +
     "to its recent highs; near the bottom, close to its lows. It shows where the price is, not whether it is cheap.",
