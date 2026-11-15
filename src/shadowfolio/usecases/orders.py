@@ -65,9 +65,9 @@ class Orders:
         quote, rate = self._latest(wallet, order.symbol)
         return OrderEstimate(order_price(order, quote), quote.currency, rate, order_amount(order, quote, rate))
 
-    def _check_rules(self, wallet: Wallet, order: Order) -> None:
-        """Raise RuleBrokenError if the buy would break one of the wallet's rules once it and the open buys before it
-        fill, each at its estimate: the open buys of the same symbol count towards the holding."""
+    def _check_value_rules(self, wallet: Wallet, order: Order) -> None:
+        """Raise RuleBrokenError if the buy would make a holding too large, or leave too little cash, once it and the
+        open buys before it fill, each at its estimate: the open buys of the same symbol count towards the holding."""
         valuation = self._valuation.current(wallet.id)
         assert valuation is not None
         if valuation.buying_power is None:
@@ -109,8 +109,11 @@ class Orders:
         if wallet is None:
             return None
         order = Order(uuid4(), side, symbol.strip().upper(), quantity, self._clock.now(), reason.strip(), limit_price)
-        if order.side is OrderSide.BUY and wallet.rules.any:
-            self._check_rules(wallet, order)
+        wallet.rules.check_order(wallet.orders, order.placed_at)
+        if order.side is OrderSide.BUY:
+            wallet.rules.check_symbol(order.symbol)
+            if wallet.rules.limits_value:
+                self._check_value_rules(wallet, order)
         updated = wallet.place_order(order)
         self._repo.update(updated)
         return updated, order

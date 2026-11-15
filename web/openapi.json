@@ -3399,12 +3399,32 @@
               }
             ],
             "title": "Min Cash Weight"
+          },
+          "allowed_symbols": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Allowed Symbols"
+          },
+          "max_orders_per_month": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Orders Per Month"
           }
         },
         "type": "object",
         "required": [
           "max_position_weight",
-          "min_cash_weight"
+          "min_cash_weight",
+          "allowed_symbols",
+          "max_orders_per_month"
         ],
         "title": "RulesRequest",
         "description": "The wallet's rules for orders, replaced as a whole: each a share of its whole value (0.2 for 20%), null for no\nlimit."
@@ -3432,12 +3452,32 @@
               }
             ],
             "title": "Min Cash Weight"
+          },
+          "allowed_symbols": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Allowed Symbols"
+          },
+          "max_orders_per_month": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Orders Per Month"
           }
         },
         "type": "object",
         "required": [
           "max_position_weight",
-          "min_cash_weight"
+          "min_cash_weight",
+          "allowed_symbols",
+          "max_orders_per_month"
         ],
         "title": "RulesResponse"
       },

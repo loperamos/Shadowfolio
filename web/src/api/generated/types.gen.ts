@@ -856,6 +856,14 @@ export type RulesRequest = {
      * Min Cash Weight
      */
     min_cash_weight: number | string | null;
+    /**
+     * Allowed Symbols
+     */
+    allowed_symbols: Array<string>;
+    /**
+     * Max Orders Per Month
+     */
+    max_orders_per_month: number | null;
 };
 
 /**
@@ -870,6 +878,14 @@ export type RulesResponse = {
      * Min Cash Weight
      */
     min_cash_weight: string | null;
+    /**
+     * Allowed Symbols
+     */
+    allowed_symbols: Array<string>;
+    /**
+     * Max Orders Per Month
+     */
+    max_orders_per_month: number | null;
 };
 
 /**
