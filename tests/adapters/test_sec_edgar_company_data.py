@@ -14,7 +14,6 @@ import pytest
 
 from shadowfolio.adapters.fixed_clock import FixedClock
 from shadowfolio.adapters.sec_edgar_company_data import FRESH_FOR, SecEdgarCompanyData
-from shadowfolio.domain.company import FiscalYear
 from shadowfolio.domain.money import Currency
 from shadowfolio.ports.company_data import CompanyDataUnavailableError
 
@@ -51,6 +50,25 @@ FACTS: dict[str, Any] = {
             },
             "NetIncomeLoss": {
                 "units": {"USD": [entry("2024-01-29", "2025-01-26", 72880000000), entry("2025-01-27", "2026-01-25", 120067000000)]}
+            },
+            "NetCashProvidedByUsedInOperatingActivities": {
+                "units": {"USD": [entry("2024-01-29", "2025-01-26", 64089000000), entry("2025-01-27", "2026-01-25", 102718000000)]}
+            },
+            # Capital spending under one concept, then another, as NVIDIA switched.
+            "PaymentsToAcquirePropertyPlantAndEquipment": {"units": {"USD": [entry("2024-01-29", "2025-01-26", 3236000000)]}},
+            "PaymentsToAcquireProductiveAssets": {"units": {"USD": [entry("2025-01-27", "2026-01-25", 6042000000)]}},
+            # Balance sheet amounts are at a moment, the fiscal year's end: no start.
+            "CashAndCashEquivalentsAtCarryingValue": {
+                "units": {
+                    "USD": [
+                        {"end": "2025-01-26", "val": 8589000000, "form": "10-K", "fp": "FY", "filed": "2026-02-25"},
+                        {"end": "2026-01-25", "val": 10605000000, "form": "10-K", "fp": "FY", "filed": "2026-02-25"},
+                        {"end": "2026-04-26", "val": 9000000000, "form": "10-Q", "fp": "Q1", "filed": "2026-05-28"},
+                    ]
+                }
+            },
+            "LongTermDebt": {
+                "units": {"USD": [{"end": "2026-01-25", "val": 8468000000, "form": "10-K", "fp": "FY", "filed": "2026-02-25"}]}
             },
             "EarningsPerShareDiluted": {
                 "units": {
@@ -98,15 +116,26 @@ def test_yearly_results_come_from_annual_reports_the_latest_filing_winning() -> 
 
     assert fundamentals is not None
     assert (fundamentals.company_name, fundamentals.currency) == ("NVIDIA CORP", Currency.USD)
-    assert fundamentals.years == (
-        FiscalYear(date(2023, 1, 30), date(2024, 1, 28), Decimal("60922000000"), None, None),
-        FiscalYear(date(2024, 1, 29), date(2025, 1, 26), Decimal("130497000000"), Decimal("72880000000"), Decimal("2.94")),
-        FiscalYear(date(2025, 1, 27), date(2026, 1, 25), Decimal("215938000000"), Decimal("120067000000"), Decimal("4.9")),
-    )
+    assert [(y.start, y.end, y.revenue, y.net_income, y.eps_diluted) for y in fundamentals.years] == [
+        (date(2023, 1, 30), date(2024, 1, 28), Decimal("60922000000"), None, None),
+        (date(2024, 1, 29), date(2025, 1, 26), Decimal("130497000000"), Decimal("72880000000"), Decimal("2.94")),
+        (date(2025, 1, 27), date(2026, 1, 25), Decimal("215938000000"), Decimal("120067000000"), Decimal("4.9")),
+    ]
     assert (fundamentals.shares_outstanding, fundamentals.shares_as_of) == (Decimal("24100000000"), date(2026, 8, 21))
     # The company is found by its ticker, and every request says who is asking, as EDGAR requires.
     assert seen[1].url.path == "/api/xbrl/companyfacts/CIK0001045810.json"
     assert {request.headers["User-Agent"] for request in seen} == {CONTACT}
+
+
+def test_cash_flows_and_the_balance_sheet_at_each_year_end_come_from_annual_reports_too() -> None:
+    fundamentals = edgar([]).fundamentals("NVDA")
+
+    assert fundamentals is not None
+    assert [(y.end, y.operating_cash_flow, y.capital_spending, y.cash, y.debt) for y in fundamentals.years] == [
+        (date(2024, 1, 28), None, None, None, None),
+        (date(2025, 1, 26), Decimal("64089000000"), Decimal("3236000000"), Decimal("8589000000"), None),
+        (date(2026, 1, 25), Decimal("102718000000"), Decimal("6042000000"), Decimal("10605000000"), Decimal("8468000000")),
+    ]
 
 
 def test_a_share_count_older_than_the_last_fiscal_year_is_not_used() -> None:

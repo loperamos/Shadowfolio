@@ -698,6 +698,11 @@ class FiscalYearResponse(BaseModel):
     eps_diluted: Decimal | None
     revenue_growth: Decimal | None  # on the year before, in percent; null without it
     net_margin: Decimal | None  # net income as a share of revenue, in percent
+    operating_cash_flow: Decimal | None  # cash the business brought in over the year
+    capital_spending: Decimal | None  # cash spent on property, plant and equipment
+    free_cash_flow: Decimal | None  # operating cash flow less capital spending
+    cash: Decimal | None  # at the year's end
+    debt: Decimal | None  # long-term debt at the year's end, the part due within a year included
 
 
 class FundamentalsResponse(BaseModel):
@@ -728,6 +733,11 @@ class FundamentalsResponse(BaseModel):
                     eps_diluted=y.eps_diluted,
                     revenue_growth=_ratio_percent(fundamentals.revenue_growth(y)),
                     net_margin=_ratio_percent(y.net_margin),
+                    operating_cash_flow=y.operating_cash_flow,
+                    capital_spending=y.capital_spending,
+                    free_cash_flow=y.free_cash_flow,
+                    cash=y.cash,
+                    debt=y.debt,
                 )
                 for y in fundamentals.years
             ],

@@ -23,7 +23,17 @@ NVDA = Fundamentals(
     currency=Currency.USD,
     years=(
         FiscalYear(date(2024, 1, 29), date(2025, 1, 26), Decimal("130497000000"), Decimal("72880000000"), Decimal("2.94")),
-        FiscalYear(date(2025, 1, 27), date(2026, 1, 25), Decimal("215938000000"), Decimal("120067000000"), Decimal("4.90")),
+        FiscalYear(
+            date(2025, 1, 27),
+            date(2026, 1, 25),
+            Decimal("215938000000"),
+            Decimal("120067000000"),
+            Decimal("4.90"),
+            operating_cash_flow=Decimal("102718000000"),
+            capital_spending=Decimal("6042000000"),
+            cash=Decimal("10605000000"),
+            debt=Decimal("8468000000"),
+        ),
     ),
     shares_outstanding=Decimal("24100000000"),
     shares_as_of=date(2026, 8, 21),
@@ -56,6 +66,16 @@ def test_each_year_says_how_revenue_grew_and_how_much_of_it_was_kept_as_profit()
     assert [(y["end"], y["revenue_growth"], y["net_margin"]) for y in years] == [
         ("2025-01-26", None, "55.85"),
         ("2026-01-25", "65.47", "55.60"),
+    ]
+
+
+def test_each_year_says_how_much_cash_the_business_made_and_what_it_holds_and_owes() -> None:
+    years = client_with(InMemoryCompanyData({"NVDA": NVDA})).get("/api/securities/NVDA/fundamentals").json()["years"]
+
+    # Free cash flow: 102.718 billion from operations less 6.042 billion spent on property and equipment.
+    assert [(y["operating_cash_flow"], y["capital_spending"], y["free_cash_flow"], y["cash"], y["debt"]) for y in years] == [
+        (None, None, None, None, None),
+        ("102718000000", "6042000000", "96676000000", "10605000000", "8468000000"),
     ]
 
 

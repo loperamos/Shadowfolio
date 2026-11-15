@@ -1,4 +1,5 @@
-"""What a company reported about itself: yearly results and shares outstanding, and the ratios they give at a price."""
+"""What a company reported about itself: yearly results, cash flows and balance sheet, and shares outstanding, and the
+ratios they give at a price."""
 
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -18,6 +19,17 @@ class FiscalYear:
     revenue: Decimal | None  # None when the company did not report it (in a way we read)
     net_income: Decimal | None
     eps_diluted: Decimal | None  # net income per share, counting shares that options and the like could add
+    operating_cash_flow: Decimal | None = None  # cash the business brought in over the year
+    capital_spending: Decimal | None = None  # cash spent on property, plant and equipment over the year
+    cash: Decimal | None = None  # cash and cash equivalents at the year's end
+    debt: Decimal | None = None  # long-term debt at the year's end, the part due within a year included
+
+    @property
+    def free_cash_flow(self) -> Decimal | None:
+        """Operating cash flow less capital spending: the cash left to pay out, invest or save; None without both."""
+        if self.operating_cash_flow is None or self.capital_spending is None:
+            return None
+        return self.operating_cash_flow - self.capital_spending
 
     @property
     def net_margin(self) -> Decimal | None:

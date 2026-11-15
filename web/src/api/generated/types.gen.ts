@@ -337,6 +337,26 @@ export type FiscalYearResponse = {
      * Net Margin
      */
     net_margin: string | null;
+    /**
+     * Operating Cash Flow
+     */
+    operating_cash_flow: string | null;
+    /**
+     * Capital Spending
+     */
+    capital_spending: string | null;
+    /**
+     * Free Cash Flow
+     */
+    free_cash_flow: string | null;
+    /**
+     * Cash
+     */
+    cash: string | null;
+    /**
+     * Debt
+     */
+    debt: string | null;
 };
 
 /**
