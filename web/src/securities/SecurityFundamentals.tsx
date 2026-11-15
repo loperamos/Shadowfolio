@@ -70,7 +70,8 @@ function FundamentalsBody({ symbol, state }: { symbol: string; state: ReturnType
     case "none":
       return <Text c="dimmed">No fundamentals for {symbol}: only companies that report to the US SEC are covered.</Text>;
     case "loaded": {
-      const { company_name, currency, years, quarters, shares_outstanding, shares_as_of, pe, market_cap } = state.fundamentals;
+      const { company_name, currency, years, quarters, shares_outstanding, shares_as_of, pe, market_cap, price_to_sales, free_cash_flow_yield } =
+        state.fundamentals;
       const latest = years.at(-1);
       const quarterly = view === ResultsView.QUARTERLY;
       const periods = quarterly ? quarters.slice(-QUARTERS_SHOWN) : years.slice(-YEARS_SHOWN);
@@ -87,6 +88,13 @@ function FundamentalsBody({ symbol, state }: { symbol: string; state: ReturnType
           {/* Top-aligned, so each label, value and note sits on the same line as the others'. */}
           <Group gap="xl" mb="md" align="flex-start">
             {figure("P/E", EXPLANATIONS.pe, pe ?? "—", pe == null ? "No positive diluted EPS for the last fiscal year" : "Price against the last fiscal year's diluted EPS")}
+            {figure("Price to sales", EXPLANATIONS.priceToSales, price_to_sales ?? "—", price_to_sales == null ? undefined : "Market cap against the last fiscal year's revenue")}
+            {figure(
+              "FCF yield",
+              EXPLANATIONS.freeCashFlowYield,
+              free_cash_flow_yield == null ? "—" : `${formatPercent(free_cash_flow_yield)}%`,
+              free_cash_flow_yield == null ? undefined : "Last fiscal year's free cash flow against the market cap",
+            )}
             {figure("Market cap", EXPLANATIONS.marketCap, amount(market_cap), market_cap == null ? "No single, recent share count (e.g. several share classes)" : undefined)}
             {figure("Shares outstanding", EXPLANATIONS.sharesOutstanding, shares_outstanding == null ? "—" : formatCompactAmount(shares_outstanding), shares_as_of ? `As of ${formatDate(shares_as_of)}` : undefined)}
             {latest && figure("Revenue", EXPLANATIONS.revenue, amount(latest.revenue), `Fiscal year to ${formatDate(latest.end)}`)}

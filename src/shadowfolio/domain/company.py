@@ -77,6 +77,17 @@ class Fundamentals:
         """What all the shares outstanding are worth at `price`; None without the share count."""
         return None if self.shares_outstanding is None else price * self.shares_outstanding
 
+    def price_to_sales(self, price: Decimal) -> Decimal | None:
+        """The market cap at `price` against the last fiscal year's revenue; None without either."""
+        market_cap, revenue = self.market_cap(price), self.years[-1].revenue if self.years else None
+        return market_cap / revenue if market_cap is not None and revenue else None
+
+    def free_cash_flow_yield(self, price: Decimal) -> Decimal | None:
+        """The last fiscal year's free cash flow against the market cap at `price` (0.025 for 2.5%); None without
+        either."""
+        market_cap, free_cash_flow = self.market_cap(price), self.years[-1].free_cash_flow if self.years else None
+        return free_cash_flow / market_cap if market_cap and free_cash_flow is not None else None
+
 
 @dataclass(frozen=True)
 class ValueRange:

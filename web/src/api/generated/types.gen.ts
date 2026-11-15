@@ -96,15 +96,6 @@ export type BuyEdit = {
 };
 
 /**
- * CalendarResponse
- *
- * What is announced ahead for a security.
- */
-export type CalendarResponse = {
-    next_ex_dividend: DividendResponse | null;
-};
-
-/**
  * CashMovementRequest
  *
  * A deposit or a withdrawal.
@@ -290,6 +281,23 @@ export type DividendResponse = {
 };
 
 /**
+ * DividendsResponse
+ *
+ * A security's dividends: the next announced, and those of the last year.
+ */
+export type DividendsResponse = {
+    next_ex_dividend: DividendResponse | null;
+    /**
+     * Last Year Per Share
+     */
+    last_year_per_share: string;
+    /**
+     * Yield Percent
+     */
+    yield_percent: string | null;
+};
+
+/**
  * ErrorResponse
  */
 export type ErrorResponse = {
@@ -427,6 +435,14 @@ export type FundamentalsResponse = {
      * Market Cap
      */
     market_cap: string | null;
+    /**
+     * Price To Sales
+     */
+    price_to_sales: string | null;
+    /**
+     * Free Cash Flow Yield
+     */
+    free_cash_flow_yield: string | null;
 };
 
 /**
@@ -981,6 +997,43 @@ export type RulesResponse = {
 export type SecurityRangesResponse = {
     price: ValueRangeResponse | null;
     pe: ValueRangeResponse | null;
+};
+
+/**
+ * SecurityStatisticsResponse
+ *
+ * How the price moved, in percent: its trend back from today, and over the period asked for its volatility (over
+ * a year), deepest fall and beta against `benchmark_symbol`. Each null without enough closes.
+ */
+export type SecurityStatisticsResponse = {
+    /**
+     * Three Month Return
+     */
+    three_month_return: string | null;
+    /**
+     * Six Month Return
+     */
+    six_month_return: string | null;
+    /**
+     * One Year Return
+     */
+    one_year_return: string | null;
+    /**
+     * Volatility Percent
+     */
+    volatility_percent: string | null;
+    /**
+     * Max Drawdown Percent
+     */
+    max_drawdown_percent: string | null;
+    /**
+     * Beta
+     */
+    beta: string | null;
+    /**
+     * Benchmark Symbol
+     */
+    benchmark_symbol: string;
 };
 
 /**
@@ -2414,7 +2467,46 @@ export type SecurityNewsResponses = {
 
 export type SecurityNewsResponse = SecurityNewsResponses[keyof SecurityNewsResponses];
 
-export type SecurityCalendarData = {
+export type SecurityStatisticsData = {
+    body?: never;
+    path: {
+        /**
+         * Symbol
+         */
+        symbol: string;
+    };
+    query?: {
+        /**
+         * Start
+         */
+        start?: string | null;
+        /**
+         * End
+         */
+        end?: string | null;
+    };
+    url: '/api/securities/{symbol}/statistics';
+};
+
+export type SecurityStatisticsErrors = {
+    /**
+     * Malformed request or broken business rule
+     */
+    422: ErrorResponse;
+};
+
+export type SecurityStatisticsError = SecurityStatisticsErrors[keyof SecurityStatisticsErrors];
+
+export type SecurityStatisticsResponses = {
+    /**
+     * Successful Response
+     */
+    200: SecurityStatisticsResponse;
+};
+
+export type SecurityStatisticsResponse2 = SecurityStatisticsResponses[keyof SecurityStatisticsResponses];
+
+export type SecurityDividendsData = {
     body?: never;
     path: {
         /**
@@ -2423,26 +2515,26 @@ export type SecurityCalendarData = {
         symbol: string;
     };
     query?: never;
-    url: '/api/securities/{symbol}/calendar';
+    url: '/api/securities/{symbol}/dividends';
 };
 
-export type SecurityCalendarErrors = {
+export type SecurityDividendsErrors = {
     /**
      * Malformed request or broken business rule
      */
     422: ErrorResponse;
 };
 
-export type SecurityCalendarError = SecurityCalendarErrors[keyof SecurityCalendarErrors];
+export type SecurityDividendsError = SecurityDividendsErrors[keyof SecurityDividendsErrors];
 
-export type SecurityCalendarResponses = {
+export type SecurityDividendsResponses = {
     /**
      * Successful Response
      */
-    200: CalendarResponse;
+    200: DividendsResponse;
 };
 
-export type SecurityCalendarResponse = SecurityCalendarResponses[keyof SecurityCalendarResponses];
+export type SecurityDividendsResponse = SecurityDividendsResponses[keyof SecurityDividendsResponses];
 
 export type SecurityRangesData = {
     body?: never;

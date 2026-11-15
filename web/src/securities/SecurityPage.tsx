@@ -7,7 +7,7 @@ import { listWallets, type WalletResponse } from "../api/generated";
 import { walletPath } from "../routes";
 import { GainText } from "../ui/GainText";
 import { Money } from "../ui/Money";
-import { formatDate, formatDateTime, todayAsInputValue } from "../ui/format";
+import { formatAmount, formatDate, formatDateTime, formatPercent, todayAsInputValue } from "../ui/format";
 import { InfoTip } from "../ui/InfoTip";
 import { TimeSeriesChart } from "../ui/TimeSeriesChart";
 import { CHART_HEIGHT, TABLE_MIN_WIDTH } from "../ui/theme";
@@ -18,8 +18,9 @@ import { type ValuationState, useWalletValuations } from "../wallets/useWalletVa
 import { SecurityFundamentals } from "./SecurityFundamentals";
 import { SecurityNews } from "./SecurityNews";
 import { SecurityRanges } from "./SecurityRanges";
+import { SecurityStatistics } from "./SecurityStatistics";
 import { EXPLANATIONS } from "./explanations";
-import { useCalendar, useCloses, useQuote } from "./useSecurity";
+import { useCloses, useDividends, useQuote } from "./useSecurity";
 
 const CLOSE_LINE = "close";
 
@@ -71,15 +72,31 @@ function Header({ symbol }: { symbol: string }) {
   );
 }
 
-/** The next ex-dividend date announced, under the price; nothing while it loads. */
+/** The last year's dividend yield and the next ex-dividend date announced, under the price; nothing while it loads. */
 function NextDividend({ symbol }: { symbol: string }) {
-  const state = useCalendar(symbol);
+  const state = useDividends(symbol);
   if (state.status === "loading") {
     return null;
   }
-  const dividend = state.status === "loaded" ? state.calendar.next_ex_dividend : null;
+  const loaded = state.status === "loaded" ? state.dividends : null;
+  const dividend = loaded?.next_ex_dividend ?? null;
   return (
     <Group gap={4} mt={4} wrap="nowrap">
+      {loaded?.yield_percent != null && Number(loaded.last_year_per_share) > 0 && (
+        <>
+          <Text size="sm">
+            Dividend yield{" "}
+            <Text span inherit fw={600}>
+              {formatPercent(loaded.yield_percent)}%
+            </Text>{" "}
+            ({formatAmount(loaded.last_year_per_share)} a share over the last 12 months)
+          </Text>
+          <InfoTip topic="the dividend yield">{EXPLANATIONS.dividendYield}</InfoTip>
+          <Text size="sm" c="dimmed">
+            ·
+          </Text>
+        </>
+      )}
       <Text size="sm" c={dividend ? undefined : "dimmed"}>
         {state.status === "error" && `Dividends unavailable: ${state.message}`}
         {state.status === "loaded" && !dividend && "No dividend announced."}
@@ -131,6 +148,9 @@ function PriceChart({ symbol }: { symbol: string }) {
         ))}
       <Box mt="lg">
         <SecurityRanges symbol={symbol} start={range.start} end={range.end} currency={state.status === "loaded" ? (state.closes[0]?.currency ?? null) : null} />
+      </Box>
+      <Box mt="lg">
+        <SecurityStatistics symbol={symbol} start={range.start} end={range.end} />
       </Box>
     </div>
   );
