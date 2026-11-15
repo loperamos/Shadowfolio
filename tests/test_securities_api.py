@@ -1,5 +1,6 @@
-"""A security's fundamentals as the company reported them (yearly revenue, net income, diluted EPS, shares
-outstanding), with the P/E and market cap they give at the latest price."""
+"""What is known about a security beyond its price: its fundamentals as the company reported them (yearly revenue, net
+income, diluted EPS, shares outstanding), with the P/E and market cap they give at the latest price; and the latest
+news about it."""
 
 from datetime import UTC, date, datetime
 from decimal import Decimal
@@ -7,9 +8,11 @@ from decimal import Decimal
 from fastapi.testclient import TestClient
 
 from shadowfolio.adapters.in_memory_company_data import InMemoryCompanyData
+from shadowfolio.adapters.in_memory_news import InMemoryNews
 from shadowfolio.adapters.in_memory_price_data import InMemoryPriceData
 from shadowfolio.domain.company import FiscalYear, Fundamentals
 from shadowfolio.domain.money import Currency
+from shadowfolio.domain.news import Article
 from shadowfolio.domain.valuation import Quote
 from shadowfolio.ports.company_data import CompanyDataUnavailableError
 from shadowfolio.wiring.test import build_test_app
@@ -61,3 +64,31 @@ def test_fundamentals_are_refused_cleanly_when_they_cannot_be_fetched() -> None:
         422,
         "could not fetch the fundamentals of NVDA right now: SEC EDGAR: timed out",
     )
+
+
+def test_the_latest_news_about_a_security_newest_first() -> None:
+    older = Article(
+        "Nvidia partner launches a probe",
+        "Megaspeed hired outside lawyers.",
+        "benzinga",
+        "https://example.com/1",
+        datetime(2026, 11, 15, 12, 7, tzinfo=UTC),
+    )
+    newer = Article(
+        "Earnings volatility watch",
+        "Options price a 9% move.",
+        "benzinga",
+        "https://example.com/2",
+        datetime(2026, 11, 15, 13, 30, tzinfo=UTC),
+    )
+    prices = InMemoryPriceData()
+    client = TestClient(build_test_app(prices=prices, news=InMemoryNews({"NVDA": [older, newer]})))
+
+    response = client.get("/api/securities/nvda/news")
+
+    assert response.status_code == 200
+    assert [(a["headline"], a["source"], a["url"], a["published_at"]) for a in response.json()] == [
+        ("Earnings volatility watch", "benzinga", "https://example.com/2", "2026-11-15T13:30:00Z"),
+        ("Nvidia partner launches a probe", "benzinga", "https://example.com/1", "2026-11-15T12:07:00Z"),
+    ]
+    assert client.get("/api/securities/ZZZZ/news").json() == []

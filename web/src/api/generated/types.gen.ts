@@ -5,6 +5,32 @@ export type ClientOptions = {
 };
 
 /**
+ * ArticleResponse
+ */
+export type ArticleResponse = {
+    /**
+     * Headline
+     */
+    headline: string;
+    /**
+     * Summary
+     */
+    summary: string;
+    /**
+     * Source
+     */
+    source: string;
+    /**
+     * Url
+     */
+    url: string;
+    /**
+     * Published At
+     */
+    published_at: string;
+};
+
+/**
  * BenchmarkResponse
  *
  * What the wallet's money would be worth in `symbol` instead, at the end of every day (see the endpoint).
@@ -1950,3 +1976,35 @@ export type SecurityFundamentalsResponses = {
 };
 
 export type SecurityFundamentalsResponse = SecurityFundamentalsResponses[keyof SecurityFundamentalsResponses];
+
+export type SecurityNewsData = {
+    body?: never;
+    path: {
+        /**
+         * Symbol
+         */
+        symbol: string;
+    };
+    query?: never;
+    url: '/api/securities/{symbol}/news';
+};
+
+export type SecurityNewsErrors = {
+    /**
+     * Malformed request or broken business rule
+     */
+    422: ErrorResponse;
+};
+
+export type SecurityNewsError = SecurityNewsErrors[keyof SecurityNewsErrors];
+
+export type SecurityNewsResponses = {
+    /**
+     * Response Security News
+     *
+     * Successful Response
+     */
+    200: Array<ArticleResponse>;
+};
+
+export type SecurityNewsResponse = SecurityNewsResponses[keyof SecurityNewsResponses];

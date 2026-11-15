@@ -73,6 +73,10 @@ class CompanyDataUnavailableNowError(DomainError):
     """A company's information cannot be fetched right now (the provider cannot answer, or is not set up)."""
 
 
+class NewsUnavailableNowError(DomainError):
+    """News cannot be fetched right now."""
+
+
 class OrderNotOpenError(DomainError):
     """The order is no longer open (filled, cancelled or rejected), so it cannot change."""
 
