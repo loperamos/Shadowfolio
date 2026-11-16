@@ -51,20 +51,13 @@ Lingering is a setting for all your user services, not part of the timer, so uni
 
 The backend also serves an MCP server at `http://127.0.0.1:8000/mcp` (Streamable HTTP), so an agent can read your wallets and securities with the same figures as the web app, and preview, place and cancel orders now (never back-dated), each with its reason. It answers on localhost, plus any address listed in `SHADOWFOLIO_MCP_ALLOWED_HOSTS` (see `.env.example`).
 
-Every request needs an access token, with a scope (`read`, or `trading`: read and place or cancel orders) and the wallets it may use. Its secret is shown once, when created:
-
-```bash
-curl -s -X POST http://127.0.0.1:8000/api/access-tokens -H 'Content-Type: application/json' \
-  -d '{"name": "Claude Code", "scope": "read", "wallet_ids": ["<wallet id>"]}'
-```
-
-Then give it to the agent as a header, e.g. with Claude Code:
+Every request needs an access token, with a scope (`read`, or `trading`: read and place or cancel orders) and the wallets it may use. Create one in the web app's **Agent access** page (or `POST /api/access-tokens`); its secret is shown once. Then give it to the agent as a header, e.g. with Claude Code:
 
 ```bash
 claude mcp add --transport http shadowfolio http://127.0.0.1:8000/mcp --header "Authorization: Bearer <secret>"
 ```
 
-Revoke a token with `POST /api/access-tokens/<id>/revoke`. The web API itself has no sign-in yet (it comes with accounts), so anyone who can reach it can create tokens: keep it on a network you trust.
+Revoke a token in the same page. The web API itself has no sign-in yet (it comes with accounts), so anyone who can reach it can create tokens: keep it on a network you trust.
 
 ## Frontend
 

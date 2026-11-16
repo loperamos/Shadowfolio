@@ -33,3 +33,6 @@ export function securitiesComparePath(symbols: string[]): string {
   const query = new URLSearchParams({ [COMPARED_SYMBOLS_PARAM]: symbols.join(COMPARED_SYMBOLS_SEPARATOR) });
   return `${SECURITIES_COMPARE_PATH}?${query.toString()}`;
 }
+
+// The access tokens agents use with the MCP server.
+export const AGENTS_PATH = "/agents";
