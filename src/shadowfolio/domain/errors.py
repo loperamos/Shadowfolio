@@ -99,3 +99,7 @@ class RuleBrokenError(DomainError):
 
 class EarningsCalendarUnavailableNowError(DomainError):
     """When a company reports results could not be fetched right now; trying again later may work."""
+
+
+class InvalidAccessTokenError(DomainError):
+    """An access token is missing what it needs (a name, wallets), or names a wallet that does not exist."""

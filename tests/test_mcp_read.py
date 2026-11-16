@@ -16,6 +16,7 @@ from shadowfolio.adapters.in_memory_price_data import InMemoryPriceData
 from shadowfolio.domain.company import FiscalYear, Fundamentals
 from shadowfolio.domain.money import Currency, FxRate
 from shadowfolio.domain.valuation import Quote
+from shadowfolio.interfaces.mcp.access import acting_with
 from shadowfolio.wiring.test import build_test_app
 
 NOW = datetime(2026, 3, 2, 15, 0, tzinfo=UTC)
@@ -56,12 +57,17 @@ def a_wallet(app: Any) -> str:
         "timestamp": "2026-01-06T15:00:00Z",
     }
     assert http.post(f"/api/wallets/{wallet_id}/buys", json=buy).status_code == 200
+    # The agent's token, reading this wallet.
+    secret = http.post("/api/access-tokens", json={"name": "agent", "scope": "read", "wallet_ids": [wallet_id]}).json()["secret"]
+    app.state.agent_token = app.state.access_tokens.authenticate(secret)
+    app.state.agent_secret = secret
     return wallet_id
 
 
 async def call(app: Any, tool: str, **arguments: Any) -> Any:
-    async with Client(app.state.mcp) as client:
-        result = await client.call_tool(tool, arguments)
+    with acting_with(app.state.agent_token):
+        async with Client(app.state.mcp) as client:
+            result = await client.call_tool(tool, arguments)
     assert not result.is_error, result.content
     return result.structured_content
 
@@ -99,6 +105,7 @@ async def test_a_wallets_snapshot_has_its_value_weights_buying_power_and_rules(a
 
 @pytest.mark.anyio
 async def test_securities_come_summarised_and_side_by_side(app: Any) -> None:
+    a_wallet(app)  # any token can read securities
     summary = await call(app, "security_summary", symbol="acme")
 
     assert (summary["symbol"], summary["pe"], summary["market_cap"], summary["unavailable"]) == ("ACME", "25.00", "5000000.00", [])
@@ -108,8 +115,10 @@ async def test_securities_come_summarised_and_side_by_side(app: Any) -> None:
 
 @pytest.mark.anyio
 async def test_an_unknown_wallet_is_an_error_the_agent_can_read(app: Any) -> None:
-    async with Client(app.state.mcp) as client:
-        result = await client.call_tool("wallet_snapshot", {"wallet_id": "00000000-0000-0000-0000-000000000000"})
+    a_wallet(app)
+    with acting_with(app.state.agent_token):
+        async with Client(app.state.mcp) as client:
+            result = await client.call_tool("wallet_snapshot", {"wallet_id": "00000000-0000-0000-0000-000000000000"})
 
     assert result.is_error
     assert "no wallet" in result.content[0].text  # type: ignore[union-attr]
@@ -117,8 +126,10 @@ async def test_an_unknown_wallet_is_an_error_the_agent_can_read(app: Any) -> Non
 
 def test_each_request_stands_alone_as_on_the_rest_api(app: Any) -> None:
     """No session to open first, and one plain JSON answer: any server instance can answer any request."""
+    wallet_id = a_wallet(app)
     request = {"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": "list_wallets", "arguments": {}}}
     headers = {"Accept": "application/json, text/event-stream", "Content-Type": "application/json"}
+    headers["Authorization"] = f"Bearer {app.state.agent_secret}"
 
     # As a local client calls it: the server only answers requests addressed to localhost.
     with TestClient(app, base_url="http://127.0.0.1:8000") as http:  # runs the app's startup, as a server does
@@ -126,16 +137,18 @@ def test_each_request_stands_alone_as_on_the_rest_api(app: Any) -> None:
 
     assert (response.status_code, response.headers["content-type"]) == (200, "application/json")
     assert "mcp-session-id" not in response.headers
-    assert response.json()["result"]["structuredContent"] == {"result": []}
+    assert [wallet["id"] for wallet in response.json()["result"]["structuredContent"]["result"]] == [wallet_id]
 
 
 @pytest.mark.parametrize(("allowed", "status"), [((), 421), (("192.168.1.75:8000",), 200)])
 def test_only_the_host_names_allowed_reach_it(allowed: tuple[str, ...], status: int) -> None:
     """Localhost always; another address (e.g. the machine's on a home network) only when configured, against DNS
     rebinding (a web page making the browser talk to a server on the network)."""
-    app = build_test_app(mcp_allowed_hosts=allowed)
+    app = build_test_app(clock=FixedClock(NOW), mcp_allowed_hosts=allowed)
+    a_wallet(app)
     request = {"jsonrpc": "2.0", "id": 1, "method": "tools/list"}
     headers = {"Accept": "application/json, text/event-stream", "Content-Type": "application/json"}
+    headers["Authorization"] = f"Bearer {app.state.agent_secret}"
 
     with TestClient(app, base_url="http://192.168.1.75:8000") as http:
         response = http.post("/mcp", json=request, headers=headers)

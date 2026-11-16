@@ -7,6 +7,7 @@ from fastapi import FastAPI
 
 from shadowfolio.adapters.degiro_statements import DegiroStatementReader
 from shadowfolio.adapters.fixed_clock import FixedClock
+from shadowfolio.adapters.in_memory_access_token_repository import InMemoryAccessTokenRepository
 from shadowfolio.adapters.in_memory_company_data import InMemoryCompanyData
 from shadowfolio.adapters.in_memory_corporate_actions import InMemoryCorporateActions
 from shadowfolio.adapters.in_memory_earnings_calendar import InMemoryEarningsCalendar
@@ -24,6 +25,7 @@ from shadowfolio.ports.fx_rates import FxRates
 from shadowfolio.ports.news import News
 from shadowfolio.ports.price_data import PriceData
 from shadowfolio.ports.security_lookup import SecurityLookup
+from shadowfolio.usecases.access_tokens import AccessTokens
 from shadowfolio.usecases.comparison import Comparison
 from shadowfolio.usecases.history import History
 from shadowfolio.usecases.imports import Imports
@@ -83,4 +85,5 @@ def build_test_app(
             DegiroStatementReader(),
         ),
         mcp_allowed_hosts=mcp_allowed_hosts,
+        access_tokens=AccessTokens(InMemoryAccessTokenRepository(), wallet_repository, clock),
     )

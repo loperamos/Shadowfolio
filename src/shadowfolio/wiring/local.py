@@ -15,9 +15,11 @@ from shadowfolio.adapters.ecb_fx_rates import EcbFxRates
 from shadowfolio.adapters.finnhub_earnings_calendar import FinnhubEarningsCalendar
 from shadowfolio.adapters.openfigi_security_lookup import OpenFigiSecurityLookup
 from shadowfolio.adapters.sec_edgar_company_data import SecEdgarCompanyData
+from shadowfolio.adapters.sqlite_access_token_repository import SqliteAccessTokenRepository
 from shadowfolio.adapters.sqlite_wallet_repository import SqliteWalletRepository
 from shadowfolio.adapters.system_clock import SystemClock
 from shadowfolio.interfaces.web.app import create_app
+from shadowfolio.usecases.access_tokens import AccessTokens
 from shadowfolio.usecases.comparison import Comparison
 from shadowfolio.usecases.history import History
 from shadowfolio.usecases.imports import Imports
@@ -75,4 +77,5 @@ def build_local_app(config: LocalConfig) -> FastAPI:
         sync=sync,
         imports=Imports(wallet_repository, WalletChanges(clock, prices, fx_rates, sync), OpenFigiSecurityLookup(), DegiroStatementReader()),
         mcp_allowed_hosts=config.mcp_allowed_hosts,
+        access_tokens=AccessTokens(SqliteAccessTokenRepository(config.db_path), wallet_repository, clock),
     )

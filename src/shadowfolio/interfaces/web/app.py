@@ -5,7 +5,9 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from shadowfolio.interfaces.mcp.access import RequireToken
 from shadowfolio.interfaces.mcp.server import MCP_PATH, mcp_server, transport_security
+from shadowfolio.interfaces.web.access import access_router
 from shadowfolio.interfaces.web.comparison import comparison_router
 from shadowfolio.interfaces.web.history import history_router
 from shadowfolio.interfaces.web.imports import imports_router
@@ -15,6 +17,7 @@ from shadowfolio.interfaces.web.securities import securities_router
 from shadowfolio.interfaces.web.sync import sync_router
 from shadowfolio.interfaces.web.valuation import valuation_router
 from shadowfolio.interfaces.web.wallets import wallets_router
+from shadowfolio.usecases.access_tokens import AccessTokens
 from shadowfolio.usecases.comparison import Comparison
 from shadowfolio.usecases.history import History
 from shadowfolio.usecases.imports import Imports
@@ -39,6 +42,7 @@ def create_app(
     comparison: Comparison,
     orders: Orders,
     securities: Securities,
+    access_tokens: AccessTokens,
     mcp_allowed_hosts: Sequence[str] = (),  # besides localhost, the addresses agents may reach the MCP server at
 ) -> FastAPI:
     # The MCP server for agents, on the same app and use cases; its sessions run while the app does.
@@ -57,6 +61,7 @@ def create_app(
     # Operation ids are the route functions' names (e.g. list_wallets), so generated clients get readable names.
     app = FastAPI(title="Shadowfolio", generate_unique_id_function=lambda route: route.name, lifespan=lifespan)
     app.state.mcp = mcp
+    app.state.access_tokens = access_tokens
     app.include_router(wallets_router(wallets), prefix=API_PREFIX)
     app.include_router(history_router(history), prefix=API_PREFIX)
     app.include_router(valuation_router(valuation), prefix=API_PREFIX)
@@ -66,6 +71,8 @@ def create_app(
     app.include_router(comparison_router(comparison), prefix=API_PREFIX)
     app.include_router(orders_router(orders), prefix=API_PREFIX)
     app.include_router(securities_router(securities), prefix=API_PREFIX)
+    app.include_router(access_router(access_tokens), prefix=API_PREFIX)
     # Last, so the API's routes are matched first; the MCP app answers at MCP_PATH.
-    app.mount("/", mcp_app)
+    # Every request to it needs an access token.
+    app.mount("/", RequireToken(mcp_app, access_tokens.authenticate))
     return app
