@@ -31,7 +31,7 @@ from shadowfolio.usecases.securities import Securities
 from shadowfolio.usecases.sync import Sync
 from shadowfolio.usecases.valuation import Valuation
 from shadowfolio.usecases.wallet_changes import WalletChanges
-from shadowfolio.usecases.wallets import Wallets
+from shadowfolio.usecases.wallets import UNOWNED, Wallets
 
 # Past market data is kept in this file, next to the database (and, like it, out of version control). It only holds
 # copies of what the providers answered: deleting it loses nothing.
@@ -56,6 +56,8 @@ class LocalConfig:
     auth0_domain: str | None = None
     auth0_client_id: str | None = None
     auth0_audience: str | None = None
+    # Who the wallets made before sign-in (owned by no user) go to, with their agents' tokens: the user's id.
+    existing_wallets_owner: str | None = None
 
 
 def build_local_app(config: LocalConfig) -> FastAPI:
@@ -67,8 +69,14 @@ def build_local_app(config: LocalConfig) -> FastAPI:
     corporate_actions = AlpacaCorporateActions(config.alpaca)
     sync = Sync(wallet_repository, clock, corporate_actions, fx_rates)
     market = Market(prices, clock, corporate_actions)
+    wallets = Wallets(wallet_repository, clock)
+    access_tokens = AccessTokens(SqliteAccessTokenRepository(config.db_path), wallet_repository, clock)
+    if config.existing_wallets_owner:
+        # The wallets made before sign-in, and their agents' tokens, go to their user: once, as none are left after.
+        wallets.hand_over(UNOWNED, config.existing_wallets_owner)
+        access_tokens.hand_over(UNOWNED, config.existing_wallets_owner)
     return create_app(
-        wallets=Wallets(wallet_repository, clock),
+        wallets=wallets,
         history=History(wallet_repository, clock, prices, fx_rates, sync),
         valuation=Valuation(wallet_repository, clock, prices, fx_rates),
         comparison=Comparison(wallet_repository, clock, prices, fx_rates, corporate_actions),
@@ -86,7 +94,7 @@ def build_local_app(config: LocalConfig) -> FastAPI:
         sync=sync,
         imports=Imports(wallet_repository, WalletChanges(clock, prices, fx_rates, sync), OpenFigiSecurityLookup(), DegiroStatementReader()),
         mcp_allowed_hosts=config.mcp_allowed_hosts,
-        access_tokens=AccessTokens(SqliteAccessTokenRepository(config.db_path), wallet_repository, clock),
+        access_tokens=access_tokens,
         identity=Auth0Identity(config.auth0_domain, config.auth0_audience, clock),
         sign_in=_sign_in(config),
     )

@@ -44,8 +44,16 @@ class SqliteAccessTokenRepository(AccessTokenRepository):
     def update(self, token: AccessToken) -> None:
         with closing(sqlite3.connect(self._path)) as conn, conn:
             conn.execute(
-                "UPDATE access_tokens SET name = ?, scope = ?, wallet_ids = ?, last_used_at = ?, revoked_at = ? WHERE id = ?",
-                (token.name, token.scope.value, _wallets(token), _optional(token.last_used_at), _optional(token.revoked_at), str(token.id)),
+                "UPDATE access_tokens SET owner_id = ?, name = ?, scope = ?, wallet_ids = ?, last_used_at = ?, revoked_at = ? WHERE id = ?",
+                (
+                    token.owner_id,
+                    token.name,
+                    token.scope.value,
+                    _wallets(token),
+                    _optional(token.last_used_at),
+                    _optional(token.revoked_at),
+                    str(token.id),
+                ),
             )
 
     def get(self, token_id: UUID) -> AccessToken | None:

@@ -11,6 +11,9 @@ from shadowfolio.domain.wallet import Wallet
 from shadowfolio.ports.clock import Clock
 from shadowfolio.ports.wallet_repository import WalletRepository
 
+# Who owned the wallets made before sign-in existed: no user (see Wallets.hand_over).
+UNOWNED = "local"
+
 
 class Wallets:
     def __init__(self, repo: WalletRepository, clock: Clock) -> None:
@@ -41,6 +44,14 @@ class Wallets:
             updated = updated.set_withholding_rate(withholding_rate)
         self._repo.update(updated)
         return updated
+
+    def hand_over(self, from_owner: str, to_owner: str) -> int:
+        """Give every wallet of `from_owner` to `to_owner` (e.g. the ones made before sign-in to their user). Returns
+        how many; none once done."""
+        found = self._repo.list_by_owner(from_owner)
+        for wallet in found:
+            self._repo.update(wallet.handed_to(to_owner))
+        return len(found)
 
     def set_rules(self, wallet_id: UUID, rules: Rules) -> Wallet | None:
         """Replace the wallet's rules for orders, its allowed symbols as market data writes them, once each. Returns

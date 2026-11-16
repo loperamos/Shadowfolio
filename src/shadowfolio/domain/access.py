@@ -57,6 +57,9 @@ class AccessToken:
     def used_at(self, at: datetime) -> Self:
         return replace(self, last_used_at=at)
 
+    def handed_to(self, owner_id: str) -> Self:
+        return replace(self, owner_id=owner_id)
+
     def revoked(self, at: datetime) -> Self:
         return self if self.revoked_at is not None else replace(self, revoked_at=at)
 

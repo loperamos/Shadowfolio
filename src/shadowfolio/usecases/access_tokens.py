@@ -53,6 +53,13 @@ class AccessTokens:
     def list(self, owner_id: str) -> list[AccessToken]:
         return self._repo.list_by_owner(owner_id)
 
+    def hand_over(self, from_owner: str, to_owner: str) -> int:
+        """Give every token of `from_owner` to `to_owner`, as their wallets (see Wallets.hand_over). Returns how many."""
+        found = self._repo.list_by_owner(from_owner)
+        for token in found:
+            self._repo.update(token.handed_to(to_owner))
+        return len(found)
+
     def revoke(self, owner_id: str, token_id: UUID) -> AccessToken | None:
         """Revoke the owner's token: it stops working at once. None if the owner has no such token."""
         token = self._repo.get(token_id)
