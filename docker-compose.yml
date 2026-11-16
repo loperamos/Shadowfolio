@@ -1,6 +1,6 @@
 # Self-hosting Shadowfolio (e.g. on a Raspberry Pi): the app, and Cloudflare's tunnel publishing it on your domain.
 #   docker compose up -d --build                    the app alone, at http://127.0.0.1:8080 on this machine
-#   docker compose --profile public up -d --build   and the tunnel: live at your domain (CLOUDFLARE_TUNNEL_TOKEN)
+#   docker compose --profile public up -d --build   and the tunnel: live at your domain (see the README to create it)
 # See the README's "Self-hosting" section.
 
 services:
@@ -22,11 +22,14 @@ services:
       - "127.0.0.1:8080:8000"
     restart: unless-stopped
 
+  # A tunnel created from the command line: its config.yml and credentials file (a secret) are read from
+  # CLOUDFLARED_DIR (default ~/.cloudflared), as the user who owns them (CLOUDFLARED_USER, default 1000:1000).
   cloudflared:
     image: cloudflare/cloudflared:2025.11.1
-    command: tunnel --no-autoupdate run
-    environment:
-      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN}
+    command: tunnel --no-autoupdate --config /etc/cloudflared/config.yml run
+    user: ${CLOUDFLARED_USER:-1000:1000}
+    volumes:
+      - ${CLOUDFLARED_DIR:-~/.cloudflared}:/etc/cloudflared:ro
     depends_on:
       - app
     restart: unless-stopped

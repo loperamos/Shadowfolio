@@ -54,6 +54,29 @@ docker compose --profile public up -d --build   # and the Cloudflare tunnel: liv
 docker compose logs -f app                      # follow it
 ```
 
+The tunnel publishes the app on your domain through Cloudflare, with https and no open ports. Create it once from the command line, with the same `cloudflared` image, as your user so it can use `~/.cloudflared` (here for `shadowfolio.epole.dev`):
+
+```bash
+mkdir -p ~/.cloudflared && chmod 700 ~/.cloudflared
+cloudflared() { docker run --rm -it --user "$(id -u):$(id -g)" -e HOME=/home/nonroot -v "$HOME/.cloudflared:/home/nonroot/.cloudflared" cloudflare/cloudflared:2025.11.1 "$@"; }
+cloudflared tunnel login                                          # open the URL it prints, pick your domain: saves cert.pem
+cloudflared tunnel create shadowfolio                             # prints the tunnel's id; saves <id>.json, its secret
+cloudflared tunnel route dns shadowfolio shadowfolio.epole.dev   # the DNS record pointing the name at the tunnel
+```
+
+Then write `~/.cloudflared/config.yml`, with the id `create` printed:
+
+```yaml
+tunnel: <id>
+credentials-file: /etc/cloudflared/<id>.json
+ingress:
+  - hostname: shadowfolio.epole.dev
+    service: http://app:8000
+  - service: http_status:404
+```
+
+`cert.pem` is only needed to create tunnels and DNS records: move it somewhere safe once done. In Auth0, add `https://shadowfolio.epole.dev` to the application's allowed callback, logout and web origin URLs.
+
 To start the container from a copy of the development database (SQLite's online backup, safe while the development backend runs), before its first start:
 
 ```bash
