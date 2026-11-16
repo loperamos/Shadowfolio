@@ -5,6 +5,33 @@
     "version": "0.1.0"
   },
   "paths": {
+    "/api/auth/config": {
+      "get": {
+        "summary": "Sign In Settings",
+        "description": "What the frontend needs to sign users in; null when sign-in is not set up.",
+        "operationId": "sign_in_settings",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/SignInSettings"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "title": "Response Sign In Settings"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/wallets": {
       "get": {
         "summary": "List Wallets",
@@ -4840,6 +4867,35 @@
         ],
         "title": "SharesSource",
         "description": "Where a company's share count comes from, the most exact first."
+      },
+      "SignInSettings": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "domain": {
+            "type": "string",
+            "title": "Domain"
+          },
+          "client_id": {
+            "type": "string",
+            "title": "Client Id"
+          },
+          "audience": {
+            "type": "string",
+            "title": "Audience"
+          }
+        },
+        "type": "object",
+        "required": [
+          "provider",
+          "domain",
+          "client_id",
+          "audience"
+        ],
+        "title": "SignInSettings",
+        "description": "What the frontend needs to sign users in with the provider; none of it is a secret."
       },
       "StatementRequest": {
         "properties": {
