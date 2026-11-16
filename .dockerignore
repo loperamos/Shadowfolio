@@ -1,0 +1,16 @@
+# Only what the image builds from: never secrets, data or local tooling.
+.env
+.git
+.venv
+data
+**/__pycache__
+**/*.py[cod]
+.mypy_cache
+.pytest_cache
+.ruff_cache
+.idea
+.claude
+web/node_modules
+web/dist
+tests
+deploy

@@ -2,8 +2,13 @@
 
 from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, FastAPI
+from starlette.exceptions import HTTPException
+from starlette.responses import JSONResponse, Response
+from starlette.staticfiles import StaticFiles
+from starlette.types import ASGIApp, Receive, Scope, Send
 
 from shadowfolio.interfaces.mcp.access import RequireToken
 from shadowfolio.interfaces.mcp.server import MCP_PATH, mcp_server, transport_security
@@ -48,6 +53,7 @@ def create_app(
     identity: Identity,
     sign_in: SignInSettings | None = None,  # for the frontend; None when sign-in is not set up
     mcp_allowed_hosts: Sequence[str] = (),  # besides localhost, the addresses agents may reach the MCP server at
+    web_dir: Path | None = None,  # the built web app, served at every other path; None when it is served apart (Vite)
 ) -> FastAPI:
     # The MCP server for agents, on the same app and use cases; its sessions run while the app does.
     mcp = mcp_server(wallets, valuation, orders, comparison, securities)
@@ -81,10 +87,50 @@ def create_app(
     api.include_router(securities_router(securities))
     api.include_router(access_router(access_tokens, current_user))
     app.include_router(api)
-    # Last, so the API's routes are matched first; the MCP app answers at MCP_PATH.
-    # Every request to it needs an access token.
-    app.mount("/", RequireToken(mcp_app, access_tokens.authenticate))
+    # Last, so the API's routes are matched first: the MCP server at MCP_PATH (every request to it needs an access
+    # token), and the web app at every other path, when it is served from here.
+    app.mount("/", _Site(RequireToken(mcp_app, access_tokens.authenticate), None if web_dir is None else _WebApp(web_dir)))
     return app
 
 
 __all__ = ["API_PREFIX", "SignInSettings", "create_app"]
+
+
+# A path whose last part has an extension asks for a file (e.g. /assets/app.js); one without is a route of the web app.
+FILE_EXTENSION = "."
+INDEX = "index.html"
+NOT_FOUND = 404
+
+
+class _Site:
+    """Everything that is not an API route: the MCP server at MCP_PATH, and the web app at every other path; an unknown
+    API path stays an API 404 rather than getting the web app's page."""
+
+    def __init__(self, mcp: ASGIApp, web: ASGIApp | None) -> None:
+        self._mcp = mcp
+        self._web = web
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        path: str = scope.get("path", "")
+        if path == MCP_PATH or path.startswith(f"{MCP_PATH}/") or self._web is None:
+            await self._mcp(scope, receive, send)
+        elif path == API_PREFIX or path.startswith(f"{API_PREFIX}/"):
+            await JSONResponse({"detail": "Not Found"}, status_code=NOT_FOUND)(scope, receive, send)
+        else:
+            await self._web(scope, receive, send)
+
+
+class _WebApp(StaticFiles):
+    """The built web app (a single-page app): its files, and its page for its own routes (e.g. /wallets/<id>), which
+    the browser then shows. A missing file still answers 404."""
+
+    def __init__(self, directory: Path) -> None:
+        super().__init__(directory=directory, html=True)
+
+    async def get_response(self, path: str, scope: Scope) -> Response:
+        try:
+            return await super().get_response(path, scope)
+        except HTTPException as error:
+            if error.status_code != NOT_FOUND or FILE_EXTENSION in path.rsplit("/", 1)[-1]:
+                raise
+            return await super().get_response(INDEX, scope)

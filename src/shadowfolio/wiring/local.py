@@ -59,6 +59,8 @@ class LocalConfig:
     auth0_audience: str | None = None
     # Who the wallets made before sign-in (owned by no user) go to, with their agents' tokens: the user's id.
     existing_wallets_owner: str | None = None
+    # The built web app, served by the backend itself (as when deployed); None in development, where Vite serves it.
+    web_dir: Path | None = None
 
 
 def build_local_app(config: LocalConfig, acting_as: str | None = None) -> FastAPI:
@@ -100,6 +102,7 @@ def build_local_app(config: LocalConfig, acting_as: str | None = None) -> FastAP
         access_tokens=access_tokens,
         identity=Auth0Identity(config.auth0_domain, config.auth0_audience, clock) if acting_as is None else FixedIdentity(acting_as),
         sign_in=_sign_in(config) if acting_as is None else SignInSettings(provider=FIXED, user_id=acting_as),
+        web_dir=config.web_dir,
     )
 
 

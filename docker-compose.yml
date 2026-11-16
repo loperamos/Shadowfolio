@@ -1,0 +1,38 @@
+# Self-hosting Shadowfolio (e.g. on a Raspberry Pi): the app, and Cloudflare's tunnel publishing it on your domain.
+#   docker compose up -d --build                    the app alone, at http://127.0.0.1:8080 on this machine
+#   docker compose --profile public up -d --build   and the tunnel: live at your domain (CLOUDFLARE_TUNNEL_TOKEN)
+# See the README's "Self-hosting" section.
+
+services:
+  app:
+    build: .
+    image: shadowfolio:latest
+    env_file: .env
+    # The container's own, over the development values in .env: its data lives in the volume, apart from the
+    # development servers' database.
+    environment:
+      SHADOWFOLIO_HOST: 0.0.0.0
+      SHADOWFOLIO_PORT: "8000"
+      SHADOWFOLIO_DB: /data/shadowfolio.db
+      SHADOWFOLIO_WEB_DIR: /app/web
+    volumes:
+      - shadowfolio-data:/data
+    # To try it on this machine only; the public way in is the tunnel, which reaches the app inside Docker's network.
+    ports:
+      - "127.0.0.1:8080:8000"
+    restart: unless-stopped
+
+  cloudflared:
+    image: cloudflare/cloudflared:2025.11.1
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on:
+      - app
+    restart: unless-stopped
+    # Only with --profile public, so nothing goes public by accident.
+    profiles:
+      - public
+
+volumes:
+  shadowfolio-data:
