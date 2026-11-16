@@ -3,11 +3,12 @@
 from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import APIRouter, Depends, FastAPI
 
 from shadowfolio.interfaces.mcp.access import RequireToken
 from shadowfolio.interfaces.mcp.server import MCP_PATH, mcp_server, transport_security
 from shadowfolio.interfaces.web.access import access_router
+from shadowfolio.interfaces.web.auth import SignInSettings, auth_router, sign_in_checks
 from shadowfolio.interfaces.web.comparison import comparison_router
 from shadowfolio.interfaces.web.history import history_router
 from shadowfolio.interfaces.web.imports import imports_router
@@ -17,6 +18,7 @@ from shadowfolio.interfaces.web.securities import securities_router
 from shadowfolio.interfaces.web.sync import sync_router
 from shadowfolio.interfaces.web.valuation import valuation_router
 from shadowfolio.interfaces.web.wallets import wallets_router
+from shadowfolio.ports.identity import Identity
 from shadowfolio.usecases.access_tokens import AccessTokens
 from shadowfolio.usecases.comparison import Comparison
 from shadowfolio.usecases.history import History
@@ -43,6 +45,8 @@ def create_app(
     orders: Orders,
     securities: Securities,
     access_tokens: AccessTokens,
+    identity: Identity,
+    sign_in: SignInSettings | None = None,  # for the frontend; None when sign-in is not set up
     mcp_allowed_hosts: Sequence[str] = (),  # besides localhost, the addresses agents may reach the MCP server at
 ) -> FastAPI:
     # The MCP server for agents, on the same app and use cases; its sessions run while the app does.
@@ -62,17 +66,25 @@ def create_app(
     app = FastAPI(title="Shadowfolio", generate_unique_id_function=lambda route: route.name, lifespan=lifespan)
     app.state.mcp = mcp
     app.state.access_tokens = access_tokens
-    app.include_router(wallets_router(wallets), prefix=API_PREFIX)
-    app.include_router(history_router(history), prefix=API_PREFIX)
-    app.include_router(valuation_router(valuation), prefix=API_PREFIX)
-    app.include_router(market_router(market), prefix=API_PREFIX)
-    app.include_router(sync_router(sync), prefix=API_PREFIX)
-    app.include_router(imports_router(imports), prefix=API_PREFIX)
-    app.include_router(comparison_router(comparison), prefix=API_PREFIX)
-    app.include_router(orders_router(orders), prefix=API_PREFIX)
-    app.include_router(securities_router(securities), prefix=API_PREFIX)
-    app.include_router(access_router(access_tokens), prefix=API_PREFIX)
+    # Every API route signs the user in first, and refuses wallets that are not theirs (see interfaces.web.auth).
+    current_user, authorize = sign_in_checks(identity, wallets, API_PREFIX)
+    api = APIRouter(prefix=API_PREFIX, dependencies=[Depends(authorize)])
+    api.include_router(auth_router(sign_in))
+    api.include_router(wallets_router(wallets, current_user))
+    api.include_router(history_router(history))
+    api.include_router(valuation_router(valuation))
+    api.include_router(market_router(market))
+    api.include_router(sync_router(sync))
+    api.include_router(imports_router(imports))
+    api.include_router(comparison_router(comparison))
+    api.include_router(orders_router(orders))
+    api.include_router(securities_router(securities))
+    api.include_router(access_router(access_tokens, current_user))
+    app.include_router(api)
     # Last, so the API's routes are matched first; the MCP app answers at MCP_PATH.
     # Every request to it needs an access token.
     app.mount("/", RequireToken(mcp_app, access_tokens.authenticate))
     return app
+
+
+__all__ = ["API_PREFIX", "SignInSettings", "create_app"]

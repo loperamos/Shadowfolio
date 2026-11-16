@@ -8,6 +8,7 @@ from fastapi import FastAPI
 from shadowfolio.adapters.alpaca_corporate_actions import AlpacaCorporateActions
 from shadowfolio.adapters.alpaca_news import AlpacaNews
 from shadowfolio.adapters.alpaca_price_data import DAILY_FEED, AlpacaConfig, AlpacaPriceData
+from shadowfolio.adapters.auth0_identity import Auth0Identity
 from shadowfolio.adapters.cached_fx_rates import CachedFxRates
 from shadowfolio.adapters.cached_price_data import CachedPriceData
 from shadowfolio.adapters.degiro_statements import DegiroStatementReader
@@ -19,6 +20,7 @@ from shadowfolio.adapters.sqlite_access_token_repository import SqliteAccessToke
 from shadowfolio.adapters.sqlite_wallet_repository import SqliteWalletRepository
 from shadowfolio.adapters.system_clock import SystemClock
 from shadowfolio.interfaces.web.app import create_app
+from shadowfolio.interfaces.web.auth import SignInSettings
 from shadowfolio.usecases.access_tokens import AccessTokens
 from shadowfolio.usecases.comparison import Comparison
 from shadowfolio.usecases.history import History
@@ -39,6 +41,9 @@ MARKET_CACHE_FILE = "market-cache.db"
 PRICE_SOURCE = f"alpaca/{DAILY_FEED}"
 FX_SOURCE = "ecb"
 
+# The sign-in provider, as the frontend is told.
+AUTH0 = "auth0"
+
 
 @dataclass(frozen=True)
 class LocalConfig:
@@ -47,6 +52,10 @@ class LocalConfig:
     edgar_contact: str | None = None  # who SEC EDGAR is told is asking; without it, no fundamentals
     finnhub_key: str | None = None  # for the earnings calendar; without it, no earnings dates
     mcp_allowed_hosts: tuple[str, ...] = ()  # besides localhost, the addresses agents may reach the MCP server at
+    # Sign-in through Auth0; without the domain and audience, sign-in is not set up and the API says so.
+    auth0_domain: str | None = None
+    auth0_client_id: str | None = None
+    auth0_audience: str | None = None
 
 
 def build_local_app(config: LocalConfig) -> FastAPI:
@@ -78,4 +87,13 @@ def build_local_app(config: LocalConfig) -> FastAPI:
         imports=Imports(wallet_repository, WalletChanges(clock, prices, fx_rates, sync), OpenFigiSecurityLookup(), DegiroStatementReader()),
         mcp_allowed_hosts=config.mcp_allowed_hosts,
         access_tokens=AccessTokens(SqliteAccessTokenRepository(config.db_path), wallet_repository, clock),
+        identity=Auth0Identity(config.auth0_domain, config.auth0_audience, clock),
+        sign_in=_sign_in(config),
     )
+
+
+def _sign_in(config: LocalConfig) -> SignInSettings | None:
+    """What the frontend needs to sign users in, when it is all set."""
+    if not (config.auth0_domain and config.auth0_client_id and config.auth0_audience):
+        return None
+    return SignInSettings(provider=AUTH0, domain=config.auth0_domain, client_id=config.auth0_client_id, audience=config.auth0_audience)
