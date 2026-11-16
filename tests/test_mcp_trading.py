@@ -14,6 +14,7 @@ from shadowfolio.adapters.fixed_clock import FixedClock
 from shadowfolio.adapters.in_memory_price_data import InMemoryPriceData
 from shadowfolio.domain.money import Currency
 from shadowfolio.domain.valuation import Quote
+from shadowfolio.interfaces.mcp.access import acting_with
 from shadowfolio.wiring.test import build_test_app
 
 PLACED = datetime(2026, 3, 2, 15, 0, 30, tzinfo=UTC)
@@ -48,19 +49,24 @@ def a_wallet(app: Any, **rules: Any) -> str:
     if rules:
         body = {"max_position_weight": None, "min_cash_weight": None, "allowed_symbols": [], "max_orders_per_month": None, **rules}
         assert http.put(f"/api/wallets/{wallet_id}/rules", json=body).status_code == 200
+    # The agent's token: trading, in this wallet.
+    secret = http.post("/api/access-tokens", json={"name": "agent", "scope": "trading", "wallet_ids": [wallet_id]}).json()["secret"]
+    app.state.agent_token = app.state.access_tokens.authenticate(secret)
     return wallet_id
 
 
 async def call(app: Any, tool: str, **arguments: Any) -> Any:
-    async with Client(app.state.mcp) as client:
-        result = await client.call_tool(tool, arguments)
+    with acting_with(app.state.agent_token):
+        async with Client(app.state.mcp) as client:
+            result = await client.call_tool(tool, arguments)
     assert not result.is_error, result.content
     return result.structured_content
 
 
 async def error_of(app: Any, tool: str, **arguments: Any) -> str:
-    async with Client(app.state.mcp) as client:
-        result = await client.call_tool(tool, arguments)
+    with acting_with(app.state.agent_token):
+        async with Client(app.state.mcp) as client:
+            result = await client.call_tool(tool, arguments)
     assert result.is_error
     text: str = result.content[0].text  # type: ignore[union-attr]
     return text

@@ -5,6 +5,41 @@ export type ClientOptions = {
 };
 
 /**
+ * AccessTokenResponse
+ */
+export type AccessTokenResponse = {
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Name
+     */
+    name: string;
+    scope: Scope;
+    /**
+     * Wallet Ids
+     */
+    wallet_ids: Array<string>;
+    /**
+     * Hint
+     */
+    hint: string;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Last Used At
+     */
+    last_used_at: string | null;
+    /**
+     * Revoked At
+     */
+    revoked_at: string | null;
+};
+
+/**
  * ArticleResponse
  */
 export type ArticleResponse = {
@@ -154,6 +189,21 @@ export type CopyWalletRequest = {
 };
 
 /**
+ * CreateAccessTokenRequest
+ */
+export type CreateAccessTokenRequest = {
+    /**
+     * Name
+     */
+    name: string;
+    scope: Scope;
+    /**
+     * Wallet Ids
+     */
+    wallet_ids: Array<string>;
+};
+
+/**
  * CreateWalletRequest
  */
 export type CreateWalletRequest = {
@@ -166,6 +216,17 @@ export type CreateWalletRequest = {
      * Cash
      */
     cash: number | string;
+};
+
+/**
+ * CreatedAccessTokenResponse
+ */
+export type CreatedAccessTokenResponse = {
+    token: AccessTokenResponse;
+    /**
+     * Secret
+     */
+    secret: string;
 };
 
 /**
@@ -1025,6 +1086,16 @@ export type RulesResponse = {
      */
     max_orders_per_month: number | null;
 };
+
+/**
+ * Scope
+ */
+export const Scope = { READ: 'read', TRADING: 'trading' } as const;
+
+/**
+ * Scope
+ */
+export type Scope = typeof Scope[keyof typeof Scope];
 
 /**
  * SecurityRangesResponse
@@ -2804,3 +2875,80 @@ export type SecurityRangesResponses = {
 };
 
 export type SecurityRangesResponse2 = SecurityRangesResponses[keyof SecurityRangesResponses];
+
+export type ListAccessTokensData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/access-tokens';
+};
+
+export type ListAccessTokensResponses = {
+    /**
+     * Response List Access Tokens
+     *
+     * Successful Response
+     */
+    200: Array<AccessTokenResponse>;
+};
+
+export type ListAccessTokensResponse = ListAccessTokensResponses[keyof ListAccessTokensResponses];
+
+export type CreateAccessTokenData = {
+    body: CreateAccessTokenRequest;
+    path?: never;
+    query?: never;
+    url: '/api/access-tokens';
+};
+
+export type CreateAccessTokenErrors = {
+    /**
+     * Malformed request or broken business rule
+     */
+    422: ErrorResponse;
+};
+
+export type CreateAccessTokenError = CreateAccessTokenErrors[keyof CreateAccessTokenErrors];
+
+export type CreateAccessTokenResponses = {
+    /**
+     * Successful Response
+     */
+    201: CreatedAccessTokenResponse;
+};
+
+export type CreateAccessTokenResponse = CreateAccessTokenResponses[keyof CreateAccessTokenResponses];
+
+export type RevokeAccessTokenData = {
+    body?: never;
+    path: {
+        /**
+         * Token Id
+         */
+        token_id: string;
+    };
+    query?: never;
+    url: '/api/access-tokens/{token_id}/revoke';
+};
+
+export type RevokeAccessTokenErrors = {
+    /**
+     * Not found
+     */
+    404: ErrorResponse;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type RevokeAccessTokenError = RevokeAccessTokenErrors[keyof RevokeAccessTokenErrors];
+
+export type RevokeAccessTokenResponses = {
+    /**
+     * Successful Response
+     */
+    200: AccessTokenResponse;
+};
+
+export type RevokeAccessTokenResponse = RevokeAccessTokenResponses[keyof RevokeAccessTokenResponses];

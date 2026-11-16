@@ -18,9 +18,11 @@ from mcp.server.transport_security import TransportSecuritySettings
 from mcp.types import ToolAnnotations
 from pydantic import BaseModel
 
+from shadowfolio.domain.access import AccessToken
 from shadowfolio.domain.errors import DomainError, OrderNotFoundError
 from shadowfolio.domain.money import to_cents
 from shadowfolio.domain.orders import OrderSide
+from shadowfolio.interfaces.mcp.access import MISSING, current_token
 from shadowfolio.interfaces.web.schemas import (
     CENT,
     OrderOutcomeResponse,
@@ -30,7 +32,6 @@ from shadowfolio.interfaces.web.schemas import (
     ValuationResponse,
     WalletResponse,
 )
-from shadowfolio.interfaces.web.wallets import LOCAL_OWNER
 from shadowfolio.usecases.comparison import DEFAULT_BENCHMARK, Comparison
 from shadowfolio.usecases.orders import Orders
 from shadowfolio.usecases.securities import Securities
@@ -112,13 +113,16 @@ def mcp_server(wallets: Wallets, valuation: Valuation, orders: Orders, compariso
     @server.tool(annotations=READ_ONLY)
     def list_wallets() -> list[WalletListing]:
         """The user's wallets: id, name, currency and cash. Use an id with wallet_snapshot for the rest."""
-        return [WalletListing(id=w.id, name=w.name, currency=w.currency.value, cash=w.cash) for w in wallets.list(LOCAL_OWNER)]
+        token = _token()
+        listed = [w for w in wallets.list(token.owner_id) if token.reaches(w.id)]
+        return [WalletListing(id=w.id, name=w.name, currency=w.currency.value, cash=w.cash) for w in listed]
 
     @server.tool(annotations=READ_ONLY)
     def wallet_snapshot(wallet_id: UUID) -> WalletSnapshot:
         """A wallet at a glance: its value now at the latest prices (each holding with its price time, weight and gain),
         cash and buying power after open buy orders, how concentrated it is, the owner's rules for orders, its open
         orders, and its returns since it started next to SPY with the same deposits."""
+        _reading(wallet_id)
         found = orders.list(wallet_id)  # reading the orders fills the ones due, as the web page does
         if found is None:
             raise ToolError(f"no wallet {wallet_id}")
@@ -154,11 +158,13 @@ def mcp_server(wallets: Wallets, valuation: Valuation, orders: Orders, compariso
         """A security at a glance: latest price, valuation (P/E, price to sales, FCF yield, market cap), last fiscal
         year's growth and margin, dividends, trend over 3, 6 and 12 months, and from `start` to `end` (default: the last
         year) its volatility, deepest fall, beta against SPY and daily traded value; its industry and next earnings."""
+        _token()
         return SecuritySummaryResponse.from_summary(securities.summary(symbol.strip().upper(), start, end))
 
     @server.tool(annotations=READ_ONLY)
     def compare_securities(symbols: list[str], start: date | None = None, end: date | None = None) -> list[SecuritySummaryResponse]:
         """Several securities' summaries (as security_summary), in the order given, to compare them side by side."""
+        _token()
         if not 1 <= len(symbols) <= MAX_COMPARED:
             raise ToolError(f"compare 1 to {MAX_COMPARED} securities at a time")
         return [SecuritySummaryResponse.from_summary(securities.summary(symbol.strip().upper(), start, end)) for symbol in symbols]
@@ -170,6 +176,7 @@ def mcp_server(wallets: Wallets, valuation: Valuation, orders: Orders, compariso
         """What an order would do if placed now, without placing it: its estimated amount (at the limit, or the latest
         price), the buying power and the symbol's share of the wallet once it fills, the wallet rule that would refuse
         it, warnings if it would be rejected when it fills, and how it fills. Use before place_order."""
+        _reading(wallet_id)
         preview = _answer(lambda: orders.preview(wallet_id, side, symbol, quantity, limit_price), wallet_id)
         return OrderPreviewResponse(
             price=preview.estimate.price,
@@ -191,6 +198,7 @@ def mcp_server(wallets: Wallets, valuation: Valuation, orders: Orders, compariso
         """Place an order now: at market, or with a limit price (the most a buy pays, the least a sell takes, in the
         symbol's currency). It fills later, as preview_order's fill_rule says; cash and shares are checked then. Give the
         reason for it: it is kept with the order as the decision log. Refused when it breaks one of the wallet's rules."""
+        _trading(wallet_id)
         if not reason.strip():
             raise ToolError("give a reason for the order: it is kept with it as the decision log")
         placed = _answer(lambda: orders.place(wallet_id, side, symbol, quantity, reason, limit_price), wallet_id)
@@ -200,6 +208,7 @@ def mcp_server(wallets: Wallets, valuation: Valuation, orders: Orders, compariso
     @server.tool(annotations=CANCELS)
     def cancel_order(wallet_id: UUID, order_id: UUID) -> OrderResponse:
         """Cancel an open order; one that has filled, or was cancelled or rejected, cannot be."""
+        _trading(wallet_id)
         wallet, order = _answer(lambda: orders.cancel(wallet_id, order_id), wallet_id)
         return OrderResponse.from_order(order, wallet)
 
@@ -207,6 +216,7 @@ def mcp_server(wallets: Wallets, valuation: Valuation, orders: Orders, compariso
     def list_orders(wallet_id: UUID, benchmark: str = DEFAULT_BENCHMARK) -> list[OrderWithOutcome]:
         """The wallet's orders in the order they were placed, each with its reason and status, and for filled ones how
         they turned out: the symbol's return since the fill next to `benchmark`'s over the same time."""
+        _reading(wallet_id)
         wallet = _answer(lambda: orders.list(wallet_id), wallet_id)
         try:
             outcomes = {o.order_id: OrderOutcomeResponse.from_outcome(o) for o in orders.outcomes(wallet_id, benchmark) or []}
@@ -215,6 +225,28 @@ def mcp_server(wallets: Wallets, valuation: Valuation, orders: Orders, compariso
         return [OrderWithOutcome(order=OrderResponse.from_order(o, wallet), outcome=outcomes.get(o.id)) for o in wallet.orders]
 
     return server
+
+
+def _token() -> AccessToken:
+    """The calling agent's token; every request has one, as the HTTP check lets no other through."""
+    token = current_token()
+    if token is None:
+        raise ToolError(MISSING)
+    return token
+
+
+def _reading(wallet_id: UUID) -> AccessToken:
+    """The token, if it may use the wallet; a wallet it may not is answered as one that does not exist."""
+    token = _token()
+    if not token.reaches(wallet_id):
+        raise ToolError(f"no wallet {wallet_id}")
+    return token
+
+
+def _trading(wallet_id: UUID) -> None:
+    """Only a trading token places or cancels orders, in the wallets it may use."""
+    if not _reading(wallet_id).may_trade:
+        raise ToolError("this access token only reads: placing or cancelling orders needs a trading token")
 
 
 def _answer[T](call: Callable[[], T | None], wallet_id: UUID) -> T:

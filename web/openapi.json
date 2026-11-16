@@ -2125,10 +2125,190 @@
           }
         }
       }
+    },
+    "/api/access-tokens": {
+      "get": {
+        "summary": "List Access Tokens",
+        "description": "The tokens, revoked ones included, in the order they were created; never their secrets.",
+        "operationId": "list_access_tokens",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/AccessTokenResponse"
+                  },
+                  "type": "array",
+                  "title": "Response List Access Tokens"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Create Access Token",
+        "description": "A new token for an agent, with its secret: shown only now, as only a hash of it is kept.",
+        "operationId": "create_access_token",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateAccessTokenRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreatedAccessTokenResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Malformed request or broken business rule",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/access-tokens/{token_id}/revoke": {
+      "post": {
+        "summary": "Revoke Access Token",
+        "description": "Revoke a token: it stops working at once, and stays listed as revoked.",
+        "operationId": "revoke_access_token",
+        "parameters": [
+          {
+            "name": "token_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Token Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccessTokenResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
     "schemas": {
+      "AccessTokenResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/Scope"
+          },
+          "wallet_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Wallet Ids"
+          },
+          "hint": {
+            "type": "string",
+            "title": "Hint"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "last_used_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Used At"
+          },
+          "revoked_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revoked At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "scope",
+          "wallet_ids",
+          "hint",
+          "created_at",
+          "last_used_at",
+          "revoked_at"
+        ],
+        "title": "AccessTokenResponse"
+      },
       "ArticleResponse": {
         "properties": {
           "headline": {
@@ -2397,6 +2577,32 @@
         ],
         "title": "CopyWalletRequest"
       },
+      "CreateAccessTokenRequest": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "scope": {
+            "$ref": "#/components/schemas/Scope"
+          },
+          "wallet_ids": {
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "type": "array",
+            "title": "Wallet Ids"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "scope",
+          "wallet_ids"
+        ],
+        "title": "CreateAccessTokenRequest"
+      },
       "CreateWalletRequest": {
         "properties": {
           "name": {
@@ -2425,6 +2631,23 @@
           "cash"
         ],
         "title": "CreateWalletRequest"
+      },
+      "CreatedAccessTokenResponse": {
+        "properties": {
+          "token": {
+            "$ref": "#/components/schemas/AccessTokenResponse"
+          },
+          "secret": {
+            "type": "string",
+            "title": "Secret"
+          }
+        },
+        "type": "object",
+        "required": [
+          "token",
+          "secret"
+        ],
+        "title": "CreatedAccessTokenResponse"
       },
       "Currency": {
         "type": "string",
@@ -4096,6 +4319,14 @@
           "max_orders_per_month"
         ],
         "title": "RulesResponse"
+      },
+      "Scope": {
+        "type": "string",
+        "enum": [
+          "read",
+          "trading"
+        ],
+        "title": "Scope"
       },
       "SecurityRangesResponse": {
         "properties": {

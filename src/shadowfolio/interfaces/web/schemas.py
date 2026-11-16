@@ -7,6 +7,7 @@ from uuid import UUID
 
 from pydantic import AwareDatetime, BaseModel, Field
 
+from shadowfolio.domain.access import AccessToken, Scope
 from shadowfolio.domain.company import FiscalYear, SharesSource, ValueRange
 from shadowfolio.domain.comparison import Benchmark
 from shadowfolio.domain.earnings import EarningsTime
@@ -945,3 +946,38 @@ class SecuritySummaryResponse(BaseModel):
             next_earnings=summary.next_earnings.day if summary.next_earnings else None,
             unavailable=list(summary.unavailable),
         )
+
+
+class CreateAccessTokenRequest(BaseModel):
+    name: str  # what it is for, e.g. "Codex on my laptop"
+    scope: Scope  # read; or trading: read, and place or cancel orders now
+    wallet_ids: list[UUID]  # the wallets it may use, at least one
+
+
+class AccessTokenResponse(BaseModel):
+    id: UUID
+    name: str
+    scope: Scope
+    wallet_ids: list[UUID]
+    hint: str  # the secret's first characters, to recognise it
+    created_at: AwareDatetime
+    last_used_at: AwareDatetime | None  # recorded at most once a minute
+    revoked_at: AwareDatetime | None
+
+    @classmethod
+    def from_token(cls, token: AccessToken) -> "AccessTokenResponse":
+        return cls(
+            id=token.id,
+            name=token.name,
+            scope=token.scope,
+            wallet_ids=list(token.wallet_ids),
+            hint=token.hint,
+            created_at=token.created_at,
+            last_used_at=token.last_used_at,
+            revoked_at=token.revoked_at,
+        )
+
+
+class CreatedAccessTokenResponse(BaseModel):
+    token: AccessTokenResponse
+    secret: str  # given only now: only its hash is kept
