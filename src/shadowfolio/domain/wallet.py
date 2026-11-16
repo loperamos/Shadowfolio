@@ -116,6 +116,10 @@ class Wallet:
         operations = tuple(replace(op, id=new_operation_id()) for op in kept if not isinstance(op, Dividend))
         return replace(self, id=wallet_id, name=name, orders=())._settled(operations)
 
+    def handed_to(self, owner_id: str) -> Self:
+        """The wallet as another owner's, history and all."""
+        return replace(self, owner_id=owner_id)
+
     def rename(self, name: str) -> Self:
         return replace(self, name=name)
 

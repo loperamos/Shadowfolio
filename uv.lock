@@ -997,6 +997,7 @@ dependencies = [
     { name = "fastapi" },
     { name = "httpx2" },
     { name = "mcp" },
+    { name = "pyjwt", extra = ["crypto"] },
     { name = "python-dotenv" },
     { name = "uvicorn" },
 ]
@@ -1014,6 +1015,7 @@ requires-dist = [
     { name = "fastapi" },
     { name = "httpx2" },
     { name = "mcp", specifier = ">=2.3.0" },
+    { name = "pyjwt", extras = ["crypto"], specifier = ">=2.15.1" },
     { name = "python-dotenv" },
     { name = "uvicorn" },
 ]

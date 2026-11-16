@@ -8,13 +8,16 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router";
 
 import { App } from "./App";
+import { AuthBoundary } from "./auth/AuthBoundary";
 import { theme } from "./ui/theme";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <MantineProvider theme={theme}>
       <BrowserRouter>
-        <App />
+        <AuthBoundary>
+          <App />
+        </AuthBoundary>
       </BrowserRouter>
     </MantineProvider>
   </StrictMode>,

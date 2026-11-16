@@ -12,16 +12,19 @@ from shadowfolio.adapters.in_memory_company_data import InMemoryCompanyData
 from shadowfolio.adapters.in_memory_corporate_actions import InMemoryCorporateActions
 from shadowfolio.adapters.in_memory_earnings_calendar import InMemoryEarningsCalendar
 from shadowfolio.adapters.in_memory_fx_rates import InMemoryFxRates
+from shadowfolio.adapters.in_memory_identity import InMemoryIdentity
 from shadowfolio.adapters.in_memory_news import InMemoryNews
 from shadowfolio.adapters.in_memory_price_data import InMemoryPriceData
 from shadowfolio.adapters.in_memory_security_lookup import InMemorySecurityLookup
 from shadowfolio.adapters.in_memory_wallet_repository import InMemoryWalletRepository
 from shadowfolio.interfaces.web.app import create_app
+from shadowfolio.interfaces.web.auth import SignInSettings
 from shadowfolio.ports.clock import Clock
 from shadowfolio.ports.company_data import CompanyData
 from shadowfolio.ports.corporate_actions import CorporateActions
 from shadowfolio.ports.earnings_calendar import EarningsCalendar
 from shadowfolio.ports.fx_rates import FxRates
+from shadowfolio.ports.identity import Identity
 from shadowfolio.ports.news import News
 from shadowfolio.ports.price_data import PriceData
 from shadowfolio.ports.security_lookup import SecurityLookup
@@ -39,6 +42,9 @@ from shadowfolio.usecases.wallets import Wallets
 
 DEFAULT_NOW = datetime(2026, 1, 5, 15, 0, tzinfo=UTC)
 
+# Who requests without a sign-in are, unless a test passes its own identity: tests not about sign-in act as one user.
+TEST_USER = "test-user"
+
 
 def build_test_app(
     clock: Clock | None = None,
@@ -51,6 +57,8 @@ def build_test_app(
     company_data: CompanyData | None = None,
     news: News | None = None,
     mcp_allowed_hosts: Sequence[str] = (),
+    identity: Identity | None = None,
+    sign_in: SignInSettings | None = None,
 ) -> FastAPI:
     """Pass fakes to control them (or to prepare stored data); otherwise "now" is DEFAULT_NOW, storage is empty and there
     are no prices, rates or corporate actions."""
@@ -86,4 +94,6 @@ def build_test_app(
         ),
         mcp_allowed_hosts=mcp_allowed_hosts,
         access_tokens=AccessTokens(InMemoryAccessTokenRepository(), wallet_repository, clock),
+        identity=identity or InMemoryIdentity({}, anonymous=TEST_USER),
+        sign_in=sign_in,
     )

@@ -47,7 +47,7 @@ def main() -> None:
     out = Path(args.out) if args.out else OUT_DIR / f"{datetime.now(UTC):%Y%m%d-%H%M%S}.png"
     env = os.environ | {"SHADOWFOLIO_HOST": HOST, "SHADOWFOLIO_PORT": str(BACKEND_PORT)}
 
-    with _server("backend", ["uv", "run", "shadowfolio"], REPO, env, f"http://{HOST}:{BACKEND_PORT}/api/wallets"):
+    with _server("backend", ["uv", "run", "shadowfolio"], REPO, env, f"http://{HOST}:{BACKEND_PORT}/api/auth/config"):
         with _server("frontend", ["bash", "-c", FRONTEND_COMMAND], REPO / "web", env, f"http://{HOST}:{FRONTEND_PORT}/"):
             _capture(f"http://{HOST}:{FRONTEND_PORT}{args.path}", args, out)
     print(out)

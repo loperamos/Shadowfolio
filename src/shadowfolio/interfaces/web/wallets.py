@@ -1,8 +1,9 @@
 """Routes for creating, changing settings of, copying, deleting and reading wallets."""
 
+from collections.abc import Callable
 from uuid import UUID
 
-from fastapi import APIRouter, Response
+from fastapi import APIRouter, Depends, Request, Response
 
 from shadowfolio.domain.errors import DomainError
 from shadowfolio.domain.rules import Rules
@@ -17,17 +18,14 @@ from shadowfolio.interfaces.web.schemas import (
 )
 from shadowfolio.usecases.wallets import Wallets
 
-# Until accounts exist, every wallet belongs to this owner.
-LOCAL_OWNER = "local"
 
-
-def wallets_router(wallets: Wallets) -> APIRouter:
+def wallets_router(wallets: Wallets, current_user: Callable[[Request], str]) -> APIRouter:
     router = APIRouter()
 
     @router.post("/wallets", status_code=201, responses=INVALID)
-    def create_wallet(request: CreateWalletRequest) -> WalletResponse:
+    def create_wallet(request: CreateWalletRequest, user_id: str = Depends(current_user)) -> WalletResponse:
         try:
-            wallet = wallets.create(LOCAL_OWNER, request.name, request.currency, request.cash)
+            wallet = wallets.create(user_id, request.name, request.currency, request.cash)
         except DomainError as error:
             raise rule_violation(error) from error
         return WalletResponse.from_wallet(wallet)
@@ -73,8 +71,8 @@ def wallets_router(wallets: Wallets) -> APIRouter:
         return Response(status_code=204)
 
     @router.get("/wallets")
-    def list_wallets() -> list[WalletResponse]:
-        return [WalletResponse.from_wallet(wallet) for wallet in wallets.list(LOCAL_OWNER)]
+    def list_wallets(user_id: str = Depends(current_user)) -> list[WalletResponse]:
+        return [WalletResponse.from_wallet(wallet) for wallet in wallets.list(user_id)]
 
     @router.get("/wallets/{wallet_id}", responses=NOT_FOUND | INVALID)
     def get_wallet(wallet_id: UUID) -> WalletResponse:

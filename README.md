@@ -32,6 +32,18 @@ uv run shadowfolio
 
 After changing dependencies, run `uv lock` and commit `uv.lock`; CI installs with `uv sync --locked`.
 
+## Sign-in
+
+Users sign in with [Auth0](https://auth0.com), and each sees only their own wallets. In your Auth0 tenant, create a **Single Page Application** (allowed callback, logout and web origin: `http://localhost:5173`) and an **API** (its identifier is the audience, e.g. `https://shadowfolio/api`; turn on *Allow Offline Access* to stay signed in across reloads). Set `AUTH0_DOMAIN`, `AUTH0_CLIENT_ID` and `AUTH0_AUDIENCE` in `.env`: none is a secret.
+
+Auth0's sign-in only works on `https` or `localhost`. To use the app from another machine, open it as `localhost` through an SSH tunnel:
+
+```bash
+ssh -L 5173:localhost:5173 -L 8000:localhost:8000 <user>@<machine running Shadowfolio>
+```
+
+Wallets made before sign-in belong to no user: after your first sign-in, copy your user id from the menu under your name into `SHADOWFOLIO_EXISTING_WALLETS_OWNER` in `.env`, and restart the backend; they become yours, with their agents' tokens.
+
 ## Daily sync
 
 Corporate actions (splits) are applied to every wallet by `POST /api/sync`. Recording a trade also applies its symbol's splits first, so the daily run is what keeps holdings right as time passes. Locally it runs as a systemd user timer, every day at 07:00 New York time (before the US market opens), against the running backend:

@@ -1304,6 +1304,30 @@ export const SharesSource = {
 export type SharesSource = typeof SharesSource[keyof typeof SharesSource];
 
 /**
+ * SignInSettings
+ *
+ * What the frontend needs to sign users in with the provider; none of it is a secret.
+ */
+export type SignInSettings = {
+    /**
+     * Provider
+     */
+    provider: string;
+    /**
+     * Domain
+     */
+    domain: string;
+    /**
+     * Client Id
+     */
+    client_id: string;
+    /**
+     * Audience
+     */
+    audience: string;
+};
+
+/**
  * StatementRequest
  *
  * A broker's two exports, as the files' text.
@@ -1609,6 +1633,24 @@ export type WithdrawalEdit = {
      */
     type: 'withdrawal';
 };
+
+export type SignInSettingsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/auth/config';
+};
+
+export type SignInSettingsResponses = {
+    /**
+     * Response Sign In Settings
+     *
+     * Successful Response
+     */
+    200: SignInSettings | null;
+};
+
+export type SignInSettingsResponse = SignInSettingsResponses[keyof SignInSettingsResponses];
 
 export type ListWalletsData = {
     body?: never;

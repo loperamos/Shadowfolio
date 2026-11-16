@@ -21,6 +21,8 @@ PORT_ENV = "SHADOWFOLIO_PORT"
 SEC_EDGAR_CONTACT_ENV = "SEC_EDGAR_CONTACT"
 FINNHUB_API_KEY_ENV = "FINNHUB_API_KEY"
 MCP_ALLOWED_HOSTS_ENV = "SHADOWFOLIO_MCP_ALLOWED_HOSTS"
+AUTH0_DOMAIN_ENV, AUTH0_CLIENT_ID_ENV, AUTH0_AUDIENCE_ENV = "AUTH0_DOMAIN", "AUTH0_CLIENT_ID", "AUTH0_AUDIENCE"
+EXISTING_WALLETS_OWNER_ENV = "SHADOWFOLIO_EXISTING_WALLETS_OWNER"
 LIST_SEPARATOR = ","
 
 
@@ -51,6 +53,10 @@ def _build_app(environment: Environment, config_dir: Path) -> FastAPI:
                     alpaca=alpaca,
                     edgar_contact=os.environ.get(SEC_EDGAR_CONTACT_ENV),
                     finnhub_key=os.environ.get(FINNHUB_API_KEY_ENV),
+                    auth0_domain=os.environ.get(AUTH0_DOMAIN_ENV) or None,
+                    auth0_client_id=os.environ.get(AUTH0_CLIENT_ID_ENV) or None,
+                    auth0_audience=os.environ.get(AUTH0_AUDIENCE_ENV) or None,
+                    existing_wallets_owner=os.environ.get(EXISTING_WALLETS_OWNER_ENV) or None,
                     mcp_allowed_hosts=tuple(
                         host.strip() for host in os.environ.get(MCP_ALLOWED_HOSTS_ENV, "").split(LIST_SEPARATOR) if host.strip()
                     ),
