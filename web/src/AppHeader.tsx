@@ -3,7 +3,7 @@ import { IconSearch } from "@tabler/icons-react";
 import { type FormEvent, useState } from "react";
 import { Link, NavLink, useNavigate } from "react-router";
 
-import { SECURITIES_COMPARE_PATH, securityPath, WALLETS_PATH } from "./routes";
+import { AGENTS_PATH, SECURITIES_COMPARE_PATH, securityPath, WALLETS_PATH } from "./routes";
 import { ICON_SIZE, SEARCH_INPUT_WIDTH } from "./ui/theme";
 
 /**
@@ -37,6 +37,9 @@ export function AppHeader() {
         </Anchor>
         <Anchor component={NavLink} to={SECURITIES_COMPARE_PATH} fw={500}>
           Compare securities
+        </Anchor>
+        <Anchor component={NavLink} to={AGENTS_PATH} fw={500}>
+          Agent access
         </Anchor>
       </Group>
       <form onSubmit={lookUp} role="search">
