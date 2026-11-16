@@ -31,11 +31,7 @@ class Environment(StrEnum):
 
 
 def main() -> None:
-    env_file = find_dotenv()  # searched upwards from this package, so found whatever folder the server starts in
-    load_dotenv(env_file)
-    # Relative paths in the config mean relative to the folder holding .env (the repo root), never to where the
-    # server happens to be started; without a .env file, they are relative to the current folder.
-    config_dir = Path(env_file).parent if env_file else Path.cwd()
+    config_dir = load_config()
     app = _build_app(Environment(_require_env(ENVIRONMENT_ENV)), config_dir)
     host = _require_env(HOST_ENV)
     port = int(_require_env(PORT_ENV))
@@ -45,23 +41,32 @@ def main() -> None:
 def _build_app(environment: Environment, config_dir: Path) -> FastAPI:
     match environment:
         case Environment.LOCAL:
-            alpaca = AlpacaConfig(key_id=_require_env(ALPACA_KEY_ID_ENV), secret_key=_require_env(ALPACA_SECRET_KEY_ENV))
-            db_path = resolve_config_path(_require_env(DB_PATH_ENV), config_dir)
-            return build_local_app(
-                LocalConfig(
-                    db_path=db_path,
-                    alpaca=alpaca,
-                    edgar_contact=os.environ.get(SEC_EDGAR_CONTACT_ENV),
-                    finnhub_key=os.environ.get(FINNHUB_API_KEY_ENV),
-                    auth0_domain=os.environ.get(AUTH0_DOMAIN_ENV) or None,
-                    auth0_client_id=os.environ.get(AUTH0_CLIENT_ID_ENV) or None,
-                    auth0_audience=os.environ.get(AUTH0_AUDIENCE_ENV) or None,
-                    existing_wallets_owner=os.environ.get(EXISTING_WALLETS_OWNER_ENV) or None,
-                    mcp_allowed_hosts=tuple(
-                        host.strip() for host in os.environ.get(MCP_ALLOWED_HOSTS_ENV, "").split(LIST_SEPARATOR) if host.strip()
-                    ),
-                )
-            )
+            return build_local_app(local_config(config_dir))
+
+
+def local_config(config_dir: Path) -> LocalConfig:
+    """The local wiring's configuration, from the environment (with .env loaded)."""
+    alpaca = AlpacaConfig(key_id=_require_env(ALPACA_KEY_ID_ENV), secret_key=_require_env(ALPACA_SECRET_KEY_ENV))
+    return LocalConfig(
+        db_path=resolve_config_path(_require_env(DB_PATH_ENV), config_dir),
+        alpaca=alpaca,
+        edgar_contact=os.environ.get(SEC_EDGAR_CONTACT_ENV),
+        finnhub_key=os.environ.get(FINNHUB_API_KEY_ENV),
+        auth0_domain=os.environ.get(AUTH0_DOMAIN_ENV) or None,
+        auth0_client_id=os.environ.get(AUTH0_CLIENT_ID_ENV) or None,
+        auth0_audience=os.environ.get(AUTH0_AUDIENCE_ENV) or None,
+        existing_wallets_owner=os.environ.get(EXISTING_WALLETS_OWNER_ENV) or None,
+        mcp_allowed_hosts=tuple(host.strip() for host in os.environ.get(MCP_ALLOWED_HOSTS_ENV, "").split(LIST_SEPARATOR) if host.strip()),
+    )
+
+
+def load_config() -> Path:
+    """Load .env into the environment; returns the folder relative paths in it are from."""
+    env_file = find_dotenv()  # searched upwards from this package, so found whatever folder the server starts in
+    load_dotenv(env_file)
+    # Relative paths in the config mean relative to the folder holding .env (the repo root), never to where the
+    # server happens to be started; without a .env file, they are relative to the current folder.
+    return Path(env_file).parent if env_file else Path.cwd()
 
 
 def resolve_config_path(value: str, config_dir: Path) -> Path:

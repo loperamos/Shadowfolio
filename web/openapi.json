@@ -4875,24 +4875,53 @@
             "title": "Provider"
           },
           "domain": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Domain"
           },
           "client_id": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Client Id"
           },
           "audience": {
-            "type": "string",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Audience"
+          },
+          "user_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "User Id"
           }
         },
         "type": "object",
         "required": [
-          "provider",
-          "domain",
-          "client_id",
-          "audience"
+          "provider"
         ],
         "title": "SignInSettings",
         "description": "What the frontend needs to sign users in with the provider; none of it is a secret."

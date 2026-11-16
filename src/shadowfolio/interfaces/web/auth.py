@@ -24,10 +24,11 @@ OPEN_PATHS = frozenset({"/auth/config", "/sync", "/orders/fill"})
 class SignInSettings(BaseModel):
     """What the frontend needs to sign users in with the provider; none of it is a secret."""
 
-    provider: str  # e.g. "auth0"
-    domain: str
-    client_id: str
-    audience: str
+    provider: str  # "auth0"; or "fixed": acting as `user_id` without signing in (see wiring.screenshot)
+    domain: str | None = None  # the provider's, for auth0
+    client_id: str | None = None
+    audience: str | None = None
+    user_id: str | None = None  # for fixed
 
 
 def sign_in_checks(identity: Identity, wallets: Wallets, api_prefix: str) -> tuple[Callable[[Request], str], Callable[[Request], None]]:

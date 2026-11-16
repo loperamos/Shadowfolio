@@ -35,6 +35,10 @@ STOP_TIMEOUT_SECONDS = 10
 SETTLE_MS = 600  # lets dialogs and menus finish opening before the capture
 PIXEL_RATIO = 2  # crisp images for people to look at
 
+# The backend acting as one user, without signing in; and the setting naming that user.
+BACKEND_COMMAND = ["uv", "run", "python", "-m", "shadowfolio.wiring.screenshot"]
+ACT_AS_ENV = "SHADOWFOLIO_ACT_AS"
+
 # The frontend needs Node from nvm, which is only loaded by an interactive shell.
 FRONTEND_COMMAND = (
     f'. "$HOME/.nvm/nvm.sh" --no-use && nvm use --silent >/dev/null && exec npx vite --host {HOST} --port {FRONTEND_PORT} --strictPort'
@@ -46,8 +50,11 @@ def main() -> None:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     out = Path(args.out) if args.out else OUT_DIR / f"{datetime.now(UTC):%Y%m%d-%H%M%S}.png"
     env = os.environ | {"SHADOWFOLIO_HOST": HOST, "SHADOWFOLIO_PORT": str(BACKEND_PORT)}
+    if args.user:
+        env[ACT_AS_ENV] = args.user
 
-    with _server("backend", ["uv", "run", "shadowfolio"], REPO, env, f"http://{HOST}:{BACKEND_PORT}/api/auth/config"):
+    # Acting as a user without signing in (see shadowfolio.wiring.screenshot), so signed-in pages can be captured.
+    with _server("backend", BACKEND_COMMAND, REPO, env, f"http://{HOST}:{BACKEND_PORT}/api/auth/config"):
         with _server("frontend", ["bash", "-c", FRONTEND_COMMAND], REPO / "web", env, f"http://{HOST}:{FRONTEND_PORT}/"):
             _capture(f"http://{HOST}:{FRONTEND_PORT}{args.path}", args, out)
     print(out)
@@ -56,6 +63,7 @@ def main() -> None:
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("path", nargs="?", default="/wallets", help="page to open, e.g. /wallets/<id>")
+    parser.add_argument("--user", help="user id to act as (default: SHADOWFOLIO_EXISTING_WALLETS_OWNER, i.e. you)")
     parser.add_argument("--area", help="capture only the first element matching this Playwright selector")
     parser.add_argument("--click", action="append", default=[], help="Playwright selector to click before capturing; repeatable")
     parser.add_argument("--wait-for", help="Playwright selector to wait for before capturing")
