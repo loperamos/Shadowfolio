@@ -9,6 +9,10 @@ The script starts its own backend (port 8765) and frontend (port 5199) with the 
 Chromium, saves a PNG and stops both servers. The developer's own servers (8000, 5173) are never touched. It reads the
 repo's `.env`, so pages show the real local data and real market prices.
 
+Its backend acts as one user without signing in (`python -m shadowfolio.wiring.screenshot`, listening on this machine
+only): by default the developer, `SHADOWFOLIO_EXISTING_WALLETS_OWNER`; another with `--user <id>`. So signed-in pages
+show that user's wallets, and the header shows their id instead of a name.
+
 ## Run it
 
 From the repo root:

@@ -14,6 +14,7 @@ from shadowfolio.adapters.cached_price_data import CachedPriceData
 from shadowfolio.adapters.degiro_statements import DegiroStatementReader
 from shadowfolio.adapters.ecb_fx_rates import EcbFxRates
 from shadowfolio.adapters.finnhub_earnings_calendar import FinnhubEarningsCalendar
+from shadowfolio.adapters.fixed_identity import FixedIdentity
 from shadowfolio.adapters.openfigi_security_lookup import OpenFigiSecurityLookup
 from shadowfolio.adapters.sec_edgar_company_data import SecEdgarCompanyData
 from shadowfolio.adapters.sqlite_access_token_repository import SqliteAccessTokenRepository
@@ -41,8 +42,8 @@ MARKET_CACHE_FILE = "market-cache.db"
 PRICE_SOURCE = f"alpaca/{DAILY_FEED}"
 FX_SOURCE = "ecb"
 
-# The sign-in provider, as the frontend is told.
-AUTH0 = "auth0"
+# The sign-in provider, as the frontend is told: Auth0, or a fixed user (acting as one, for screenshots).
+AUTH0, FIXED = "auth0", "fixed"
 
 
 @dataclass(frozen=True)
@@ -60,7 +61,9 @@ class LocalConfig:
     existing_wallets_owner: str | None = None
 
 
-def build_local_app(config: LocalConfig) -> FastAPI:
+def build_local_app(config: LocalConfig, acting_as: str | None = None) -> FastAPI:
+    """The app on this machine. With `acting_as`, every request is that user's without signing in: only for the
+    screenshot entry point (see wiring.screenshot), never from the configuration."""
     clock = SystemClock()
     wallet_repository = SqliteWalletRepository(config.db_path)
     market_cache = config.db_path.parent / MARKET_CACHE_FILE
@@ -95,8 +98,8 @@ def build_local_app(config: LocalConfig) -> FastAPI:
         imports=Imports(wallet_repository, WalletChanges(clock, prices, fx_rates, sync), OpenFigiSecurityLookup(), DegiroStatementReader()),
         mcp_allowed_hosts=config.mcp_allowed_hosts,
         access_tokens=access_tokens,
-        identity=Auth0Identity(config.auth0_domain, config.auth0_audience, clock),
-        sign_in=_sign_in(config),
+        identity=Auth0Identity(config.auth0_domain, config.auth0_audience, clock) if acting_as is None else FixedIdentity(acting_as),
+        sign_in=_sign_in(config) if acting_as is None else SignInSettings(provider=FIXED, user_id=acting_as),
     )
 
 

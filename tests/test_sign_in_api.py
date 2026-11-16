@@ -7,6 +7,7 @@ from typing import Any
 import pytest
 from fastapi.testclient import TestClient
 
+from shadowfolio.adapters.fixed_identity import FixedIdentity
 from shadowfolio.adapters.in_memory_identity import InMemoryIdentity
 from shadowfolio.interfaces.web.app import SignInSettings
 from shadowfolio.wiring.test import build_test_app
@@ -81,6 +82,7 @@ def test_the_sign_in_settings_and_the_systems_jobs_need_no_user(client: TestClie
         "domain": "tenant.eu.auth0.com",
         "client_id": "spa-client",
         "audience": "https://shadowfolio/api",
+        "user_id": None,
     }
     assert client.post("/api/sync").status_code == 200
     assert client.post("/api/orders/fill").status_code == 200
@@ -93,3 +95,20 @@ def test_without_sign_in_set_up_it_says_so() -> None:
 
     assert (response.status_code, response.json()["detail"]) == (503, "sign-in is not set up: set AUTH0_DOMAIN")
     assert client.get("/api/auth/config").json() is None
+
+
+def test_acting_as_a_fixed_user_needs_no_sign_in_and_tells_the_frontend() -> None:
+    """For screenshots of signed-in pages on the developer's machine: every request is that user's, and the frontend
+    is told so, to skip the provider's sign-in. Only the screenshot entry point builds it (see wiring.screenshot)."""
+    fixed = SignInSettings(provider="fixed", user_id=ANA)
+    client = TestClient(build_test_app(identity=FixedIdentity(ANA), sign_in=fixed))
+    wallet_id = client.post("/api/wallets", json={"name": "Ana's", "currency": "EUR", "cash": "10"}).json()["id"]
+
+    assert [w["id"] for w in client.get("/api/wallets").json()] == [wallet_id]
+    assert client.get("/api/auth/config").json() == {
+        "provider": "fixed",
+        "domain": None,
+        "client_id": None,
+        "audience": None,
+        "user_id": ANA,
+    }

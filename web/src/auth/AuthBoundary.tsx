@@ -8,6 +8,11 @@ import { client } from "../api/generated/client.gen";
 import { type SignInSettings, signInSettings } from "../api/generated";
 import { AuthContext, type Auth } from "./useAuth";
 
+// The sign-in providers the backend can name: Auth0, or a fixed user it acts as without sign-in (for screenshots on
+// the developer's machine; see the backend's wiring.screenshot).
+const AUTH0 = "auth0";
+const FIXED = "fixed";
+
 type SettingsState = { status: "loading" } | { status: "error"; message: string } | { status: "loaded"; settings: SignInSettings | null };
 
 /**
@@ -34,7 +39,11 @@ export function AuthBoundary({ children }: { children: ReactNode }) {
     return <Notice title="Cannot sign in">{state.message}</Notice>;
   }
   const { settings } = state;
-  if (settings === null) {
+  if (settings?.provider === FIXED && settings.user_id) {
+    const auth: Auth = { user: { id: settings.user_id, name: settings.user_id, email: null }, signOut: () => {} };
+    return <AuthContext.Provider value={auth}>{children}</AuthContext.Provider>;
+  }
+  if (settings === null || settings.provider !== AUTH0 || !settings.domain || !settings.client_id || !settings.audience) {
     return (
       <Notice title="Sign-in is not set up">
         Set AUTH0_DOMAIN, AUTH0_CLIENT_ID and AUTH0_AUDIENCE in the repository&apos;s .env (see .env.example), then restart

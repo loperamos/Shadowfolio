@@ -1316,15 +1316,19 @@ export type SignInSettings = {
     /**
      * Domain
      */
-    domain: string;
+    domain?: string | null;
     /**
      * Client Id
      */
-    client_id: string;
+    client_id?: string | null;
     /**
      * Audience
      */
-    audience: string;
+    audience?: string | null;
+    /**
+     * User Id
+     */
+    user_id?: string | null;
 };
 
 /**
