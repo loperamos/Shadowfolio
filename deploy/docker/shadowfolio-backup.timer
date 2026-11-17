@@ -1,0 +1,11 @@
+# Backs up the Docker app's database every night, when it is quietest.
+[Unit]
+Description=Daily Shadowfolio backup of the Docker app's database
+
+[Timer]
+OnCalendar=*-*-* 03:30:00
+# If the machine was off at that time, run as soon as it is back on.
+Persistent=true
+
+[Install]
+WantedBy=timers.target

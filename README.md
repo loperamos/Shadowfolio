@@ -58,7 +58,7 @@ The tunnel publishes the app on your domain through Cloudflare, with https and n
 
 ```bash
 mkdir -p ~/.cloudflared && chmod 700 ~/.cloudflared
-cloudflared() { docker run --rm -it --user "$(id -u):$(id -g)" -e HOME=/home/nonroot -v "$HOME/.cloudflared:/home/nonroot/.cloudflared" cloudflare/cloudflared:2025.11.1 "$@"; }
+cloudflared() { docker run --rm -it --user "$(id -u):$(id -g)" -e HOME=/home/nonroot -v "$HOME/.cloudflared:/home/nonroot/.cloudflared" cloudflare/cloudflared:2026.10.1 "$@"; }
 cloudflared tunnel login                                          # open the URL it prints, pick your domain: saves cert.pem
 cloudflared tunnel create shadowfolio                             # prints the tunnel's id; saves <id>.json, its secret
 cloudflared tunnel route dns shadowfolio shadowfolio.epole.dev   # the DNS record pointing the name at the tunnel
@@ -89,6 +89,24 @@ for name in ('shadowfolio.db', 'market-cache.db'):
     os.chown(f'/data/{name}', pwd.getpwnam('shadowfolio').pw_uid, -1)
 "
 ```
+
+Back up the container's database every night (03:30) to `~/shadowfolio-backups` (or `SHADOWFOLIO_BACKUP_DIR`), keeping 14 days, with a systemd user timer; it is on the same disk, so copy that folder elsewhere to survive a failed disk:
+
+```bash
+./deploy/docker/install-backup-timer.sh     # install and start the timer
+./deploy/docker/backup-db.sh                # one backup now
+./deploy/docker/uninstall-backup-timer.sh   # stop and remove the timer (the backups stay)
+```
+
+To restore one, stop the app and copy it over `/data/shadowfolio.db` in the volume, as the seeding above does.
+
+Going live, in order:
+
+1. The tunnel exists, with its DNS record and `~/.cloudflared/config.yml` (above).
+2. Auth0: the domain in the application's allowed URLs, and only invited people let in (e.g. an Action on login that only allows a list of emails for this application).
+3. `.env`: the domain in `SHADOWFOLIO_MCP_ALLOWED_HOSTS` (e.g. `shadowfolio.epole.dev`), and `SHADOWFOLIO_JOB_TOKEN` set.
+4. The container's data: freshly copied from the development database if that is where your wallets are (above), as from then on the container's is the one in use.
+5. `docker compose --profile public up -d --build`, then open the domain and sign in.
 
 ## Daily sync
 
