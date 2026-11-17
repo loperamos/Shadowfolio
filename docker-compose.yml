@@ -27,7 +27,7 @@ services:
   # A tunnel created from the command line: its config.yml and credentials file (a secret) are read from
   # CLOUDFLARED_DIR (default ~/.cloudflared), as the user who owns them (CLOUDFLARED_USER, default 1000:1000).
   cloudflared:
-    image: cloudflare/cloudflared:2025.11.1
+    image: cloudflare/cloudflared:2026.10.1
     command: tunnel --no-autoupdate --config /etc/cloudflared/config.yml run
     user: ${CLOUDFLARED_USER:-1000:1000}
     volumes:

@@ -1,0 +1,8 @@
+# Backs up the Docker app's database (see backup-db.sh).
+# Installed by install-backup-timer.sh, which replaces @REPO_DIR@ with the repository's path.
+[Unit]
+Description=Shadowfolio daily backup of the Docker app's database
+
+[Service]
+Type=oneshot
+ExecStart=@REPO_DIR@/deploy/docker/backup-db.sh
