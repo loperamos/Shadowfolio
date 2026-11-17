@@ -61,6 +61,8 @@ class LocalConfig:
     existing_wallets_owner: str | None = None
     # The built web app, served by the backend itself (as when deployed); None in development, where Vite serves it.
     web_dir: Path | None = None
+    run_jobs: bool = False  # whether the app runs the system's jobs itself, as when deployed (see interfaces.jobs)
+    job_token: str | None = None  # the secret the jobs' endpoints need; without it, they are closed
 
 
 def build_local_app(config: LocalConfig, acting_as: str | None = None) -> FastAPI:
@@ -103,6 +105,9 @@ def build_local_app(config: LocalConfig, acting_as: str | None = None) -> FastAP
         identity=Auth0Identity(config.auth0_domain, config.auth0_audience, clock) if acting_as is None else FixedIdentity(acting_as),
         sign_in=_sign_in(config) if acting_as is None else SignInSettings(provider=FIXED, user_id=acting_as),
         web_dir=config.web_dir,
+        clock=clock,
+        run_jobs=config.run_jobs,
+        job_token=config.job_token,
     )
 
 

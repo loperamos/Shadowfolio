@@ -45,6 +45,9 @@ DEFAULT_NOW = datetime(2026, 1, 5, 15, 0, tzinfo=UTC)
 
 # Who requests without a sign-in are, unless a test passes its own identity: tests not about sign-in act as one user.
 TEST_USER = "test-user"
+# The job secret the test app has, unless a test passes its own; and the header calling the jobs with it.
+TEST_JOB_TOKEN = "test-job-secret"
+JOB = {"Authorization": f"Bearer {TEST_JOB_TOKEN}"}
 
 
 def build_test_app(
@@ -61,6 +64,7 @@ def build_test_app(
     identity: Identity | None = None,
     sign_in: SignInSettings | None = None,
     web_dir: Path | None = None,
+    job_token: str | None = TEST_JOB_TOKEN,
 ) -> FastAPI:
     """Pass fakes to control them (or to prepare stored data); otherwise "now" is DEFAULT_NOW, storage is empty and there
     are no prices, rates or corporate actions."""
@@ -99,4 +103,6 @@ def build_test_app(
         identity=identity or InMemoryIdentity({}, anonymous=TEST_USER),
         sign_in=sign_in,
         web_dir=web_dir,
+        clock=clock,
+        job_token=job_token,
     )

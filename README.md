@@ -92,7 +92,11 @@ for name in ('shadowfolio.db', 'market-cache.db'):
 
 ## Daily sync
 
-Corporate actions (splits) are applied to every wallet by `POST /api/sync`. Recording a trade also applies its symbol's splits first, so the daily run is what keeps holdings right as time passes. Locally it runs as a systemd user timer, every day at 07:00 New York time (before the US market opens), against the running backend:
+Corporate actions (splits and dividends) are applied to every wallet by `POST /api/sync`. Recording a trade also applies its symbol's splits first, so the daily run is what keeps holdings right as time passes.
+
+The Docker container runs it itself, when it starts and every day at 07:00 New York time, and fills due orders every minute (`SHADOWFOLIO_RUN_JOBS=true`). The jobs' endpoints (`POST /api/sync`, `POST /api/orders/fill`) need the job secret, `Authorization: Bearer <SHADOWFOLIO_JOB_TOKEN>`, and are closed without one configured, so the public cannot trigger them.
+
+For the development servers, it runs as a systemd user timer, every day at 07:00 New York time (before the US market opens), against the running backend, sending the job secret from `.env`:
 
 ```bash
 ./deploy/local/install-sync-timer.sh   # install and start the timer

@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 from shadowfolio.adapters.fixed_identity import FixedIdentity
 from shadowfolio.adapters.in_memory_identity import InMemoryIdentity
 from shadowfolio.interfaces.web.app import SignInSettings
-from shadowfolio.wiring.test import build_test_app
+from shadowfolio.wiring.test import JOB, build_test_app
 
 ANA, BEN = "auth0|ana", "auth0|ben"
 SETTINGS = SignInSettings(provider="auth0", domain="tenant.eu.auth0.com", client_id="spa-client", audience="https://shadowfolio/api")
@@ -84,8 +84,9 @@ def test_the_sign_in_settings_and_the_systems_jobs_need_no_user(client: TestClie
         "audience": "https://shadowfolio/api",
         "user_id": None,
     }
-    assert client.post("/api/sync").status_code == 200
-    assert client.post("/api/orders/fill").status_code == 200
+    # Jobs need the job secret, not a user (see test_jobs_api).
+    assert client.post("/api/sync", headers=JOB).status_code == 200
+    assert client.post("/api/orders/fill", headers=JOB).status_code == 200
 
 
 def test_without_sign_in_set_up_it_says_so() -> None:

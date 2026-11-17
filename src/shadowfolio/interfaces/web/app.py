@@ -1,5 +1,6 @@
 """The HTTP app: one router per area, each calling its use cases and nothing more."""
 
+import asyncio
 from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -10,10 +11,11 @@ from starlette.responses import JSONResponse, Response
 from starlette.staticfiles import StaticFiles
 from starlette.types import ASGIApp, Receive, Scope, Send
 
+from shadowfolio.interfaces.jobs import Jobs
 from shadowfolio.interfaces.mcp.access import RequireToken
 from shadowfolio.interfaces.mcp.server import MCP_PATH, mcp_server, transport_security
 from shadowfolio.interfaces.web.access import access_router
-from shadowfolio.interfaces.web.auth import SignInSettings, auth_router, sign_in_checks
+from shadowfolio.interfaces.web.auth import SignInSettings, auth_router, job_check, sign_in_checks
 from shadowfolio.interfaces.web.comparison import comparison_router
 from shadowfolio.interfaces.web.history import history_router
 from shadowfolio.interfaces.web.imports import imports_router
@@ -23,6 +25,7 @@ from shadowfolio.interfaces.web.securities import securities_router
 from shadowfolio.interfaces.web.sync import sync_router
 from shadowfolio.interfaces.web.valuation import valuation_router
 from shadowfolio.interfaces.web.wallets import wallets_router
+from shadowfolio.ports.clock import Clock
 from shadowfolio.ports.identity import Identity
 from shadowfolio.usecases.access_tokens import AccessTokens
 from shadowfolio.usecases.comparison import Comparison
@@ -51,9 +54,12 @@ def create_app(
     securities: Securities,
     access_tokens: AccessTokens,
     identity: Identity,
+    clock: Clock,
     sign_in: SignInSettings | None = None,  # for the frontend; None when sign-in is not set up
     mcp_allowed_hosts: Sequence[str] = (),  # besides localhost, the addresses agents may reach the MCP server at
     web_dir: Path | None = None,  # the built web app, served at every other path; None when it is served apart (Vite)
+    run_jobs: bool = False,  # whether the app runs the system's jobs itself (when deployed; see interfaces.jobs)
+    job_token: str | None = None,  # the secret the jobs' endpoints need; None closes them
 ) -> FastAPI:
     # The MCP server for agents, on the same app and use cases; its sessions run while the app does.
     mcp = mcp_server(wallets, valuation, orders, comparison, securities)
@@ -66,7 +72,12 @@ def create_app(
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         async with mcp.session_manager.run():
-            yield
+            running = asyncio.create_task(Jobs(sync, orders, clock).run_forever()) if run_jobs else None
+            try:
+                yield
+            finally:
+                if running is not None:
+                    running.cancel()
 
     # Operation ids are the route functions' names (e.g. list_wallets), so generated clients get readable names.
     app = FastAPI(title="Shadowfolio", generate_unique_id_function=lambda route: route.name, lifespan=lifespan)
@@ -80,10 +91,11 @@ def create_app(
     api.include_router(history_router(history))
     api.include_router(valuation_router(valuation))
     api.include_router(market_router(market))
-    api.include_router(sync_router(sync))
+    jobs_only = job_check(job_token)
+    api.include_router(sync_router(sync, jobs_only))
     api.include_router(imports_router(imports))
     api.include_router(comparison_router(comparison))
-    api.include_router(orders_router(orders))
+    api.include_router(orders_router(orders, jobs_only))
     api.include_router(securities_router(securities))
     api.include_router(access_router(access_tokens, current_user))
     app.include_router(api)

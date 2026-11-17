@@ -25,6 +25,9 @@ AUTH0_DOMAIN_ENV, AUTH0_CLIENT_ID_ENV, AUTH0_AUDIENCE_ENV = "AUTH0_DOMAIN", "AUT
 EXISTING_WALLETS_OWNER_ENV = "SHADOWFOLIO_EXISTING_WALLETS_OWNER"
 # Optional: the built web app (web/dist) for the backend to serve, as when deployed; without it, Vite serves it.
 WEB_DIR_ENV = "SHADOWFOLIO_WEB_DIR"
+# Whether the app runs the system's jobs itself (true when deployed), and the secret the jobs' endpoints need.
+RUN_JOBS_ENV, JOB_TOKEN_ENV = "SHADOWFOLIO_RUN_JOBS", "SHADOWFOLIO_JOB_TOKEN"
+TRUE = "true"
 LIST_SEPARATOR = ","
 
 
@@ -59,6 +62,8 @@ def local_config(config_dir: Path) -> LocalConfig:
         auth0_audience=os.environ.get(AUTH0_AUDIENCE_ENV) or None,
         existing_wallets_owner=os.environ.get(EXISTING_WALLETS_OWNER_ENV) or None,
         web_dir=resolve_config_path(web_dir, config_dir) if (web_dir := os.environ.get(WEB_DIR_ENV)) else None,
+        run_jobs=os.environ.get(RUN_JOBS_ENV, "").strip().lower() == TRUE,
+        job_token=os.environ.get(JOB_TOKEN_ENV) or None,
         mcp_allowed_hosts=tuple(host.strip() for host in os.environ.get(MCP_ALLOWED_HOSTS_ENV, "").split(LIST_SEPARATOR) if host.strip()),
     )
 

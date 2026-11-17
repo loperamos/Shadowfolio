@@ -16,7 +16,7 @@ from shadowfolio.adapters.in_memory_price_data import InMemoryPriceData
 from shadowfolio.domain.market import MinuteBar
 from shadowfolio.domain.money import Currency
 from shadowfolio.domain.valuation import Quote
-from shadowfolio.wiring.test import build_test_app
+from shadowfolio.wiring.test import JOB, build_test_app
 
 MONDAY_TRADING = datetime(2024, 6, 24, 14, 26, 30, tzinfo=UTC)  # half a minute into the 14:26 bar
 NEXT_MINUTE = datetime(2024, 6, 24, 14, 27, tzinfo=UTC)
@@ -145,7 +145,7 @@ def test_the_job_fills_every_wallets_due_orders(client: TestClient, clock: Fixed
     place(client, second, "buy", "2")
 
     clock.set(datetime(2024, 6, 24, 14, 30, tzinfo=UTC))
-    response = client.post("/api/orders/fill")
+    response = client.post("/api/orders/fill", headers=JOB)
 
     assert (response.status_code, response.json()) == (200, {"wallets": 2, "filled": 2})
     assert client.get(f"/api/wallets/{second}").json()["holdings"] == {"NVDA": "2"}

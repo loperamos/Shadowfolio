@@ -3,6 +3,7 @@ provider gave them), and a request naming a wallet must be its owner's; another 
 not exist. Open to all: the sign-in settings the frontend needs to sign in, and the jobs the system runs for every
 wallet (see SPEC.md on protecting them)."""
 
+import hmac
 from collections.abc import Callable
 from uuid import UUID
 
@@ -17,8 +18,10 @@ BEARER = "bearer"
 UNAUTHORIZED, UNAVAILABLE = 401, 503
 CHALLENGE = {"WWW-Authenticate": "Bearer"}
 WALLET_PARAM = "wallet_id"
-# Paths answered without a user, under the API's prefix.
+# Paths answered without a user, under the API's prefix: the sign-in settings, and the jobs (which need the job secret
+# instead, see job_check).
 OPEN_PATHS = frozenset({"/auth/config", "/sync", "/orders/fill"})
+FORBIDDEN = 403
 
 
 class SignInSettings(BaseModel):
@@ -79,3 +82,17 @@ def auth_router(sign_in: SignInSettings | None) -> APIRouter:
         return sign_in
 
     return router
+
+
+def job_check(job_token: str | None) -> Callable[[Request], None]:
+    """For the jobs' endpoints: only the job secret calls them (`Authorization: Bearer <secret>`), compared in constant
+    time; without one configured, they are closed (the app runs the jobs itself, see interfaces.jobs)."""
+
+    def check(request: Request) -> None:
+        if not job_token:
+            raise HTTPException(status_code=FORBIDDEN, detail="the jobs run inside the app; set SHADOWFOLIO_JOB_TOKEN to call them")
+        given = _bearer(request.headers.get("authorization")) or ""
+        if not hmac.compare_digest(given.encode(), job_token.encode()):
+            raise HTTPException(status_code=UNAUTHORIZED, detail="the job secret is missing or wrong", headers=CHALLENGE)
+
+    return check
