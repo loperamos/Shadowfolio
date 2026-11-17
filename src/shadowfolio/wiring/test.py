@@ -2,6 +2,7 @@
 
 from collections.abc import Sequence
 from datetime import UTC, datetime
+from pathlib import Path
 
 from fastapi import FastAPI
 
@@ -59,6 +60,7 @@ def build_test_app(
     mcp_allowed_hosts: Sequence[str] = (),
     identity: Identity | None = None,
     sign_in: SignInSettings | None = None,
+    web_dir: Path | None = None,
 ) -> FastAPI:
     """Pass fakes to control them (or to prepare stored data); otherwise "now" is DEFAULT_NOW, storage is empty and there
     are no prices, rates or corporate actions."""
@@ -96,4 +98,5 @@ def build_test_app(
         access_tokens=AccessTokens(InMemoryAccessTokenRepository(), wallet_repository, clock),
         identity=identity or InMemoryIdentity({}, anonymous=TEST_USER),
         sign_in=sign_in,
+        web_dir=web_dir,
     )

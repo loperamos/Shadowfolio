@@ -44,6 +44,52 @@ ssh -L 5173:localhost:5173 -L 8000:localhost:8000 <user>@<machine running Shadow
 
 Wallets made before sign-in belong to no user: after your first sign-in, copy your user id from the menu under your name into `SHADOWFOLIO_EXISTING_WALLETS_OWNER` in `.env`, and restart the backend; they become yours, with their agents' tokens.
 
+## Self-hosting (Docker)
+
+One image runs the backend, which also serves the built web app, so browser, API and MCP share one origin. Its data (the database and the market cache) lives in the `shadowfolio-data` volume, apart from the development servers' `data/`. Configuration comes from `.env` at run time; the container sets its own address, database path and web app.
+
+```bash
+docker compose up -d --build                    # the app alone, at http://127.0.0.1:8080 on this machine
+docker compose --profile public up -d --build   # and the Cloudflare tunnel: live at your domain
+docker compose logs -f app                      # follow it
+```
+
+The tunnel publishes the app on your domain through Cloudflare, with https and no open ports. Create it once from the command line, with the same `cloudflared` image, as your user so it can use `~/.cloudflared` (here for `shadowfolio.epole.dev`):
+
+```bash
+mkdir -p ~/.cloudflared && chmod 700 ~/.cloudflared
+cloudflared() { docker run --rm -it --user "$(id -u):$(id -g)" -e HOME=/home/nonroot -v "$HOME/.cloudflared:/home/nonroot/.cloudflared" cloudflare/cloudflared:2025.11.1 "$@"; }
+cloudflared tunnel login                                          # open the URL it prints, pick your domain: saves cert.pem
+cloudflared tunnel create shadowfolio                             # prints the tunnel's id; saves <id>.json, its secret
+cloudflared tunnel route dns shadowfolio shadowfolio.epole.dev   # the DNS record pointing the name at the tunnel
+```
+
+Then write `~/.cloudflared/config.yml`, with the id `create` printed:
+
+```yaml
+tunnel: <id>
+credentials-file: /etc/cloudflared/<id>.json
+ingress:
+  - hostname: shadowfolio.epole.dev
+    service: http://app:8000
+  - service: http_status:404
+```
+
+`cert.pem` is only needed to create tunnels and DNS records: move it somewhere safe once done. In Auth0, add `https://shadowfolio.epole.dev` to the application's allowed callback, logout and web origin URLs.
+
+To start the container from a copy of the development database (SQLite's online backup, safe while the development backend runs), before its first start:
+
+```bash
+docker compose run --rm --no-deps --user root -v "$PWD/data:/seed:ro" app python -c "
+import os, pwd, sqlite3
+for name in ('shadowfolio.db', 'market-cache.db'):
+    source, copy = sqlite3.connect(f'file:/seed/{name}?mode=ro', uri=True), sqlite3.connect(f'/data/{name}')
+    source.backup(copy)
+    copy.close()
+    os.chown(f'/data/{name}', pwd.getpwnam('shadowfolio').pw_uid, -1)
+"
+```
+
 ## Daily sync
 
 Corporate actions (splits) are applied to every wallet by `POST /api/sync`. Recording a trade also applies its symbol's splits first, so the daily run is what keeps holdings right as time passes. Locally it runs as a systemd user timer, every day at 07:00 New York time (before the US market opens), against the running backend:
