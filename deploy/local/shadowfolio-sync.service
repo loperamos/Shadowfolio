@@ -8,5 +8,6 @@ Type=oneshot
 # The backend's address comes from the repo's .env, read at every run, so changing it there is enough.
 # The backend must be running; it alone decides where the database is (SHADOWFOLIO_DB).
 EnvironmentFile=@REPO_DIR@/.env
-# A backend listening on every interface (0.0.0.0) is reached through the loopback address.
-ExecStart=/bin/sh -c 'host="$${SHADOWFOLIO_HOST}"; [ "$$host" = "0.0.0.0" ] && host=127.0.0.1; exec /usr/bin/curl --fail --silent --show-error --max-time 300 -X POST "http://$$host:$${SHADOWFOLIO_PORT}/api/sync"'
+# A backend listening on every interface (0.0.0.0) is reached through the loopback address. The endpoint needs the
+# job secret from .env (SHADOWFOLIO_JOB_TOKEN).
+ExecStart=/bin/sh -c 'host="$${SHADOWFOLIO_HOST}"; [ "$$host" = "0.0.0.0" ] && host=127.0.0.1; exec /usr/bin/curl --fail --silent --show-error --max-time 300 -X POST -H "Authorization: Bearer $${SHADOWFOLIO_JOB_TOKEN}" "http://$$host:$${SHADOWFOLIO_PORT}/api/sync"'

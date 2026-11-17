@@ -1,9 +1,10 @@
 """Routes for orders placed now: placing, listing (which fills the due ones first), cancelling, and the fill job."""
 
+from collections.abc import Callable
 from decimal import Decimal
 from uuid import UUID
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, Request
 
 from shadowfolio.domain.errors import DomainError, OrderNotFoundError
 from shadowfolio.domain.orders import OrderSide
@@ -19,7 +20,7 @@ from shadowfolio.usecases.comparison import DEFAULT_BENCHMARK
 from shadowfolio.usecases.orders import Orders
 
 
-def orders_router(orders: Orders) -> APIRouter:
+def orders_router(orders: Orders, job_check: Callable[[Request], None]) -> APIRouter:
     router = APIRouter()
 
     @router.post("/wallets/{wallet_id}/orders", status_code=201, responses=NOT_FOUND | INVALID)
@@ -83,7 +84,7 @@ def orders_router(orders: Orders) -> APIRouter:
         wallet, order = cancelled
         return OrderResponse.from_order(order, wallet)
 
-    @router.post("/orders/fill")
+    @router.post("/orders/fill", dependencies=[Depends(job_check)])
     def fill_all_orders() -> FillSummaryResponse:
         """Fill every wallet's due orders. Called by the job that runs while the market is open (or by hand)."""
         summary = orders.fill_all()

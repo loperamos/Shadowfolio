@@ -17,7 +17,7 @@ from shadowfolio.adapters.in_memory_corporate_actions import InMemoryCorporateAc
 from shadowfolio.adapters.in_memory_wallet_repository import InMemoryWalletRepository
 from shadowfolio.domain.corporate_actions import SplitEvent
 from shadowfolio.ports.corporate_actions import CorporateActionsUnavailableError
-from shadowfolio.wiring.test import build_test_app
+from shadowfolio.wiring.test import JOB, build_test_app
 
 NOW = datetime(2026, 3, 2, 15, 0, tzinfo=UTC)
 NVDA_SPLIT = SplitEvent("NVDA", date(2024, 6, 10), Decimal(1), Decimal(10), "nvda-2024-split")
@@ -114,13 +114,13 @@ def test_the_daily_sync_applies_splits_published_since_and_late_ones(actions: Co
     assert client.get(f"/api/wallets/{wallet_id}").json()["holdings"] == {"NVDA": "8"}
 
     clock.set(datetime(2024, 6, 11, 12, 0, tzinfo=UTC))  # the day after the split
-    summary = client.post("/api/sync").json()
+    summary = client.post("/api/sync", headers=JOB).json()
     assert summary == {"wallets": 1, "added": 1}
     wallet = client.get(f"/api/wallets/{wallet_id}").json()
     assert (wallet["holdings"], wallet["splits_checked_through"]) == ({"NVDA": "80"}, "2024-06-11")
     # The run looked back a week before the last checked day, for actions published late.
     assert actions.calls[-1] == ("NVDA", date(2024, 5, 25), date(2024, 6, 11))
-    assert client.post("/api/sync").json() == {"wallets": 1, "added": 0}
+    assert client.post("/api/sync", headers=JOB).json() == {"wallets": 1, "added": 0}
 
 
 def test_a_split_while_no_shares_are_held_changes_nothing(client: TestClient) -> None:
@@ -154,7 +154,7 @@ def test_the_daily_sync_also_checks_trades_recorded_before_periods_existed(actio
     assert stored is not None
     repository.update(replace(stored, operations=tuple(op for op in stored.operations if not op.automatic), checked={}))
 
-    assert client.post("/api/sync").json() == {"wallets": 1, "added": 1}
+    assert client.post("/api/sync", headers=JOB).json() == {"wallets": 1, "added": 1}
     assert client.get(f"/api/wallets/{wallet_id}").json()["holdings"] == {"NVDA": "80"}
 
 

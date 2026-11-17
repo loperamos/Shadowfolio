@@ -13,7 +13,7 @@ from shadowfolio.adapters.in_memory_fx_rates import InMemoryFxRates
 from shadowfolio.domain.corporate_actions import DividendEvent
 from shadowfolio.domain.money import Currency, FxRate
 from shadowfolio.ports.fx_rates import FxRatesUnavailableError
-from shadowfolio.wiring.test import build_test_app
+from shadowfolio.wiring.test import JOB, build_test_app
 
 NOW = datetime(2026, 3, 2, 15, 0, tzinfo=UTC)
 # Alphabet's real dividend: 0.20 USD a share, ex-date 10 June 2024, paid 17 June 2024.
@@ -136,8 +136,8 @@ def test_the_daily_sync_credits_a_dividend_paid_since_once(actions: CountingCorp
     assert dividends(client, wallet_id) == []
 
     clock.set(datetime(2024, 6, 18, 12, 0, tzinfo=UTC))
-    client.post("/api/sync")
-    client.post("/api/sync")
+    client.post("/api/sync", headers=JOB)
+    client.post("/api/sync", headers=JOB)
     assert [d["amount"] for d in dividends(client, wallet_id)] == ["0.60"]
 
 
