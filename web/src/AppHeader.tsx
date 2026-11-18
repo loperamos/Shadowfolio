@@ -5,7 +5,8 @@ import { Link, NavLink, useNavigate } from "react-router";
 
 import { AGENTS_PATH, SECURITIES_COMPARE_PATH, securityPath, WALLETS_PATH } from "./routes";
 import { useAuth } from "./auth/useAuth";
-import { ICON_SIZE, SEARCH_INPUT_WIDTH } from "./ui/theme";
+import { Wordmark } from "./ui/Logo";
+import { ICON_SIZE, LOGO_HEADER_SIZE, SEARCH_INPUT_WIDTH } from "./ui/theme";
 
 /**
  * The header on every page: the app's name, its sections, and a symbol lookup that opens any security's page (as on
@@ -27,10 +28,8 @@ export function AppHeader() {
   return (
     <Group justify="space-between" mb="xl">
       <Group gap="lg">
-        <Anchor component={Link} to={WALLETS_PATH} c="inherit" underline="never">
-          <Text fw={700} size="lg">
-            Shadowfolio
-          </Text>
+        <Anchor component={Link} to={WALLETS_PATH} underline="never" aria-label="Shadowfolio: your wallets">
+          <Wordmark size={LOGO_HEADER_SIZE} />
         </Anchor>
         {/* The current section reads as active (aria-current), as NavLink marks it. */}
         <Anchor component={NavLink} to={WALLETS_PATH} fw={500}>
