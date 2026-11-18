@@ -8,7 +8,9 @@ import { type AccessTokenResponse, listAccessTokens, listWallets, Scope, type Wa
 import { formatDateTime } from "../ui/format";
 import { ICON_SIZE, TABLE_MIN_WIDTH } from "../ui/theme";
 import { CreateTokenModal } from "./CreateTokenModal";
+import { WalletSettingsModal } from "../wallets/WalletSettingsModal";
 import { RevokeTokenModal } from "./RevokeTokenModal";
+import { WalletRulesTable } from "./WalletRulesTable";
 
 export const SCOPE_LABELS: Record<Scope, string> = { [Scope.READ]: "Read", [Scope.TRADING]: "Trading" };
 const SCOPE_COLORS: Record<Scope, string> = { [Scope.READ]: "blue", [Scope.TRADING]: "orange" };
@@ -25,6 +27,7 @@ export function AgentAccessPage() {
   const [creating, { open: openCreate, close: closeCreate }] = useDisclosure(false);
   const [toRevoke, setToRevoke] = useState<AccessTokenResponse | null>(null);
   const me = useMe();
+  const [toConfigure, setToConfigure] = useState<WalletResponse | null>(null);
 
   const load = useCallback(() => {
     Promise.all([listAccessTokens(), listWallets()])
@@ -125,6 +128,8 @@ export function AgentAccessPage() {
         address: /mcp on the backend (see the README). A read token sees its wallets and previews orders; a trading token
         also places and cancels orders, now only, within each wallet&apos;s rules.
       </Text>
+      {loaded !== null && loaded.wallets.length > 0 && <WalletRulesTable wallets={loaded.wallets} onEdit={setToConfigure} />}
+      <WalletSettingsModal wallet={toConfigure} onClose={() => setToConfigure(null)} onSaved={load} />
       {loaded && <CreateTokenModal opened={creating} wallets={loaded.wallets} onClose={closeCreate} onCreated={load} />}
       <RevokeTokenModal token={toRevoke} onClose={() => setToRevoke(null)} onRevoked={load} />
     </Stack>
