@@ -6,6 +6,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
 from shadowfolio.ports.corporate_actions import CorporateActions
+from shadowfolio.ports.earnings_calendar import EarningsCalendar
 from shadowfolio.ports.news import News
 from shadowfolio.ports.price_data import PriceData
 
@@ -17,6 +18,7 @@ class MarketData:
     prices: PriceData
     corporate_actions: CorporateActions
     news: News
+    earnings_calendar: EarningsCalendar | None = None  # None when the user has no key for it (it is optional)
 
 
 class MarketDataSource(ABC):

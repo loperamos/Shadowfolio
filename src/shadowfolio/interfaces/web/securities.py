@@ -68,10 +68,10 @@ def securities_router(securities: Securities, current_user: Callable[[Request], 
         return SecurityStatisticsResponse.from_statistics(statistics)
 
     @router.get("/securities/{symbol}/earnings", responses=INVALID)
-    def security_earnings(symbol: str) -> EarningsResponse:
+    def security_earnings(symbol: str, user_id: str = Depends(current_user)) -> EarningsResponse:
         """When the company reports results next, from today on: the days prices often jump."""
         try:
-            upcoming = securities.next_earnings(symbol.strip().upper())
+            upcoming = securities.next_earnings(user_id, symbol.strip().upper())
         except DomainError as error:
             raise rule_violation(error) from error
         return EarningsResponse(next_date=None if upcoming is None else upcoming.day, time=None if upcoming is None else upcoming.time)

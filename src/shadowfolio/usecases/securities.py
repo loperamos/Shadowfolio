@@ -22,7 +22,7 @@ from shadowfolio.domain.valuation import Quote
 from shadowfolio.ports.clock import Clock
 from shadowfolio.ports.company_data import CompanyData, CompanyDataUnavailableError
 from shadowfolio.ports.corporate_actions import CorporateActionsUnavailableError
-from shadowfolio.ports.earnings_calendar import EarningsCalendar, EarningsCalendarUnavailableError
+from shadowfolio.ports.earnings_calendar import EarningsCalendarUnavailableError
 from shadowfolio.ports.market_data import MarketDataSource
 from shadowfolio.ports.news import NewsUnavailableError
 from shadowfolio.ports.price_data import PriceDataUnavailableError
@@ -105,16 +105,17 @@ class SecurityRanges:
     pe: ValueRange | None
 
 
+# Earnings dates need the user's own Finnhub key, which is optional.
+MISSING_EARNINGS_KEY = "connect your Finnhub key in Settings to see earnings dates"
+
+
 class Securities:
-    def __init__(
-        self, company_data: CompanyData, market_data: MarketDataSource, market: Market, earnings_calendar: EarningsCalendar, clock: Clock
-    ) -> None:
-        """Prices, dividends and news come from the market data of the user who is looking; company data is the same
-        for everyone (public filings)."""
+    def __init__(self, company_data: CompanyData, market_data: MarketDataSource, market: Market, clock: Clock) -> None:
+        """Prices, dividends, news and earnings dates come from the market data of the user who is looking; company
+        data is the same for everyone (public filings)."""
         self._company_data = company_data
         self._market_data = market_data
         self._market = market
-        self._earnings_calendar = earnings_calendar
         self._clock = clock
 
     def summary(self, user_id: str, symbol: str, start: date | None = None, end: date | None = None) -> SecuritySummary:
@@ -140,14 +141,18 @@ class Securities:
         figures = fetched(lambda: self.fundamentals(user_id, symbol))
         dividends = fetched(lambda: self.dividends(user_id, symbol))
         statistics = fetched(lambda: self.statistics(user_id, symbol, start, end))
-        upcoming = fetched(lambda: self.next_earnings(symbol))
+        upcoming = fetched(lambda: self.next_earnings(user_id, symbol))
         return SecuritySummary(symbol, price, figures, dividends, statistics, upcoming, tuple(unavailable))
 
-    def next_earnings(self, symbol: str) -> EarningsDate | None:
-        """The next day, from today on, the company reports results; None when none is known."""
+    def next_earnings(self, user_id: str, symbol: str) -> EarningsDate | None:
+        """The next day, from today on, the company reports results; None when none is known. Needs the user's
+        earnings calendar (their Finnhub key), which is optional."""
         today = self._clock.now().date()
+        calendar = self._market_data.for_user(user_id).earnings_calendar
+        if calendar is None:
+            raise MissingDataKeyError(MISSING_EARNINGS_KEY)
         try:
-            found = self._earnings_calendar.earnings(symbol, today, today + EARNINGS_AHEAD)
+            found = calendar.earnings(symbol, today, today + EARNINGS_AHEAD)
         except EarningsCalendarUnavailableError as error:
             raise EarningsCalendarUnavailableNowError(f"could not fetch when {symbol} reports next right now: {error}") from error
         return found[0] if found else None
