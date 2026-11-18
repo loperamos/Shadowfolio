@@ -75,12 +75,14 @@ def build_test_app(
     job_token: str | None = TEST_JOB_TOKEN,
     admins: Sequence[str] = (TEST_USER,),
     own_keys: Callable[[str, ProviderKey], MarketData] | None = None,
+    own_earnings: Callable[[ProviderKey], EarningsCalendar] | None = None,
 ) -> FastAPI:
     """Pass fakes to control them (or to prepare stored data); otherwise "now" is DEFAULT_NOW, storage is empty and there
     are no prices, rates or corporate actions. TEST_USER is an admin, so tests not about plans meet no plan's limits.
 
-    Every user shares the same market data (`prices`, `corporate_actions`, `news`), unless `own_keys` is given: then
-    each user's comes from the key they saved, built by it, and admins without one get the shared market data."""
+    Every user shares the same market data (`prices`, `corporate_actions`, `news`, `earnings_calendar`), unless
+    `own_keys` is given: then each user's comes from the keys they saved, built by it and `own_earnings`, and admins
+    get the shared market data for what they have no key for."""
     clock = clock or FixedClock(DEFAULT_NOW)
     prices = prices or InMemoryPriceData()
     fx_rates = fx_rates or InMemoryFxRates()
@@ -88,11 +90,17 @@ def build_test_app(
     wallet_repository = wallet_repository or InMemoryWalletRepository()
     users = Users(InMemoryUserRepository(), clock, admins)
     keys = InMemoryProviderKeyRepository()
-    shared = MarketData(prices, corporate_actions, news or InMemoryNews())
+    shared = MarketData(prices, corporate_actions, news or InMemoryNews(), earnings_calendar or InMemoryEarningsCalendar())
     market_data: MarketDataSource = (
         SharedMarketData(shared)
         if own_keys is None
-        else OwnKeyMarketData(keys, own_keys, shared, lambda user_id: users.user(user_id).uses_server_keys)
+        else OwnKeyMarketData(
+            keys,
+            own_keys,
+            own_earnings or (lambda _: InMemoryEarningsCalendar()),
+            shared,
+            lambda user_id: users.user(user_id).uses_server_keys,
+        )
     )
     sync = Sync(wallet_repository, clock, market_data, fx_rates)
     market = Market(market_data, clock)
@@ -102,9 +110,7 @@ def build_test_app(
         valuation=Valuation(wallet_repository, clock, market_data, fx_rates),
         comparison=Comparison(wallet_repository, clock, market_data, fx_rates),
         orders=Orders(wallet_repository, clock, market_data, fx_rates, WalletChanges(clock, market_data, fx_rates, sync), users),
-        securities=Securities(
-            company_data or InMemoryCompanyData(), market_data, market, earnings_calendar or InMemoryEarningsCalendar(), clock
-        ),
+        securities=Securities(company_data or InMemoryCompanyData(), market_data, market, clock),
         market=market,
         sync=sync,
         imports=Imports(

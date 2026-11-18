@@ -1,6 +1,6 @@
 """Wiring for running on a developer's machine."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -27,6 +27,7 @@ from shadowfolio.domain.provider_keys import ProviderKey
 from shadowfolio.interfaces.web.app import create_app
 from shadowfolio.interfaces.web.auth import SignInSettings
 from shadowfolio.ports.clock import Clock
+from shadowfolio.ports.earnings_calendar import EarningsCalendar
 from shadowfolio.ports.market_data import MarketData
 from shadowfolio.usecases.access_tokens import AccessTokens
 from shadowfolio.usecases.comparison import Comparison
@@ -86,14 +87,19 @@ def build_local_app(config: LocalConfig, acting_as: str | None = None) -> FastAP
     fx_rates = CachedFxRates(EcbFxRates(clock), FX_SOURCE, market_cache, clock)
     users = Users(SqliteUserRepository(config.db_path), clock, config.admins)
     keys = SqliteProviderKeyRepository(config.db_path, config.keys_secret)
-    # Each user's market data comes from their own Alpaca key; admins without one use the server's (development plan).
-    server = _alpaca(config.alpaca, PRICE_SOURCE, market_cache, clock)
+    # Each user's market data comes from their own Alpaca and Finnhub keys; admins without them use the server's
+    # (development plans).
+    finnhub = FinnhubEarningsCalendar(config.finnhub_key, clock)
+    server = replace(_alpaca(config.alpaca, PRICE_SOURCE, market_cache, clock), earnings_calendar=finnhub)
 
     def with_own_key(user_id: str, key: ProviderKey) -> MarketData:
         own = AlpacaConfig(key_id=key.key_id or "", secret_key=key.secret)
         return _alpaca(own, OWN_KEY_SOURCE.format(user_id=user_id), market_cache, clock)
 
-    market_data = OwnKeyMarketData(keys, with_own_key, server, lambda user_id: users.user(user_id).uses_server_keys)
+    def with_own_finnhub_key(key: ProviderKey) -> EarningsCalendar:
+        return FinnhubEarningsCalendar(key.secret, clock)
+
+    market_data = OwnKeyMarketData(keys, with_own_key, with_own_finnhub_key, server, lambda user_id: users.user(user_id).uses_server_keys)
     sync = Sync(wallet_repository, clock, market_data, fx_rates)
     market = Market(market_data, clock)
     wallets = Wallets(wallet_repository, clock, users)
@@ -108,9 +114,7 @@ def build_local_app(config: LocalConfig, acting_as: str | None = None) -> FastAP
         valuation=Valuation(wallet_repository, clock, market_data, fx_rates),
         comparison=Comparison(wallet_repository, clock, market_data, fx_rates),
         orders=Orders(wallet_repository, clock, market_data, fx_rates, WalletChanges(clock, market_data, fx_rates, sync), users),
-        securities=Securities(
-            SecEdgarCompanyData(config.edgar_contact, clock), market_data, market, FinnhubEarningsCalendar(config.finnhub_key, clock), clock
-        ),
+        securities=Securities(SecEdgarCompanyData(config.edgar_contact, clock), market_data, market, clock),
         market=market,
         sync=sync,
         imports=Imports(
