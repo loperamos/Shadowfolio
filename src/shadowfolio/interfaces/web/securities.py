@@ -1,8 +1,9 @@
 """Routes for what is known about a listed company, beyond its price."""
 
+from collections.abc import Callable
 from datetime import date
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from shadowfolio.domain.errors import DomainError
 from shadowfolio.interfaces.web.errors import INVALID, NOT_FOUND, rule_violation
@@ -18,16 +19,16 @@ from shadowfolio.interfaces.web.schemas import (
 from shadowfolio.usecases.securities import Securities
 
 
-def securities_router(securities: Securities) -> APIRouter:
+def securities_router(securities: Securities, current_user: Callable[[Request], str]) -> APIRouter:
     router = APIRouter()
 
     @router.get("/securities/{symbol}/fundamentals", responses=NOT_FOUND | INVALID)
-    def security_fundamentals(symbol: str) -> FundamentalsResponse:
+    def security_fundamentals(symbol: str, user_id: str = Depends(current_user)) -> FundamentalsResponse:
         """The company's reported yearly results and shares outstanding, with its P/E and market cap at the latest
         price."""
         symbol = symbol.strip().upper()
         try:
-            figures = securities.fundamentals(symbol)
+            figures = securities.fundamentals(user_id, symbol)
         except DomainError as error:
             raise rule_violation(error) from error
         if figures is None:
@@ -35,10 +36,10 @@ def securities_router(securities: Securities) -> APIRouter:
         return FundamentalsResponse.from_figures(figures)
 
     @router.get("/securities/{symbol}/news", responses=INVALID)
-    def security_news(symbol: str) -> list[ArticleResponse]:
+    def security_news(symbol: str, user_id: str = Depends(current_user)) -> list[ArticleResponse]:
         """The latest articles about the symbol, newest first; empty when there are none."""
         try:
-            articles = securities.news(symbol.strip().upper())
+            articles = securities.news(user_id, symbol.strip().upper())
         except DomainError as error:
             raise rule_violation(error) from error
         return [
@@ -47,17 +48,21 @@ def securities_router(securities: Securities) -> APIRouter:
         ]
 
     @router.get("/securities/{symbol}/summary")
-    def security_summary(symbol: str, start: date | None = None, end: date | None = None) -> SecuritySummaryResponse:
+    def security_summary(
+        symbol: str, start: date | None = None, end: date | None = None, user_id: str = Depends(current_user)
+    ) -> SecuritySummaryResponse:
         """What compares securities, in one place: valuation, dividends, growth, trend and risk from `start` to `end`,
         and the next earnings date. A part that cannot be fetched right now is left out, and `unavailable` says why."""
-        return SecuritySummaryResponse.from_summary(securities.summary(symbol.strip().upper(), start, end))
+        return SecuritySummaryResponse.from_summary(securities.summary(user_id, symbol.strip().upper(), start, end))
 
     @router.get("/securities/{symbol}/statistics", responses=INVALID)
-    def security_statistics(symbol: str, start: date | None = None, end: date | None = None) -> SecurityStatisticsResponse:
+    def security_statistics(
+        symbol: str, start: date | None = None, end: date | None = None, user_id: str = Depends(current_user)
+    ) -> SecurityStatisticsResponse:
         """How the price moved: its trend over the last 3, 6 and 12 months, and from `start` to `end` (as for the
         closes) its volatility, deepest fall and beta against the market. A description of the past, not a signal."""
         try:
-            statistics = securities.statistics(symbol.strip().upper(), start, end)
+            statistics = securities.statistics(user_id, symbol.strip().upper(), start, end)
         except DomainError as error:
             raise rule_violation(error) from error
         return SecurityStatisticsResponse.from_statistics(statistics)
@@ -72,19 +77,21 @@ def securities_router(securities: Securities) -> APIRouter:
         return EarningsResponse(next_date=None if upcoming is None else upcoming.day, time=None if upcoming is None else upcoming.time)
 
     @router.get("/securities/{symbol}/dividends", responses=INVALID)
-    def security_dividends(symbol: str) -> DividendsResponse:
+    def security_dividends(symbol: str, user_id: str = Depends(current_user)) -> DividendsResponse:
         """The next dividend whose ex-date is still to come, and the last 12 months' dividends and their yield."""
         try:
-            dividends = securities.dividends(symbol.strip().upper())
+            dividends = securities.dividends(user_id, symbol.strip().upper())
         except DomainError as error:
             raise rule_violation(error) from error
         return DividendsResponse.from_dividends(dividends)
 
     @router.get("/securities/{symbol}/ranges", responses=INVALID)
-    def security_ranges(symbol: str, start: date | None = None, end: date | None = None) -> SecurityRangesResponse:
+    def security_ranges(
+        symbol: str, start: date | None = None, end: date | None = None, user_id: str = Depends(current_user)
+    ) -> SecurityRangesResponse:
         """Where the price and the P/E stand within their lows and highs from `start` to `end` (as for the closes)."""
         try:
-            ranges = securities.ranges(symbol.strip().upper(), start, end)
+            ranges = securities.ranges(user_id, symbol.strip().upper(), start, end)
         except DomainError as error:
             raise rule_violation(error) from error
         return SecurityRangesResponse.from_ranges(ranges)

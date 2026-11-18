@@ -1,6 +1,6 @@
 """Wiring for tests: fakes for every port, nothing persisted."""
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -20,6 +20,9 @@ from shadowfolio.adapters.in_memory_provider_key_repository import InMemoryProvi
 from shadowfolio.adapters.in_memory_security_lookup import InMemorySecurityLookup
 from shadowfolio.adapters.in_memory_user_repository import InMemoryUserRepository
 from shadowfolio.adapters.in_memory_wallet_repository import InMemoryWalletRepository
+from shadowfolio.adapters.own_key_market_data import OwnKeyMarketData
+from shadowfolio.adapters.shared_market_data import SharedMarketData
+from shadowfolio.domain.provider_keys import ProviderKey
 from shadowfolio.interfaces.web.app import create_app
 from shadowfolio.interfaces.web.auth import SignInSettings
 from shadowfolio.ports.clock import Clock
@@ -28,6 +31,7 @@ from shadowfolio.ports.corporate_actions import CorporateActions
 from shadowfolio.ports.earnings_calendar import EarningsCalendar
 from shadowfolio.ports.fx_rates import FxRates
 from shadowfolio.ports.identity import Identity
+from shadowfolio.ports.market_data import MarketData, MarketDataSource
 from shadowfolio.ports.news import News
 from shadowfolio.ports.price_data import PriceData
 from shadowfolio.ports.security_lookup import SecurityLookup
@@ -70,44 +74,49 @@ def build_test_app(
     web_dir: Path | None = None,
     job_token: str | None = TEST_JOB_TOKEN,
     admins: Sequence[str] = (TEST_USER,),
+    own_keys: Callable[[str, ProviderKey], MarketData] | None = None,
 ) -> FastAPI:
     """Pass fakes to control them (or to prepare stored data); otherwise "now" is DEFAULT_NOW, storage is empty and there
-    are no prices, rates or corporate actions. TEST_USER is an admin, so tests not about plans meet no plan's limits."""
+    are no prices, rates or corporate actions. TEST_USER is an admin, so tests not about plans meet no plan's limits.
+
+    Every user shares the same market data (`prices`, `corporate_actions`, `news`), unless `own_keys` is given: then
+    each user's comes from the key they saved, built by it, and admins without one get the shared market data."""
     clock = clock or FixedClock(DEFAULT_NOW)
     prices = prices or InMemoryPriceData()
     fx_rates = fx_rates or InMemoryFxRates()
     corporate_actions = corporate_actions or InMemoryCorporateActions()
     wallet_repository = wallet_repository or InMemoryWalletRepository()
-    sync = Sync(wallet_repository, clock, corporate_actions, fx_rates)
-    market = Market(prices, clock, corporate_actions)
     users = Users(InMemoryUserRepository(), clock, admins)
+    keys = InMemoryProviderKeyRepository()
+    shared = MarketData(prices, corporate_actions, news or InMemoryNews())
+    market_data: MarketDataSource = (
+        SharedMarketData(shared)
+        if own_keys is None
+        else OwnKeyMarketData(keys, own_keys, shared, lambda user_id: users.user(user_id).uses_server_keys)
+    )
+    sync = Sync(wallet_repository, clock, market_data, fx_rates)
+    market = Market(market_data, clock)
     return create_app(
         wallets=Wallets(wallet_repository, clock, users),
-        history=History(wallet_repository, clock, prices, fx_rates, sync),
-        valuation=Valuation(wallet_repository, clock, prices, fx_rates),
-        comparison=Comparison(wallet_repository, clock, prices, fx_rates, corporate_actions),
-        orders=Orders(wallet_repository, clock, prices, fx_rates, WalletChanges(clock, prices, fx_rates, sync), users),
+        history=History(wallet_repository, clock, market_data, fx_rates, sync),
+        valuation=Valuation(wallet_repository, clock, market_data, fx_rates),
+        comparison=Comparison(wallet_repository, clock, market_data, fx_rates),
+        orders=Orders(wallet_repository, clock, market_data, fx_rates, WalletChanges(clock, market_data, fx_rates, sync), users),
         securities=Securities(
-            company_data or InMemoryCompanyData(),
-            prices,
-            news or InMemoryNews(),
-            market,
-            corporate_actions,
-            earnings_calendar or InMemoryEarningsCalendar(),
-            clock,
+            company_data or InMemoryCompanyData(), market_data, market, earnings_calendar or InMemoryEarningsCalendar(), clock
         ),
         market=market,
         sync=sync,
         imports=Imports(
             wallet_repository,
-            WalletChanges(clock, prices, fx_rates, sync),
+            WalletChanges(clock, market_data, fx_rates, sync),
             security_lookup or InMemorySecurityLookup({}),
             DegiroStatementReader(),
         ),
         mcp_allowed_hosts=mcp_allowed_hosts,
         access_tokens=AccessTokens(InMemoryAccessTokenRepository(), wallet_repository, clock, users),
         users=users,
-        provider_keys=ProviderKeys(InMemoryProviderKeyRepository(), clock),
+        provider_keys=ProviderKeys(keys, clock, users),
         identity=identity or InMemoryIdentity({}, anonymous=TEST_USER),
         sign_in=sign_in,
         web_dir=web_dir,

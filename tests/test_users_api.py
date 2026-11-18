@@ -34,6 +34,7 @@ def test_signing_in_for_the_first_time_makes_an_account_on_the_free_plan(client:
         "tier": "free",
         "limits": FREE_WALLETS,
         "created_at": "2026-01-05T15:00:00Z",
+        "missing_keys": ["alpaca"],  # market data needs their own key
     }
 
 

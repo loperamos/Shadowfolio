@@ -22,9 +22,10 @@ from shadowfolio.domain.performance import (
 from shadowfolio.domain.valuation import DailyValue
 from shadowfolio.domain.wallet import Wallet
 from shadowfolio.ports.clock import Clock
-from shadowfolio.ports.corporate_actions import CorporateActions, CorporateActionsUnavailableError
+from shadowfolio.ports.corporate_actions import CorporateActionsUnavailableError
 from shadowfolio.ports.fx_rates import FxRates, FxRatesUnavailableError
-from shadowfolio.ports.price_data import PriceData, PriceDataUnavailableError
+from shadowfolio.ports.market_data import MarketDataSource
+from shadowfolio.ports.price_data import PriceDataUnavailableError
 from shadowfolio.ports.wallet_repository import WalletRepository
 from shadowfolio.usecases.valuation import Valuation
 
@@ -56,16 +57,14 @@ class PerformanceComparison:
 
 
 class Comparison:
-    def __init__(
-        self, repo: WalletRepository, clock: Clock, prices: PriceData, fx_rates: FxRates, corporate_actions: CorporateActions
-    ) -> None:
+    def __init__(self, repo: WalletRepository, clock: Clock, market_data: MarketDataSource, fx_rates: FxRates) -> None:
+        """Benchmarks come from each wallet's owner's market data."""
         self._repo = repo
         self._clock = clock
-        self._prices = prices
+        self._market_data = market_data
         self._fx_rates = fx_rates
-        self._corporate_actions = corporate_actions
         # The wallet's own daily values: a withdrawal sells the share of the benchmark it took from the wallet.
-        self._valuation = Valuation(repo, clock, prices, fx_rates)
+        self._valuation = Valuation(repo, clock, market_data, fx_rates)
 
     def benchmark_daily(self, wallet_id: UUID, symbol: str = DEFAULT_BENCHMARK) -> Benchmark | None:
         """The benchmark's value at the end of every day from the wallet's first operation to today, given the wallet's
@@ -133,8 +132,9 @@ class Comparison:
             if isinstance(op, Deposit | Withdrawal):
                 day = op.timestamp.astimezone(UTC).date()
                 flows[day] = flows.get(day, Decimal(0)) + op.cash_delta
+        data = self._market_data.for_user(wallet.owner_id)
         try:
-            closes = self._prices.closes_between(symbol, start, end)
+            closes = data.prices.closes_between(symbol, start, end)
         except PriceDataUnavailableError as error:
             raise PriceUnavailableError(f"could not fetch the price of {symbol} right now; try again later") from error
         # What one unit of the benchmark's currency is worth in the wallet's, per day.
@@ -147,7 +147,7 @@ class Comparison:
                 raise FxRateUnavailableError(f"could not fetch the {currency}→{wallet.currency} rate right now; try again later") from error
             rates = {day: rate.rate for day, rate in fx.items()}
         try:
-            dividends = self._corporate_actions.dividends(symbol, start, end)
+            dividends = data.corporate_actions.dividends(symbol, start, end)
         except CorporateActionsUnavailableError as error:
             raise CorporateActionsUnavailableNowError(f"could not fetch {symbol}'s dividends right now; try again later") from error
         wallet_values = {value.day: value.total for value in daily if value.total is not None}

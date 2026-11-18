@@ -35,7 +35,7 @@
     "/api/me": {
       "get": {
         "summary": "Get Me",
-        "description": "The signed-in user: their tier, and what their plan allows.",
+        "description": "The signed-in user: their tier, what their plan allows, and the market-data keys they still need to connect.",
         "operationId": "get_me",
         "responses": {
           "200": {
@@ -5536,6 +5536,20 @@
             "type": "string",
             "format": "date-time",
             "title": "Created At"
+          },
+          "missing_keys": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/DataProvider"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Missing Keys"
           }
         },
         "type": "object",

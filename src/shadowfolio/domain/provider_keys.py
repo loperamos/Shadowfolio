@@ -21,6 +21,8 @@ class DataProvider(StrEnum):
 
 # The providers whose keys come in two parts, a key id and a secret.
 WITH_KEY_ID = frozenset({DataProvider.ALPACA})
+# The keys market data needs: prices, dividends, splits and news come from Alpaca.
+NEEDED = (DataProvider.ALPACA,)
 NAMES = {DataProvider.ALPACA: "Alpaca", DataProvider.FINNHUB: "Finnhub"}
 
 

@@ -1008,10 +1008,12 @@ class UserResponse(BaseModel):
     tier: Tier
     limits: LimitsResponse
     created_at: AwareDatetime  # when they first signed in
+    missing_keys: list[DataProvider] | None = None  # for the signed-in user: the keys market data still needs from them
 
     @classmethod
-    def from_user(cls, user: User) -> "UserResponse":
-        return cls(id=user.id, tier=user.tier, limits=LimitsResponse.from_limits(user.limits), created_at=user.created_at)
+    def from_user(cls, user: User, missing_keys: list[DataProvider] | None = None) -> "UserResponse":
+        limits = LimitsResponse.from_limits(user.limits)
+        return cls(id=user.id, tier=user.tier, limits=limits, created_at=user.created_at, missing_keys=missing_keys)
 
 
 class SetTierRequest(BaseModel):
