@@ -158,16 +158,16 @@ def mcp_server(wallets: Wallets, valuation: Valuation, orders: Orders, compariso
         """A security at a glance: latest price, valuation (P/E, price to sales, FCF yield, market cap), last fiscal
         year's growth and margin, dividends, trend over 3, 6 and 12 months, and from `start` to `end` (default: the last
         year) its volatility, deepest fall, beta against SPY and daily traded value; its industry and next earnings."""
-        _token()
-        return SecuritySummaryResponse.from_summary(securities.summary(symbol.strip().upper(), start, end))
+        owner = _token().owner_id  # with the market data of the user the agent works for
+        return SecuritySummaryResponse.from_summary(securities.summary(owner, symbol.strip().upper(), start, end))
 
     @server.tool(annotations=READ_ONLY)
     def compare_securities(symbols: list[str], start: date | None = None, end: date | None = None) -> list[SecuritySummaryResponse]:
         """Several securities' summaries (as security_summary), in the order given, to compare them side by side."""
-        _token()
+        owner = _token().owner_id
         if not 1 <= len(symbols) <= MAX_COMPARED:
             raise ToolError(f"compare 1 to {MAX_COMPARED} securities at a time")
-        return [SecuritySummaryResponse.from_summary(securities.summary(symbol.strip().upper(), start, end)) for symbol in symbols]
+        return [SecuritySummaryResponse.from_summary(securities.summary(owner, symbol.strip().upper(), start, end)) for symbol in symbols]
 
     @server.tool(annotations=READ_ONLY)
     def preview_order(

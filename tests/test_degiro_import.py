@@ -16,15 +16,18 @@ from shadowfolio.adapters.degiro_statements import DegiroStatementReader
 from shadowfolio.adapters.fixed_clock import FixedClock
 from shadowfolio.adapters.in_memory_corporate_actions import InMemoryCorporateActions
 from shadowfolio.adapters.in_memory_fx_rates import InMemoryFxRates
+from shadowfolio.adapters.in_memory_news import InMemoryNews
 from shadowfolio.adapters.in_memory_price_data import InMemoryPriceData
 from shadowfolio.adapters.in_memory_security_lookup import InMemorySecurityLookup
 from shadowfolio.adapters.in_memory_user_repository import InMemoryUserRepository
 from shadowfolio.adapters.in_memory_wallet_repository import InMemoryWalletRepository
+from shadowfolio.adapters.shared_market_data import SharedMarketData
 from shadowfolio.domain.corporate_actions import DividendEvent, SplitEvent
 from shadowfolio.domain.imports import DividendDetails, ImportKind, ImportRecord, TradeDetails
 from shadowfolio.domain.money import Currency, FxRate
 from shadowfolio.domain.operations import Dividend, Fee, ImportedDividend, Income, SharesReceived
 from shadowfolio.domain.wallet import Wallet
+from shadowfolio.ports.market_data import MarketData
 from shadowfolio.ports.security_lookup import SecurityLookup, SecurityLookupUnavailableError
 from shadowfolio.usecases.imports import ImportReport, Imports
 from shadowfolio.usecases.sync import Sync
@@ -65,8 +68,9 @@ def import_degiro(
     it automatically).
     """
     repo, clock, rates = InMemoryWalletRepository(), FixedClock(NOW), InMemoryFxRates(*fx_rates)
-    sync = Sync(repo, clock, InMemoryCorporateActions(*corporate_actions), rates)
-    changes = WalletChanges(clock, InMemoryPriceData(), rates, sync)
+    market_data = SharedMarketData(MarketData(InMemoryPriceData(), InMemoryCorporateActions(*corporate_actions), InMemoryNews()))
+    sync = Sync(repo, clock, market_data, rates)
+    changes = WalletChanges(clock, market_data, rates, sync)
     wallets = Wallets(repo, clock, Users(InMemoryUserRepository(), clock))
     wallet = wallets.create("owner", "DEGIRO", Currency.EUR, Decimal(0))
 
@@ -760,7 +764,8 @@ def test_a_trade_in_a_currency_wallets_do_not_use_is_reported_and_nothing_is_sav
 
 def test_importing_into_a_wallet_that_does_not_exist_imports_nothing() -> None:
     repo, clock, rates = InMemoryWalletRepository(), FixedClock(NOW), InMemoryFxRates()
-    changes = WalletChanges(clock, InMemoryPriceData(), rates, Sync(repo, clock, InMemoryCorporateActions(), rates))
+    market_data = SharedMarketData(MarketData(InMemoryPriceData(), InMemoryCorporateActions(), InMemoryNews()))
+    changes = WalletChanges(clock, market_data, rates, Sync(repo, clock, market_data, rates))
     records = DegiroStatementReader().read(TRANSACTIONS_HEADER, "\n".join([ACCOUNT_HEADER, DEPOSIT_500]))
 
     assert Imports(repo, changes, InMemorySecurityLookup({}), DegiroStatementReader()).apply(uuid4(), records) is None

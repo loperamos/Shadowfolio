@@ -17,14 +17,16 @@ from shadowfolio.domain.valuation import Quote
 from shadowfolio.domain.wallet import Wallet
 from shadowfolio.ports.clock import Clock
 from shadowfolio.ports.fx_rates import FxRates, FxRatesUnavailableError
-from shadowfolio.ports.price_data import PriceData, PriceDataUnavailableError
+from shadowfolio.ports.market_data import MarketDataSource
+from shadowfolio.ports.price_data import PriceDataUnavailableError
 from shadowfolio.usecases.sync import Sync
 
 
 class WalletChanges:
-    def __init__(self, clock: Clock, prices: PriceData, fx_rates: FxRates, sync: Sync) -> None:
+    def __init__(self, clock: Clock, market_data: MarketDataSource, fx_rates: FxRates, sync: Sync) -> None:
+        """Prices come from each wallet's owner's market data."""
         self._clock = clock
-        self._prices = prices
+        self._market_data = market_data
         self._fx_rates = fx_rates
         self._sync = sync
 
@@ -127,7 +129,7 @@ class WalletChanges:
                 raise MissingPriceCurrencyError("a price needs its currency")
             return Trade(symbol, quantity, price, price_currency), settled_amount
         try:
-            quote = self._prices.price_at(symbol, at)
+            quote = self._market_data.for_user(wallet.owner_id).prices.price_at(symbol, at)
         except PriceDataUnavailableError as error:
             raise PriceUnavailableError(f"could not fetch the price of {symbol} right now; try again later") from error
         if quote is None:

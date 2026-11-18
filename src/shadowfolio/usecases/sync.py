@@ -9,11 +9,12 @@ from datetime import UTC, date, datetime, time, timedelta
 from uuid import uuid4
 
 from shadowfolio.domain.corporate_actions import CheckedPeriod, DividendEvent, RecordedDividend
-from shadowfolio.domain.errors import CorporateActionsUnavailableNowError
+from shadowfolio.domain.errors import CorporateActionsUnavailableNowError, MissingDataKeyError
 from shadowfolio.domain.wallet import Wallet
 from shadowfolio.ports.clock import Clock
-from shadowfolio.ports.corporate_actions import CorporateActions, CorporateActionsUnavailableError
+from shadowfolio.ports.corporate_actions import CorporateActionsUnavailableError
 from shadowfolio.ports.fx_rates import FxRates, FxRatesUnavailableError
+from shadowfolio.ports.market_data import MarketDataSource
 from shadowfolio.ports.wallet_repository import WalletRepository
 
 # Each daily sync looks this far back again, in case the provider published an action late. Applying is idempotent.
@@ -27,10 +28,11 @@ class SyncSummary:
 
 
 class Sync:
-    def __init__(self, repo: WalletRepository, clock: Clock, corporate_actions: CorporateActions, fx_rates: FxRates) -> None:
+    def __init__(self, repo: WalletRepository, clock: Clock, market_data: MarketDataSource, fx_rates: FxRates) -> None:
+        """Corporate actions come from each wallet's owner's market data."""
         self._repo = repo
         self._clock = clock
-        self._corporate_actions = corporate_actions
+        self._market_data = market_data
         self._fx_rates = fx_rates
 
     def ensure_checked(self, wallet: Wallet, symbol: str, day: date) -> Wallet:
@@ -46,21 +48,25 @@ class Sync:
         return self._check(wallet, symbol, start, start)
 
     def all_wallets(self) -> SyncSummary:
-        """Extend every wallet's checked periods to today, adding the splits and dividends found. For the daily job."""
+        """Extend every wallet's checked periods to today, adding the splits and dividends found. For the daily job.
+        Wallets whose owner has no market-data key are left as they are."""
         wallets = added_total = 0
         for wallet_id in self._repo.all_ids():
             wallet = self._repo.get(wallet_id)
             if wallet is None:
                 continue
-            wallets += 1
             updated = wallet
-            for symbol, first_trade in sorted(_first_trade_dates(wallet).items()):
-                period = wallet.checked.get(symbol)
-                if period is None:  # traded before periods were recorded: check its whole history once
-                    updated = self._check(updated, symbol, first_trade, first_trade)
-                else:
-                    fetch_from = max(period.start, period.end - LATE_PUBLICATION_LOOKBACK)
-                    updated = self._check(updated, symbol, period.start, fetch_from)
+            try:
+                for symbol, first_trade in sorted(_first_trade_dates(wallet).items()):
+                    period = wallet.checked.get(symbol)
+                    if period is None:  # traded before periods were recorded: check its whole history once
+                        updated = self._check(updated, symbol, first_trade, first_trade)
+                    else:
+                        fetch_from = max(period.start, period.end - LATE_PUBLICATION_LOOKBACK)
+                        updated = self._check(updated, symbol, period.start, fetch_from)
+            except MissingDataKeyError:
+                continue
+            wallets += 1
             if updated != wallet:
                 self._repo.update(updated)
             added_total += len(updated.operations) - len(wallet.operations)
@@ -70,8 +76,9 @@ class Sync:
         """Apply `symbol`'s splits and dividends from `fetch_from` to today, and mark it checked from `start` to today."""
         today = self._clock.now().date()
         try:
-            splits = self._corporate_actions.splits(symbol, fetch_from, today)
-            dividends = self._corporate_actions.dividends(symbol, fetch_from, today)
+            actions = self._market_data.for_user(wallet.owner_id).corporate_actions
+            splits = actions.splits(symbol, fetch_from, today)
+            dividends = actions.dividends(symbol, fetch_from, today)
         except CorporateActionsUnavailableError as error:
             raise CorporateActionsUnavailableNowError(
                 f"could not check corporate actions of {symbol} right now; try again later"

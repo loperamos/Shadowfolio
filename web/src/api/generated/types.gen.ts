@@ -1555,6 +1555,10 @@ export type UserResponse = {
      * Created At
      */
     created_at: string;
+    /**
+     * Missing Keys
+     */
+    missing_keys?: Array<DataProvider> | null;
 };
 
 /**

@@ -50,6 +50,12 @@ class User:
     def limits(self) -> Limits:
         return TIER_LIMITS[self.tier]
 
+    @property
+    def uses_server_keys(self) -> bool:
+        """Whether market data may be fetched with the server's own keys when they have saved none: only admins, as
+        what a development plan's key fetches may not be shown to other users."""
+        return self.tier is Tier.ADMIN
+
     def with_tier(self, tier: Tier) -> "User":
         return replace(self, tier=tier)
 

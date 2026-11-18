@@ -22,15 +22,17 @@ from shadowfolio.domain.valuation import (
 from shadowfolio.domain.wallet import Wallet
 from shadowfolio.ports.clock import Clock
 from shadowfolio.ports.fx_rates import FxRates, FxRatesUnavailableError
-from shadowfolio.ports.price_data import PriceData, PriceDataUnavailableError
+from shadowfolio.ports.market_data import MarketDataSource
+from shadowfolio.ports.price_data import PriceDataUnavailableError
 from shadowfolio.ports.wallet_repository import WalletRepository
 
 
 class Valuation:
-    def __init__(self, repo: WalletRepository, clock: Clock, prices: PriceData, fx_rates: FxRates) -> None:
+    def __init__(self, repo: WalletRepository, clock: Clock, market_data: MarketDataSource, fx_rates: FxRates) -> None:
+        """Prices come from each wallet's owner's market data."""
         self._repo = repo
         self._clock = clock
-        self._prices = prices
+        self._market_data = market_data
         self._fx_rates = fx_rates
 
     def current(self, wallet_id: UUID) -> WalletValuation | None:
@@ -46,7 +48,7 @@ class Valuation:
         buying = {order.symbol for order in wallet.orders if order.is_open and order.side is OrderSide.BUY}
         symbols = sorted(set(wallet.holdings) | buying)
         try:
-            quotes = self._prices.latest_prices(symbols)
+            quotes = self._market_data.for_user(wallet.owner_id).prices.latest_prices(symbols)
         except PriceDataUnavailableError as error:
             raise PriceUnavailableError(f"could not fetch the price of {', '.join(symbols)} right now; try again later") from error
         valuation = self._value(wallet, quotes.get, lambda currency: self._fx_rates.latest_rate(currency, wallet.currency), "")
@@ -71,9 +73,10 @@ class Valuation:
         if wallet is None:
             return None
         past = wallet.as_of(_end_of(day))
+        prices = self._market_data.for_user(wallet.owner_id).prices
         return self._value(
             past,
-            lambda symbol: self._prices.close_on(symbol, day),
+            lambda symbol: prices.close_on(symbol, day),
             lambda currency: self._fx_rates.rate_on(currency, wallet.currency, day),
             f" on or before {day.isoformat()}",
         )
@@ -103,9 +106,10 @@ class Valuation:
         # Each day's state in one pass over the operations, rather than rebuilding the wallet for every day.
         states = wallet.states_at([_end_of(day) for day in days])
         closes: dict[str, dict[date, Quote]] = {}
+        prices = self._market_data.for_user(wallet.owner_id).prices
         for symbol in sorted({symbol for state in states for symbol in state.holdings}):
             try:
-                closes[symbol] = self._prices.closes_between(symbol, start, end)
+                closes[symbol] = prices.closes_between(symbol, start, end)
             except PriceDataUnavailableError as error:
                 raise PriceUnavailableError(f"could not fetch the price of {symbol} right now; try again later") from error
         # Symbols market data has no prices for at all (e.g. listings it does not cover) are valued at the price of the

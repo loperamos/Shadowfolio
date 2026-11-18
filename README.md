@@ -48,7 +48,7 @@ Signing in for the first time makes an account, on the free plan: 3 wallets, 20 
 
 ## Your own market-data keys
 
-Each user saves their own Alpaca and Finnhub keys in Settings, so data fetched with a key is only shown to its owner. They are stored encrypted with `SHADOWFOLIO_KEYS_SECRET` (see `.env.example` to make one). The nightly backups hold the keys only encrypted; keep a copy of that master key apart from them, as without it the saved keys cannot be read.
+Each user saves their own Alpaca and Finnhub keys in Settings, so data fetched with a key is only shown to its owner: each user's prices, dividends, splits and news come from their own Alpaca key (their past closes cached apart from everyone else's), and the daily jobs use each wallet's owner's. Admins without a key of their own use the server's (`ALPACA_API_KEY_ID`); anyone else is asked to connect one. They are stored encrypted with `SHADOWFOLIO_KEYS_SECRET` (see `.env.example` to make one). The nightly backups hold the keys only encrypted; keep a copy of that master key apart from them, as without it the saved keys cannot be read.
 
 ## Self-hosting (Docker)
 

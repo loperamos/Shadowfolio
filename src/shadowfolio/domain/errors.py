@@ -119,3 +119,7 @@ class RateLimitError(PlanLimitError):
 
 class InvalidProviderKeyError(DomainError):
     """A market-data provider's key is missing a part it needs, or has one it does not take."""
+
+
+class MissingDataKeyError(DomainError):
+    """The user has not connected the key a market-data provider needs (in Settings)."""

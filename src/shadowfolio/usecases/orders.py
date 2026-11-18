@@ -14,6 +14,7 @@ from shadowfolio.domain.errors import (
     FxRateUnavailableError,
     InsufficientCashError,
     InsufficientSharesError,
+    MissingDataKeyError,
     PlanLimitError,
     PriceUnavailableError,
     RuleBrokenError,
@@ -25,6 +26,7 @@ from shadowfolio.domain.valuation import Quote, order_amount, order_price, reser
 from shadowfolio.domain.wallet import Wallet
 from shadowfolio.ports.clock import Clock
 from shadowfolio.ports.fx_rates import FxRates, FxRatesUnavailableError
+from shadowfolio.ports.market_data import MarketDataSource
 from shadowfolio.ports.price_data import PriceData, PriceDataUnavailableError
 from shadowfolio.ports.wallet_repository import WalletRepository
 from shadowfolio.usecases.comparison import DEFAULT_BENCHMARK
@@ -75,16 +77,16 @@ class FillSummary:
 
 class Orders:
     def __init__(
-        self, repo: WalletRepository, clock: Clock, prices: PriceData, fx_rates: FxRates, changes: WalletChanges, users: Users
+        self, repo: WalletRepository, clock: Clock, market_data: MarketDataSource, fx_rates: FxRates, changes: WalletChanges, users: Users
     ) -> None:
         self._repo = repo
         self._users = users
         self._clock = clock
-        self._prices = prices
+        self._market_data = market_data
         self._fx_rates = fx_rates
         self._changes = changes
         # The wallet's value now, for its rules.
-        self._valuation = Valuation(repo, clock, prices, fx_rates)
+        self._valuation = Valuation(repo, clock, market_data, fx_rates)
 
     def estimate(
         self, wallet_id: UUID, side: OrderSide, symbol: str, quantity: Decimal, limit_price: Decimal | None = None
@@ -188,7 +190,7 @@ class Orders:
     def _latest(self, wallet: Wallet, symbol: str) -> tuple[Quote, FxRate | None]:
         """The symbol's latest price, and the latest rate into the wallet's currency (None when the same)."""
         try:
-            quote = self._prices.latest_prices([symbol]).get(symbol)
+            quote = self._market_data.for_user(wallet.owner_id).prices.latest_prices([symbol]).get(symbol)
         except PriceDataUnavailableError as error:
             raise PriceUnavailableError(f"could not fetch the price of {symbol} right now; try again later") from error
         if quote is None:
@@ -242,9 +244,10 @@ class Orders:
         trades = {op.id: op.trade for op in wallet.operations if isinstance(op, Buy | Sell)}
         filled = [order for order in wallet.orders if order.status is OrderStatus.FILLED and order.id in trades]
         symbols = sorted({order.symbol for order in filled} | {benchmark})
+        prices = self._market_data.for_user(wallet.owner_id).prices
         try:
-            latest = self._prices.latest_prices(symbols) if filled else {}
-            benchmark_then = {order.id: self._prices.price_at(benchmark, order.closed_at) for order in filled if order.closed_at}
+            latest = prices.latest_prices(symbols) if filled else {}
+            benchmark_then = {order.id: prices.price_at(benchmark, order.closed_at) for order in filled if order.closed_at}
         except PriceDataUnavailableError as error:
             raise PriceUnavailableError(f"could not fetch the prices of {', '.join(symbols)} right now; try again later") from error
         benchmark_now = latest.get(benchmark)
@@ -284,12 +287,20 @@ class Orders:
 
     def _fill_due(self, wallet: Wallet) -> tuple[Wallet, int]:
         """Fill each open order whose first price after it is known by now, or reject it when the wallet cannot cover
-        it then; save the wallet if anything changed. Returns it and how many orders filled."""
+        it then; save the wallet if anything changed. Returns it and how many orders filled: none while its owner has no
+        market-data key to price them with."""
         now = self._clock.now()
         updated, filled = wallet, 0
-        for order in (order for order in wallet.orders if order.is_open):
+        open_orders = [order for order in wallet.orders if order.is_open]
+        if not open_orders:
+            return wallet, 0
+        try:
+            prices = self._market_data.for_user(wallet.owner_id).prices
+        except MissingDataKeyError:
+            return wallet, 0
+        for order in open_orders:
             try:
-                quote = self._fill_price(order, now)
+                quote = self._fill_price(prices, order, now)
             except PriceDataUnavailableError:
                 continue  # try again later
             if quote is None:
@@ -307,13 +318,13 @@ class Orders:
             self._repo.update(updated)
         return updated, filled
 
-    def _fill_price(self, order: Order, now: datetime) -> Quote | None:
+    def _fill_price(self, prices: PriceData, order: Order, now: datetime) -> Quote | None:
         """The price and time an open order fills at, by now; None while it cannot yet."""
         if order.limit_price is None:
-            quote = self._prices.price_at(order.symbol, order.placed_at)
+            quote = prices.price_at(order.symbol, order.placed_at)
             return quote if quote is not None and quote.as_of <= now else None
         # Bars starting at or after the order, so never one already under way when it was placed.
-        for bar in self._prices.minute_bars(order.symbol, order.placed_at, now):
+        for bar in prices.minute_bars(order.symbol, order.placed_at, now):
             price = order.fill_price(bar)
             if price is not None:
                 return Quote(price, bar.currency, bar.as_of)

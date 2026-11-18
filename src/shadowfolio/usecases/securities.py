@@ -13,6 +13,7 @@ from shadowfolio.domain.errors import (
     CorporateActionsUnavailableNowError,
     DomainError,
     EarningsCalendarUnavailableNowError,
+    MissingDataKeyError,
     NewsUnavailableNowError,
 )
 from shadowfolio.domain.news import Article
@@ -20,10 +21,11 @@ from shadowfolio.domain.statistics import average_daily_value, average_daily_vol
 from shadowfolio.domain.valuation import Quote
 from shadowfolio.ports.clock import Clock
 from shadowfolio.ports.company_data import CompanyData, CompanyDataUnavailableError
-from shadowfolio.ports.corporate_actions import CorporateActions, CorporateActionsUnavailableError
+from shadowfolio.ports.corporate_actions import CorporateActionsUnavailableError
 from shadowfolio.ports.earnings_calendar import EarningsCalendar, EarningsCalendarUnavailableError
-from shadowfolio.ports.news import News, NewsUnavailableError
-from shadowfolio.ports.price_data import PriceData, PriceDataUnavailableError
+from shadowfolio.ports.market_data import MarketDataSource
+from shadowfolio.ports.news import NewsUnavailableError
+from shadowfolio.ports.price_data import PriceDataUnavailableError
 from shadowfolio.usecases.market import Market
 
 
@@ -105,24 +107,17 @@ class SecurityRanges:
 
 class Securities:
     def __init__(
-        self,
-        company_data: CompanyData,
-        prices: PriceData,
-        news: News,
-        market: Market,
-        corporate_actions: CorporateActions,
-        earnings_calendar: EarningsCalendar,
-        clock: Clock,
+        self, company_data: CompanyData, market_data: MarketDataSource, market: Market, earnings_calendar: EarningsCalendar, clock: Clock
     ) -> None:
+        """Prices, dividends and news come from the market data of the user who is looking; company data is the same
+        for everyone (public filings)."""
         self._company_data = company_data
-        self._prices = prices
-        self._news = news
+        self._market_data = market_data
         self._market = market
-        self._corporate_actions = corporate_actions
         self._earnings_calendar = earnings_calendar
         self._clock = clock
 
-    def summary(self, symbol: str, start: date | None = None, end: date | None = None) -> SecuritySummary:
+    def summary(self, user_id: str, symbol: str, start: date | None = None, end: date | None = None) -> SecuritySummary:
         """The latest price, the fundamentals' ratios, the dividends, the trend and risk from `start` to `end`, and the
         next earnings date: each part as its own use case gives it, or None with the reason it could not be fetched."""
         unavailable: list[str] = []
@@ -135,13 +130,16 @@ class Securities:
                 return None
 
         try:
-            price = self._prices.latest_price(symbol)
+            price = self._market_data.for_user(user_id).prices.latest_price(symbol)
         except PriceDataUnavailableError:
             price = None
             unavailable.append(f"could not fetch the price of {symbol} right now; try again later")
-        figures = fetched(lambda: self.fundamentals(symbol))
-        dividends = fetched(lambda: self.dividends(symbol))
-        statistics = fetched(lambda: self.statistics(symbol, start, end))
+        except MissingDataKeyError as error:
+            price = None
+            unavailable.append(str(error))
+        figures = fetched(lambda: self.fundamentals(user_id, symbol))
+        dividends = fetched(lambda: self.dividends(user_id, symbol))
+        statistics = fetched(lambda: self.statistics(user_id, symbol, start, end))
         upcoming = fetched(lambda: self.next_earnings(symbol))
         return SecuritySummary(symbol, price, figures, dividends, statistics, upcoming, tuple(unavailable))
 
@@ -154,15 +152,15 @@ class Securities:
             raise EarningsCalendarUnavailableNowError(f"could not fetch when {symbol} reports next right now: {error}") from error
         return found[0] if found else None
 
-    def statistics(self, symbol: str, start: date | None = None, end: date | None = None) -> SecurityStatistics:
+    def statistics(self, user_id: str, symbol: str, start: date | None = None, end: date | None = None) -> SecurityStatistics:
         """The trend over the last 3, 6 and 12 months, and from `start` to `end` (as for its closes) the volatility, the
         deepest fall, the beta against the benchmark and how much trades on an average day (see domain.statistics)."""
         today = self._clock.now().date()
-        quotes = self._market.closes(symbol, start, end)
+        quotes = self._market.closes(user_id, symbol, start, end)
         closes = _days(quotes)
         traded = [(quote.price, quote.volume) for quote in quotes if quote.volume is not None]
-        benchmark = _days(self._market.closes(BETA_BENCHMARK, start, end))
-        recent = _days(self._market.closes(symbol, today - TREND_HISTORY, today))
+        benchmark = _days(self._market.closes(user_id, BETA_BENCHMARK, start, end))
+        recent = _days(self._market.closes(user_id, symbol, today - TREND_HISTORY, today))
         return SecurityStatistics(
             three_months=change_since(recent, today - THREE_MONTHS),
             six_months=change_since(recent, today - SIX_MONTHS),
@@ -175,26 +173,27 @@ class Securities:
             average_daily_value=average_daily_value(traded),
         )
 
-    def dividends(self, symbol: str) -> Dividends:
+    def dividends(self, user_id: str, symbol: str) -> Dividends:
         """The next dividend announced whose ex-date is still ahead (from today on; shares held before it starts
         receive it), and those whose ex-date was in the last year, with their yield at the latest price."""
         today = self._clock.now().date()
+        data = self._market_data.for_user(user_id)
         try:
-            found = self._corporate_actions.dividends(symbol, today - ONE_YEAR - PAYMENT_LAG, today + DIVIDENDS_AHEAD)
+            found = data.corporate_actions.dividends(symbol, today - ONE_YEAR - PAYMENT_LAG, today + DIVIDENDS_AHEAD)
         except CorporateActionsUnavailableError as error:
             raise CorporateActionsUnavailableNowError(f"could not fetch {symbol}'s dividends right now; try again later") from error
         upcoming = min((d for d in found if d.ex_date >= today), key=lambda dividend: dividend.ex_date, default=None)
         last_year = sum((d.per_share for d in found if today - ONE_YEAR < d.ex_date <= today), Decimal(0))
         try:
-            quote = self._prices.latest_price(symbol)
+            quote = data.prices.latest_price(symbol)
         except PriceDataUnavailableError:
             quote = None  # the dividends stand without it
         return Dividends(upcoming, last_year, last_year / quote.price if quote is not None and quote.price else None)
 
-    def ranges(self, symbol: str, start: date | None = None, end: date | None = None) -> SecurityRanges:
+    def ranges(self, user_id: str, symbol: str, start: date | None = None, end: date | None = None) -> SecurityRanges:
         """The price's and the P/E's lowest, highest and latest values from `start` to `end` (as for its closes). The
         P/E is left out when the company's fundamentals are not available (or cannot be fetched now)."""
-        closes = [(close.as_of.date(), close.price) for close in self._market.closes(symbol, start, end)]
+        closes = [(close.as_of.date(), close.price) for close in self._market.closes(user_id, symbol, start, end)]
         try:
             fundamentals = self._company_data.fundamentals(symbol)
         except CompanyDataUnavailableError:
@@ -202,14 +201,15 @@ class Securities:
         pe = None if fundamentals is None else ValueRange.of(pe_by_day(closes, fundamentals.years))
         return SecurityRanges(ValueRange.of(closes), pe)
 
-    def news(self, symbol: str) -> list[Article]:
+    def news(self, user_id: str, symbol: str) -> list[Article]:
         """The latest articles about the symbol, newest first."""
+        news = self._market_data.for_user(user_id).news
         try:
-            return self._news.latest(symbol, NEWS_LIMIT)
+            return news.latest(symbol, NEWS_LIMIT)
         except NewsUnavailableError as error:
             raise NewsUnavailableNowError(f"could not fetch the news about {symbol} right now: {error}") from error
 
-    def fundamentals(self, symbol: str) -> CompanyFigures | None:
+    def fundamentals(self, user_id: str, symbol: str) -> CompanyFigures | None:
         """The company's reported results, with its P/E, market cap, price to sales and free cash flow yield at the latest
         price. None if the provider has
         no fundamentals for the symbol; the ratios are None when there is no price (or it cannot be fetched now)."""
@@ -220,8 +220,8 @@ class Securities:
         if fundamentals is None:
             return None
         try:
-            quote = self._prices.latest_price(symbol)
-        except PriceDataUnavailableError:
+            quote = self._market_data.for_user(user_id).prices.latest_price(symbol)
+        except (PriceDataUnavailableError, MissingDataKeyError):
             quote = None  # the reported figures stand without it
         if quote is None or quote.currency is not fundamentals.currency:
             return CompanyFigures(fundamentals, quote, None, None, None, None)

@@ -6,16 +6,17 @@ from fastapi import APIRouter, Depends, Request
 
 from shadowfolio.interfaces.web.errors import FORBIDDEN, NOT_FOUND, not_allowed, user_not_found
 from shadowfolio.interfaces.web.schemas import SetTierRequest, UserResponse
+from shadowfolio.usecases.provider_keys import ProviderKeys
 from shadowfolio.usecases.users import NotAllowedError, Users
 
 
-def users_router(users: Users, current_user: Callable[[Request], str]) -> APIRouter:
+def users_router(users: Users, provider_keys: ProviderKeys, current_user: Callable[[Request], str]) -> APIRouter:
     router = APIRouter()
 
     @router.get("/me")
     def get_me(user_id: str = Depends(current_user)) -> UserResponse:
-        """The signed-in user: their tier, and what their plan allows."""
-        return UserResponse.from_user(users.user(user_id))
+        """The signed-in user: their tier, what their plan allows, and the market-data keys they still need to connect."""
+        return UserResponse.from_user(users.user(user_id), provider_keys.missing(user_id))
 
     @router.get("/users", responses=FORBIDDEN)
     def list_users(user_id: str = Depends(current_user)) -> list[UserResponse]:

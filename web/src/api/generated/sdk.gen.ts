@@ -28,7 +28,7 @@ export const signInSettings = <ThrowOnError extends boolean = false>(options?: O
 /**
  * Get Me
  *
- * The signed-in user: their tier, and what their plan allows.
+ * The signed-in user: their tier, what their plan allows, and the market-data keys they still need to connect.
  */
 export const getMe = <ThrowOnError extends boolean = false>(options?: Options<GetMeData, ThrowOnError>): RequestResult<GetMeResponses, unknown, ThrowOnError> => (options?.client ?? client).get<GetMeResponses, unknown, ThrowOnError>({ url: '/api/me', ...options });
 

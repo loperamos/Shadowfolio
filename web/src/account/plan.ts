@@ -3,10 +3,11 @@ import { useEffect, useState } from "react";
 import { getMe, type UserResponse } from "../api/generated";
 
 /**
- * The signed-in user, with their tier and what their plan allows; null while loading or if it could not load (the
- * backend still refuses what the plan does not allow, with the reason).
+ * The signed-in user, with their tier, what their plan allows and the keys they still need; null while loading or if it
+ * could not load (the backend still refuses what the plan does not allow, with the reason). Change `refreshKey` to load
+ * it again.
  */
-export function useMe(): UserResponse | null {
+export function useMe(refreshKey: unknown = null): UserResponse | null {
   const [me, setMe] = useState<UserResponse | null>(null);
 
   useEffect(() => {
@@ -17,7 +18,7 @@ export function useMe(): UserResponse | null {
     return () => {
       current = false;
     };
-  }, []);
+  }, [refreshKey]);
 
   return me;
 }

@@ -16,14 +16,18 @@ from shadowfolio.adapters.ecb_fx_rates import EcbFxRates
 from shadowfolio.adapters.finnhub_earnings_calendar import FinnhubEarningsCalendar
 from shadowfolio.adapters.fixed_identity import FixedIdentity
 from shadowfolio.adapters.openfigi_security_lookup import OpenFigiSecurityLookup
+from shadowfolio.adapters.own_key_market_data import OwnKeyMarketData
 from shadowfolio.adapters.sec_edgar_company_data import SecEdgarCompanyData
 from shadowfolio.adapters.sqlite_access_token_repository import SqliteAccessTokenRepository
 from shadowfolio.adapters.sqlite_provider_key_repository import SqliteProviderKeyRepository
 from shadowfolio.adapters.sqlite_user_repository import SqliteUserRepository
 from shadowfolio.adapters.sqlite_wallet_repository import SqliteWalletRepository
 from shadowfolio.adapters.system_clock import SystemClock
+from shadowfolio.domain.provider_keys import ProviderKey
 from shadowfolio.interfaces.web.app import create_app
 from shadowfolio.interfaces.web.auth import SignInSettings
+from shadowfolio.ports.clock import Clock
+from shadowfolio.ports.market_data import MarketData
 from shadowfolio.usecases.access_tokens import AccessTokens
 from shadowfolio.usecases.comparison import Comparison
 from shadowfolio.usecases.history import History
@@ -42,8 +46,10 @@ from shadowfolio.usecases.wallets import UNOWNED, Wallets
 # copies of what the providers answered: deleting it loses nothing.
 MARKET_CACHE_FILE = "market-cache.db"
 # What each provider's data is kept under in that file, so data from one plan or feed never answers for another.
-# Closes are cached under the feed they come from, so ones from another feed are fetched again rather than mixed.
+# Closes are cached under the feed they come from, so ones from another feed are fetched again rather than mixed; and
+# those fetched with a user's own key under that user too, so they are only ever shown to them.
 PRICE_SOURCE = f"alpaca/{DAILY_FEED}"
+OWN_KEY_SOURCE = PRICE_SOURCE + "/user/{user_id}"
 FX_SOURCE = "ecb"
 
 # The sign-in provider, as the frontend is told: Auth0, or a fixed user (acting as one, for screenshots).
@@ -77,12 +83,19 @@ def build_local_app(config: LocalConfig, acting_as: str | None = None) -> FastAP
     clock = SystemClock()
     wallet_repository = SqliteWalletRepository(config.db_path)
     market_cache = config.db_path.parent / MARKET_CACHE_FILE
-    prices = CachedPriceData(AlpacaPriceData(config.alpaca, clock), PRICE_SOURCE, market_cache, clock)
     fx_rates = CachedFxRates(EcbFxRates(clock), FX_SOURCE, market_cache, clock)
-    corporate_actions = AlpacaCorporateActions(config.alpaca)
-    sync = Sync(wallet_repository, clock, corporate_actions, fx_rates)
-    market = Market(prices, clock, corporate_actions)
     users = Users(SqliteUserRepository(config.db_path), clock, config.admins)
+    keys = SqliteProviderKeyRepository(config.db_path, config.keys_secret)
+    # Each user's market data comes from their own Alpaca key; admins without one use the server's (development plan).
+    server = _alpaca(config.alpaca, PRICE_SOURCE, market_cache, clock)
+
+    def with_own_key(user_id: str, key: ProviderKey) -> MarketData:
+        own = AlpacaConfig(key_id=key.key_id or "", secret_key=key.secret)
+        return _alpaca(own, OWN_KEY_SOURCE.format(user_id=user_id), market_cache, clock)
+
+    market_data = OwnKeyMarketData(keys, with_own_key, server, lambda user_id: users.user(user_id).uses_server_keys)
+    sync = Sync(wallet_repository, clock, market_data, fx_rates)
+    market = Market(market_data, clock)
     wallets = Wallets(wallet_repository, clock, users)
     access_tokens = AccessTokens(SqliteAccessTokenRepository(config.db_path), wallet_repository, clock, users)
     if config.existing_wallets_owner:
@@ -91,26 +104,22 @@ def build_local_app(config: LocalConfig, acting_as: str | None = None) -> FastAP
         access_tokens.hand_over(UNOWNED, config.existing_wallets_owner)
     return create_app(
         wallets=wallets,
-        history=History(wallet_repository, clock, prices, fx_rates, sync),
-        valuation=Valuation(wallet_repository, clock, prices, fx_rates),
-        comparison=Comparison(wallet_repository, clock, prices, fx_rates, corporate_actions),
-        orders=Orders(wallet_repository, clock, prices, fx_rates, WalletChanges(clock, prices, fx_rates, sync), users),
+        history=History(wallet_repository, clock, market_data, fx_rates, sync),
+        valuation=Valuation(wallet_repository, clock, market_data, fx_rates),
+        comparison=Comparison(wallet_repository, clock, market_data, fx_rates),
+        orders=Orders(wallet_repository, clock, market_data, fx_rates, WalletChanges(clock, market_data, fx_rates, sync), users),
         securities=Securities(
-            SecEdgarCompanyData(config.edgar_contact, clock),
-            prices,
-            AlpacaNews(config.alpaca),
-            market,
-            corporate_actions,
-            FinnhubEarningsCalendar(config.finnhub_key, clock),
-            clock,
+            SecEdgarCompanyData(config.edgar_contact, clock), market_data, market, FinnhubEarningsCalendar(config.finnhub_key, clock), clock
         ),
         market=market,
         sync=sync,
-        imports=Imports(wallet_repository, WalletChanges(clock, prices, fx_rates, sync), OpenFigiSecurityLookup(), DegiroStatementReader()),
+        imports=Imports(
+            wallet_repository, WalletChanges(clock, market_data, fx_rates, sync), OpenFigiSecurityLookup(), DegiroStatementReader()
+        ),
         mcp_allowed_hosts=config.mcp_allowed_hosts,
         access_tokens=access_tokens,
         users=users,
-        provider_keys=ProviderKeys(SqliteProviderKeyRepository(config.db_path, config.keys_secret), clock),
+        provider_keys=ProviderKeys(keys, clock, users),
         identity=Auth0Identity(config.auth0_domain, config.auth0_audience, clock) if acting_as is None else FixedIdentity(acting_as),
         sign_in=_sign_in(config) if acting_as is None else SignInSettings(provider=FIXED, user_id=acting_as),
         web_dir=config.web_dir,
@@ -118,6 +127,12 @@ def build_local_app(config: LocalConfig, acting_as: str | None = None) -> FastAP
         run_jobs=config.run_jobs,
         job_token=config.job_token,
     )
+
+
+def _alpaca(config: AlpacaConfig, price_source: str, market_cache: Path, clock: Clock) -> MarketData:
+    """Market data from Alpaca with one key: its daily closes cached under `price_source`."""
+    prices = CachedPriceData(AlpacaPriceData(config, clock), price_source, market_cache, clock)
+    return MarketData(prices, AlpacaCorporateActions(config), AlpacaNews(config))
 
 
 def _sign_in(config: LocalConfig) -> SignInSettings | None:

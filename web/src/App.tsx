@@ -1,6 +1,7 @@
 import { Anchor, Container, Stack, Text, Title } from "@mantine/core";
 import { Link, Route, Routes } from "react-router";
 
+import { MissingKeysNotice } from "./account/MissingKeysNotice";
 import { AppHeader } from "./AppHeader";
 import { AgentAccessPage } from "./agents/AgentAccessPage";
 import { AGENTS_PATH, COMPARE_PATH, SECURITIES_COMPARE_PATH, SECURITY_PATH, SETTINGS_PATH, WALLET_PATH, WALLETS_PATH } from "./routes";
@@ -15,6 +16,7 @@ export function App() {
   return (
     <Container size="xl" py="xl">
       <AppHeader />
+      <MissingKeysNotice />
       <Routes>
         <Route path={WALLETS_PATH} element={<WalletsPage />} />
         <Route path={WALLET_PATH} element={<WalletPage />} />

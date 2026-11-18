@@ -13,16 +13,16 @@ from shadowfolio.domain.money import Currency
 from shadowfolio.domain.wallet import Wallet
 from shadowfolio.ports.clock import Clock
 from shadowfolio.ports.fx_rates import FxRates
-from shadowfolio.ports.price_data import PriceData
+from shadowfolio.ports.market_data import MarketDataSource
 from shadowfolio.ports.wallet_repository import WalletRepository
 from shadowfolio.usecases.sync import Sync
 from shadowfolio.usecases.wallet_changes import WalletChanges
 
 
 class History:
-    def __init__(self, repo: WalletRepository, clock: Clock, prices: PriceData, fx_rates: FxRates, sync: Sync) -> None:
+    def __init__(self, repo: WalletRepository, clock: Clock, market_data: MarketDataSource, fx_rates: FxRates, sync: Sync) -> None:
         self._repo = repo
-        self._changes = WalletChanges(clock, prices, fx_rates, sync)
+        self._changes = WalletChanges(clock, market_data, fx_rates, sync)
 
     # Every recording method can instead replace an existing operation (`replacing=<its id>`), keeping its id.
 
