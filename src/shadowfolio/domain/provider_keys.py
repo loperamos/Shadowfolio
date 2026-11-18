@@ -27,6 +27,14 @@ NAMES = {DataProvider.ALPACA: "Alpaca", DataProvider.FINNHUB: "Finnhub"}
 
 
 @dataclass(frozen=True)
+class KeyCheck:
+    """Whether a saved key works with its provider, in words for its owner."""
+
+    works: bool
+    message: str
+
+
+@dataclass(frozen=True)
 class ProviderKey:
     owner_id: str
     provider: DataProvider

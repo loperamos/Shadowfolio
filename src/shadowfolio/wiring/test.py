@@ -14,6 +14,7 @@ from shadowfolio.adapters.in_memory_corporate_actions import InMemoryCorporateAc
 from shadowfolio.adapters.in_memory_earnings_calendar import InMemoryEarningsCalendar
 from shadowfolio.adapters.in_memory_fx_rates import InMemoryFxRates
 from shadowfolio.adapters.in_memory_identity import InMemoryIdentity
+from shadowfolio.adapters.in_memory_key_checker import InMemoryKeyChecker
 from shadowfolio.adapters.in_memory_news import InMemoryNews
 from shadowfolio.adapters.in_memory_price_data import InMemoryPriceData
 from shadowfolio.adapters.in_memory_provider_key_repository import InMemoryProviderKeyRepository
@@ -76,6 +77,7 @@ def build_test_app(
     admins: Sequence[str] = (TEST_USER,),
     own_keys: Callable[[str, ProviderKey], MarketData] | None = None,
     own_earnings: Callable[[ProviderKey], EarningsCalendar] | None = None,
+    key_checker: InMemoryKeyChecker | None = None,
 ) -> FastAPI:
     """Pass fakes to control them (or to prepare stored data); otherwise "now" is DEFAULT_NOW, storage is empty and there
     are no prices, rates or corporate actions. TEST_USER is an admin, so tests not about plans meet no plan's limits.
@@ -122,7 +124,7 @@ def build_test_app(
         mcp_allowed_hosts=mcp_allowed_hosts,
         access_tokens=AccessTokens(InMemoryAccessTokenRepository(), wallet_repository, clock, users),
         users=users,
-        provider_keys=ProviderKeys(keys, clock, users),
+        provider_keys=ProviderKeys(keys, clock, users, key_checker or InMemoryKeyChecker()),
         identity=identity or InMemoryIdentity({}, anonymous=TEST_USER),
         sign_in=sign_in,
         web_dir=web_dir,

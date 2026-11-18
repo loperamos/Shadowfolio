@@ -1,14 +1,16 @@
 """Use cases for a user's own market-data keys: saving, listing and removing them."""
 
-from shadowfolio.domain.provider_keys import NEEDED, DataProvider, ProviderKey
+from shadowfolio.domain.provider_keys import NAMES, NEEDED, DataProvider, KeyCheck, ProviderKey
 from shadowfolio.ports.clock import Clock
+from shadowfolio.ports.key_checker import KeyChecker
 from shadowfolio.ports.provider_key_repository import ProviderKeyRepository
 from shadowfolio.usecases.users import Users
 
 
 class ProviderKeys:
-    def __init__(self, repo: ProviderKeyRepository, clock: Clock, users: Users) -> None:
+    def __init__(self, repo: ProviderKeyRepository, clock: Clock, users: Users, checker: KeyChecker) -> None:
         self._repo = repo
+        self._checker = checker
         self._clock = clock
         self._users = users
 
@@ -27,6 +29,14 @@ class ProviderKeys:
 
     def list(self, owner_id: str) -> list[ProviderKey]:
         return self._repo.list_by_owner(owner_id)
+
+    def test(self, owner_id: str, provider: DataProvider) -> KeyCheck | None:
+        """Whether the owner's saved key for the provider works, asking the provider; None if they saved none."""
+        key = self._repo.get(owner_id, provider)
+        if key is None:
+            return None
+        reason = self._checker.check(key)
+        return KeyCheck(True, f"{NAMES[provider]} answered with this key.") if reason is None else KeyCheck(False, reason)
 
     def delete(self, owner_id: str, provider: DataProvider) -> bool:
         """Forget the owner's key for the provider; False if they had none."""
