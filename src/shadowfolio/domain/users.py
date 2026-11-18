@@ -28,14 +28,15 @@ class Limits:
     orders_per_day: int | None  # orders placed in a day (UTC) across their wallets, by them or their agents
     access_tokens: int | None  # agent tokens at once, not counting revoked ones
     requests_per_minute: int | None  # to the web API and the MCP server together
+    imports_per_day: int | None  # broker statements imported (saved, not previewed) in a day (UTC)
 
 
-NO_LIMITS = Limits(wallets=None, orders_per_day=None, access_tokens=None, requests_per_minute=None)
+NO_LIMITS = Limits(wallets=None, orders_per_day=None, access_tokens=None, requests_per_minute=None, imports_per_day=None)
 TIER_LIMITS: Mapping[Tier, Limits] = MappingProxyType(
     {
         Tier.ADMIN: NO_LIMITS,
-        Tier.MEMBER: Limits(wallets=10, orders_per_day=100, access_tokens=10, requests_per_minute=600),
-        Tier.FREE: Limits(wallets=3, orders_per_day=20, access_tokens=2, requests_per_minute=120),
+        Tier.MEMBER: Limits(wallets=10, orders_per_day=100, access_tokens=10, requests_per_minute=600, imports_per_day=20),
+        Tier.FREE: Limits(wallets=3, orders_per_day=20, access_tokens=2, requests_per_minute=120, imports_per_day=5),
     }
 )
 
@@ -76,6 +77,13 @@ class User:
         allowed = self.limits.access_tokens
         if allowed is not None and active >= allowed:
             raise PlanLimitError(f"your plan allows {allowed} agent tokens at once; revoke one to make another")
+
+    def check_new_import(self, imported_today: int) -> None:
+        """Raise PlanLimitError if the user, having imported `imported_today` statements today (UTC), may not import
+        another."""
+        allowed = self.limits.imports_per_day
+        if allowed is not None and imported_today >= allowed:
+            raise PlanLimitError(f"your plan allows {allowed} imports a day; import more tomorrow (UTC)")
 
     def check_request(self, made: int, window_ends: datetime, now: datetime) -> None:
         """Raise RateLimitError if the user, having made `made` requests in the window ending at `window_ends`, may

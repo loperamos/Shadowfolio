@@ -36,6 +36,14 @@ class Usage:
         if now - self._saved_at >= SAVE_EVERY:
             self.save()
 
+    def today(self, user_id: str, counter: Counter) -> int:
+        """How many of `counter` the user has used today (UTC), from any source, saved or not yet."""
+        day = self._clock.now().date()
+        with self._lock:
+            pending = sum(n for key, n in self._pending.items() if (key.day, key.user_id, key.counter) == (day, user_id, counter))
+        saved = sum(c.count for c in self._repo.between(day, day) if (c.key.user_id, c.key.counter) == (user_id, counter))
+        return pending + saved
+
     def recorder(self, user_id: str, source: str) -> RecordUsage:
         """What records counts for the user and source, e.g. for a provider's adapter built for them."""
         return lambda counter, n: self.record(user_id, source, counter, n)

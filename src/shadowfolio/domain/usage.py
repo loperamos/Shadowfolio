@@ -13,10 +13,13 @@ class Counter(StrEnum):
     ERRORS = "errors"  # calls to a provider refused (an error status) or never answered
     CACHE_HITS = "cache_hits"  # price lookups answered from the cache
     CACHE_MISSES = "cache_misses"  # price lookups that had to ask the provider
+    IMPORTS = "imports"  # broker statements imported (saved)
 
 
 # Where requests to Shadowfolio come from; calls to a provider are counted under its name (e.g. "alpaca").
 WEB, MCP = "web", "mcp"
+# Where imports are counted from.
+IMPORT = "import"
 # Who calls made with the server's own keys (admins without keys of their own) are counted under.
 SERVER_KEYS = "server keys"
 

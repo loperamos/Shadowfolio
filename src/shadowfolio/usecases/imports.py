@@ -13,10 +13,13 @@ from uuid import UUID
 from shadowfolio.domain.errors import DomainError, UnsupportedStatementFormatError
 from shadowfolio.domain.imports import ImportKind, ImportRecord, TradeDetails
 from shadowfolio.domain.money import Currency
+from shadowfolio.domain.usage import IMPORT, Counter
 from shadowfolio.domain.wallet import Wallet
 from shadowfolio.ports.security_lookup import SecurityLookup, SecurityLookupUnavailableError
 from shadowfolio.ports.statement_reader import StatementReader, UnsupportedStatementError
 from shadowfolio.ports.wallet_repository import WalletRepository
+from shadowfolio.usecases.usage import Usage
+from shadowfolio.usecases.users import Users
 from shadowfolio.usecases.wallet_changes import WalletChanges
 
 
@@ -65,8 +68,13 @@ SECURITY_KINDS = {
 
 
 class Imports:
-    def __init__(self, repo: WalletRepository, changes: WalletChanges, lookup: SecurityLookup, reader: StatementReader) -> None:
+    def __init__(
+        self, repo: WalletRepository, changes: WalletChanges, lookup: SecurityLookup, reader: StatementReader, users: Users, usage: Usage
+    ) -> None:
+        """Saved imports count against the owner's plan (a number a day), in their usage."""
         self._repo = repo
+        self._users = users
+        self._usage = usage
         self._changes = changes
         self._lookup = lookup
         self._reader = reader
@@ -89,6 +97,9 @@ class Imports:
         wallet = self._repo.get(wallet_id)
         if wallet is None:
             return None
+        owner = wallet.owner_id
+        if save:
+            self._users.user(owner).check_new_import(self._usage.today(owner, Counter.IMPORTS))
         report = ImportReport(records=len(records))
         try:
             tickers = _with_exchanged_identifiers(records, self._lookup.tickers(_securities(records)))
@@ -111,6 +122,7 @@ class Imports:
         if report.imported and save:
             self._repo.update(wallet)
             report.saved = True
+            self._usage.record(owner, IMPORT, Counter.IMPORTS)
         return report
 
     def _apply(self, wallet: Wallet, record: ImportRecord, tickers: Mapping[str, str]) -> tuple[Wallet, str | None]:

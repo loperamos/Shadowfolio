@@ -12,13 +12,20 @@ from fastapi.testclient import TestClient
 from shadowfolio.adapters.fixed_clock import FixedClock
 from shadowfolio.adapters.in_memory_identity import InMemoryIdentity
 from shadowfolio.adapters.in_memory_price_data import InMemoryPriceData
+from shadowfolio.adapters.in_memory_security_lookup import InMemorySecurityLookup
 from shadowfolio.domain.money import Currency
 from shadowfolio.domain.valuation import Quote
 from shadowfolio.wiring.test import build_test_app
 
 NOW = datetime(2026, 3, 2, 15, 0, 20, tzinfo=UTC)  # 20 seconds into a minute
 ADMIN, BEN = "auth0|admin", "auth0|ben"
-FREE_ORDERS_A_DAY, FREE_TOKENS, FREE_REQUESTS_A_MINUTE = 20, 2, 120
+FREE_ORDERS_A_DAY, FREE_TOKENS, FREE_REQUESTS_A_MINUTE, FREE_IMPORTS_A_DAY = 20, 2, 120, 5
+# DEGIRO's export headers, for imports.
+TRANSACTIONS_HEADER = (
+    "Date,Heure,Produit,Code ISIN,Place boursière sectionnée,Lieu d'exécution,Quantité,Cours,,Montant devise locale,,"
+    "Montant EUR,Taux de change,Frais conversion AutoFX,Frais de courtage et/ou de parties,Montant négocié EUR,ID Ordre"
+)
+ACCOUNT_HEADER = "Date,Heure,Date de,Produit,Code ISIN,Description,FX,Mouvements,,Solde,,ID Ordre"
 ACCEPT = {"Accept": "application/json, text/event-stream", "Content-Type": "application/json"}
 
 
@@ -70,6 +77,7 @@ def test_the_plan_says_what_it_allows(http: TestClient) -> None:
         "orders_per_day": FREE_ORDERS_A_DAY,
         "access_tokens": FREE_TOKENS,
         "requests_per_minute": FREE_REQUESTS_A_MINUTE,
+        "imports_per_day": FREE_IMPORTS_A_DAY,
     }
 
 
@@ -135,3 +143,27 @@ def test_an_admin_has_none_of_these_limits(http: TestClient) -> None:
     assert all(order(http, wallet_id, "admin-token").status_code == 201 for _ in range(FREE_ORDERS_A_DAY + 1))
     assert all(token_for(http, wallet_id, token="admin-token").status_code == 201 for _ in range(FREE_TOKENS + 1))
     assert all(http.get("/api/me", headers=as_user("admin-token")).status_code == 200 for _ in range(FREE_REQUESTS_A_MINUTE))
+
+
+def test_a_free_user_saves_as_many_imports_a_day_as_their_plan_allows(clock: FixedClock) -> None:
+    lookup = InMemorySecurityLookup({"US88160R1014": "TSLA"})
+    identity = InMemoryIdentity({"admin-token": ADMIN, "ben-token": BEN})
+    with TestClient(build_test_app(clock=clock, identity=identity, admins=(ADMIN,), security_lookup=lookup)) as http:
+        wallet_id = wallet(http)
+        deposits = [f'{day:02d}-01-2025,10:00,{day:02d}-01-2025,,,Dépôt flatex,,EUR,"10,00",EUR,"10,00",' for day in range(2, 9)]
+
+        def save(n: int) -> Any:
+            body = {"transactions": TRANSACTIONS_HEADER, "account": f"{ACCOUNT_HEADER}\n{deposits[n]}"}
+            return http.post(f"/api/wallets/{wallet_id}/imports/degiro", json=body, headers=as_user("ben-token"))
+
+        preview = {"transactions": TRANSACTIONS_HEADER, "account": f"{ACCOUNT_HEADER}\n{deposits[0]}"}
+        for _ in range(FREE_IMPORTS_A_DAY + 1):  # previews do not count
+            http.post(f"/api/wallets/{wallet_id}/imports/degiro/preview", json=preview, headers=as_user("ben-token"))
+        assert [save(n).status_code for n in range(FREE_IMPORTS_A_DAY)] == [200] * FREE_IMPORTS_A_DAY
+
+        refused = save(FREE_IMPORTS_A_DAY)
+        assert refused.status_code == 422
+        assert refused.json() == {"detail": f"your plan allows {FREE_IMPORTS_A_DAY} imports a day; import more tomorrow (UTC)"}
+
+        clock.set(NOW + timedelta(days=1))
+        assert save(FREE_IMPORTS_A_DAY).status_code == 200

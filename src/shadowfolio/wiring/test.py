@@ -126,6 +126,8 @@ def build_test_app(
             WalletChanges(clock, market_data, fx_rates, sync),
             security_lookup or InMemorySecurityLookup({}),
             DegiroStatementReader(),
+            users,
+            usage,
         ),
         mcp_allowed_hosts=mcp_allowed_hosts,
         access_tokens=AccessTokens(token_repository, wallet_repository, clock, users),
