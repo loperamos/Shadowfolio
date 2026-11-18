@@ -38,6 +38,10 @@ class SqliteUserRepository(UserRepository):
             row = conn.execute(f"SELECT {_COLUMNS} FROM users WHERE id = ?", (user_id,)).fetchone()  # noqa: S608
         return None if row is None else _user(row)
 
+    def delete(self, user_id: str) -> None:
+        with closing(sqlite3.connect(self._path)) as conn, conn:
+            conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+
     def list(self) -> list[User]:
         with closing(sqlite3.connect(self._path)) as conn:
             rows = conn.execute(f"SELECT {_COLUMNS} FROM users ORDER BY rowid").fetchall()  # noqa: S608

@@ -17,3 +17,6 @@ class InMemoryUsageRepository(UsageRepository):
 
     def between(self, start: date, end: date) -> list[UsageCount]:
         return [UsageCount(key, count) for key, count in self._counts.items() if start <= key.day <= end]
+
+    def delete_user(self, user_id: str) -> None:
+        self._counts = {key: count for key, count in self._counts.items() if key.user_id != user_id}

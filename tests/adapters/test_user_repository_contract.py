@@ -41,3 +41,13 @@ def test_users_are_listed_in_the_order_they_were_added(make_repository: Reposito
         make_repository().add(user)
 
     assert make_repository().list() == [first, second]
+
+
+def test_a_deleted_user_is_gone(make_repository: RepositoryFactory) -> None:
+    kept, deleted = User("a", Tier.FREE, NOW), User("b", Tier.FREE, NOW)
+    for user in (kept, deleted):
+        make_repository().add(user)
+
+    make_repository().delete("b")
+
+    assert make_repository().list() == [kept]

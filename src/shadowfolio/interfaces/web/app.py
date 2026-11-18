@@ -32,6 +32,7 @@ from shadowfolio.interfaces.web.wallets import wallets_router
 from shadowfolio.ports.clock import Clock
 from shadowfolio.ports.identity import Identity
 from shadowfolio.usecases.access_tokens import AccessTokens
+from shadowfolio.usecases.accounts import Accounts
 from shadowfolio.usecases.comparison import Comparison
 from shadowfolio.usecases.history import History
 from shadowfolio.usecases.imports import Imports
@@ -61,6 +62,7 @@ def create_app(
     securities: Securities,
     access_tokens: AccessTokens,
     users: Users,
+    accounts: Accounts,
     usage: Usage,
     provider_keys: ProviderKeys,
     identity: Identity,
@@ -104,7 +106,7 @@ def create_app(
     current_user, authorize = sign_in_checks(identity, users, usage, wallets, API_PREFIX)
     api = APIRouter(prefix=API_PREFIX, dependencies=[Depends(authorize)])
     api.include_router(auth_router(sign_in))
-    api.include_router(users_router(users, provider_keys, current_user))
+    api.include_router(users_router(users, accounts, provider_keys, current_user))
     api.include_router(provider_keys_router(provider_keys, current_user))
     api.include_router(usage_router(usage, current_user))
     api.include_router(wallets_router(wallets, current_user))

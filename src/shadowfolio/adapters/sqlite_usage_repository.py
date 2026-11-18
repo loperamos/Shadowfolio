@@ -37,6 +37,10 @@ class SqliteUsageRepository(UsageRepository):
                 rows,
             )
 
+    def delete_user(self, user_id: str) -> None:
+        with closing(sqlite3.connect(self._path)) as conn, conn:
+            conn.execute("DELETE FROM usage WHERE user_id = ?", (user_id,))
+
     def between(self, start: date, end: date) -> list[UsageCount]:
         with closing(sqlite3.connect(self._path)) as conn:
             rows = conn.execute(

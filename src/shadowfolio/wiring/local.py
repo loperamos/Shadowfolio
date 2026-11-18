@@ -35,6 +35,7 @@ from shadowfolio.ports.clock import Clock
 from shadowfolio.ports.earnings_calendar import EarningsCalendar
 from shadowfolio.ports.market_data import MarketData
 from shadowfolio.usecases.access_tokens import AccessTokens
+from shadowfolio.usecases.accounts import Accounts
 from shadowfolio.usecases.comparison import Comparison
 from shadowfolio.usecases.history import History
 from shadowfolio.usecases.imports import Imports
@@ -91,7 +92,8 @@ def build_local_app(config: LocalConfig, acting_as: str | None = None) -> FastAP
     wallet_repository = SqliteWalletRepository(config.db_path)
     market_cache = config.db_path.parent / MARKET_CACHE_FILE
     fx_rates = CachedFxRates(EcbFxRates(clock), FX_SOURCE, market_cache, clock)
-    users = Users(SqliteUserRepository(config.db_path), clock, config.admins)
+    user_repository = SqliteUserRepository(config.db_path)
+    users = Users(user_repository, clock, config.admins)
     keys = SqliteProviderKeyRepository(config.db_path, config.keys_secret)
     usage = Usage(SqliteUsageRepository(config.db_path), clock, users)
     # Each user's market data comes from their own Alpaca and Finnhub keys; admins without them use the server's
@@ -110,7 +112,8 @@ def build_local_app(config: LocalConfig, acting_as: str | None = None) -> FastAP
     sync = Sync(wallet_repository, clock, market_data, fx_rates)
     market = Market(market_data, clock)
     wallets = Wallets(wallet_repository, clock, users)
-    access_tokens = AccessTokens(SqliteAccessTokenRepository(config.db_path), wallet_repository, clock, users)
+    token_repository = SqliteAccessTokenRepository(config.db_path)
+    access_tokens = AccessTokens(token_repository, wallet_repository, clock, users)
     if config.existing_wallets_owner:
         # The wallets made before sign-in, and their agents' tokens, go to their user: once, as none are left after.
         wallets.hand_over(UNOWNED, config.existing_wallets_owner)
@@ -131,6 +134,7 @@ def build_local_app(config: LocalConfig, acting_as: str | None = None) -> FastAP
         access_tokens=access_tokens,
         users=users,
         usage=usage,
+        accounts=Accounts(user_repository, wallet_repository, token_repository, keys, usage),
         provider_keys=ProviderKeys(keys, clock, users, HttpKeyChecker(clock)),
         identity=Auth0Identity(config.auth0_domain, config.auth0_audience, clock) if acting_as is None else FixedIdentity(acting_as),
         sign_in=_sign_in(config) if acting_as is None else SignInSettings(provider=FIXED, user_id=acting_as),

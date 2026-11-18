@@ -6,6 +6,7 @@ import { Link } from "react-router";
 import { WALLETS_PATH } from "../routes";
 import { Logo, Wordmark } from "../ui/Logo";
 import { ICON_SIZE, LANDING_ICON_SIZE, LOGO_HEADER_SIZE, LOGO_HERO_SIZE } from "../ui/theme";
+import { PublicFooter } from "./PublicFooter";
 
 const FEATURES: { icon: ReactNode; title: string; text: string }[] = [
   {
@@ -26,11 +27,17 @@ const FEATURES: { icon: ReactNode; title: string; text: string }[] = [
 ];
 
 const STEPS: { title: string; text: string; code?: string }[] = [
-  { title: "Create a wallet", text: "Start with cash, or import your broker's history to mirror what you already own." },
-  { title: "Set its rules and a token", text: "Choose the limits it trades within, and create a token for the agent: read only, or trading." },
+  {
+    title: "Connect your market data",
+    text: "Sign in, and add the key of a free Alpaca account: your prices come from it, and are only shown to you.",
+  },
+  {
+    title: "Create a wallet and its rules",
+    text: "Start with cash, or import your broker's history to mirror what you already own; then choose the limits it trades within.",
+  },
   {
     title: "Connect your agent",
-    text: "Give it the token, e.g. with Claude Code:",
+    text: "Create a token for it (read only, or trading) and give it to your agent, e.g. with Claude Code:",
     code: 'claude mcp add --transport http \\\n  shadowfolio <this site>/mcp \\\n  --header "Authorization: Bearer <token>"',
   },
 ];
@@ -58,7 +65,7 @@ export function LandingPage() {
           Open the app
         </Button>
         <Text size="sm" c="dimmed">
-          Invite only for now.
+          Free. Sign in with Google.
         </Text>
       </Stack>
 
@@ -99,10 +106,7 @@ export function LandingPage() {
         figure explained, and each company&apos;s results, valuation and trend, side by side.
       </Text>
 
-      <Text size="sm" c="dimmed" ta="center" mt="xl">
-        Shadowfolio simulates: it never connects to a brokerage account or places real orders. Not investment advice.
-        Market data from Alpaca; company filings from SEC EDGAR.
-      </Text>
+      <PublicFooter />
     </Container>
   );
 }

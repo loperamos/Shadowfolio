@@ -7,6 +7,7 @@ import { DataProvider, type KeyCheckResponse, listProviderKeys, type ProviderKey
 import { formatDateTime } from "../ui/format";
 import { ExternalLink } from "../ui/ExternalLink";
 import { PROVIDERS } from "./providers";
+import { DeleteAccountModal } from "./DeleteAccountModal";
 import { RemoveKeyModal } from "./RemoveKeyModal";
 import { SaveKeyModal } from "./SaveKeyModal";
 
@@ -20,6 +21,7 @@ export function SettingsPage() {
   const [toSave, setToSave] = useState<DataProvider | null>(null);
   const [toRemove, setToRemove] = useState<DataProvider | null>(null);
   const [testing, setTesting] = useState<DataProvider | null>(null);
+  const [deletingAccount, setDeletingAccount] = useState(false);
   const [checks, setChecks] = useState<Partial<Record<DataProvider, KeyCheckResponse>>>({});
 
   const load = useCallback(() => {
@@ -108,6 +110,22 @@ export function SettingsPage() {
         })}
       <SaveKeyModal provider={toSave} replacing={toSave !== null && saved(toSave) !== null} onClose={() => setToSave(null)} onSaved={load} />
       <RemoveKeyModal provider={toRemove} onClose={() => setToRemove(null)} onRemoved={load} />
+
+      {/* Last and apart, as GitHub's danger zone: the one action here that cannot be undone. */}
+      <Card withBorder padding="lg" mt="xl">
+        <Group justify="space-between" wrap="nowrap">
+          <div>
+            <Title order={2}>Delete account</Title>
+            <Text c="dimmed" mt="xs">
+              Deletes your wallets, agent tokens and saved keys, for good.
+            </Text>
+          </div>
+          <Button color="red" variant="light" onClick={() => setDeletingAccount(true)}>
+            Delete account
+          </Button>
+        </Group>
+      </Card>
+      <DeleteAccountModal opened={deletingAccount} onClose={() => setDeletingAccount(false)} />
     </Stack>
   );
 }

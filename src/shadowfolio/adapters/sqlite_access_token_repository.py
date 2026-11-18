@@ -67,6 +67,10 @@ class SqliteAccessTokenRepository(AccessTokenRepository):
             rows = conn.execute(f"SELECT {_COLUMNS} FROM access_tokens WHERE owner_id = ? ORDER BY rowid", (owner_id,)).fetchall()
         return [_token(row) for row in rows]
 
+    def delete(self, token_id: UUID) -> None:
+        with closing(sqlite3.connect(self._path)) as conn, conn:
+            conn.execute("DELETE FROM access_tokens WHERE id = ?", (str(token_id),))
+
     def _one(self, condition: str, value: str) -> AccessToken | None:
         with closing(sqlite3.connect(self._path)) as conn:
             row = conn.execute(f"SELECT {_COLUMNS} FROM access_tokens WHERE {condition}", (value,)).fetchone()  # noqa: S608

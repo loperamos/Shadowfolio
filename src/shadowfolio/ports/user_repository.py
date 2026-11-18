@@ -19,3 +19,7 @@ class UserRepository(ABC):
     @abstractmethod
     def list(self) -> list[User]:
         """Every user, in the order they were added."""
+
+    @abstractmethod
+    def delete(self, user_id: str) -> None:
+        """Forget the user; nothing if there is none."""

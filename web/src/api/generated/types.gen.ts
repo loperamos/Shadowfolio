@@ -189,6 +189,22 @@ export type CopyWalletRequest = {
 };
 
 /**
+ * Counter
+ */
+export const Counter = {
+    REQUESTS: 'requests',
+    CALLS: 'calls',
+    ERRORS: 'errors',
+    CACHE_HITS: 'cache_hits',
+    CACHE_MISSES: 'cache_misses'
+} as const;
+
+/**
+ * Counter
+ */
+export type Counter = typeof Counter[keyof typeof Counter];
+
+/**
  * CreateAccessTokenRequest
  */
 export type CreateAccessTokenRequest = {
@@ -1558,6 +1574,31 @@ export type UpdateWalletRequest = {
 };
 
 /**
+ * UsageCountResponse
+ *
+ * How many of a counter a user (or the server's keys) used in a day, from one source.
+ */
+export type UsageCountResponse = {
+    /**
+     * Day
+     */
+    day: string;
+    /**
+     * User Id
+     */
+    user_id: string;
+    /**
+     * Source
+     */
+    source: string;
+    counter: Counter;
+    /**
+     * Count
+     */
+    count: number;
+};
+
+/**
  * UserResponse
  */
 export type UserResponse = {
@@ -1778,6 +1819,22 @@ export type SignInSettingsResponses = {
 
 export type SignInSettingsResponse = SignInSettingsResponses[keyof SignInSettingsResponses];
 
+export type DeleteMeData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/me';
+};
+
+export type DeleteMeResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type DeleteMeResponse = DeleteMeResponses[keyof DeleteMeResponses];
+
 export type GetMeData = {
     body?: never;
     path?: never;
@@ -1965,6 +2022,46 @@ export type TestProviderKeyResponses = {
 };
 
 export type TestProviderKeyResponse = TestProviderKeyResponses[keyof TestProviderKeyResponses];
+
+export type UsageFiguresData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Start
+         */
+        start?: string | null;
+        /**
+         * End
+         */
+        end?: string | null;
+    };
+    url: '/api/usage';
+};
+
+export type UsageFiguresErrors = {
+    /**
+     * Only admins can do this
+     */
+    403: ErrorResponse;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type UsageFiguresError = UsageFiguresErrors[keyof UsageFiguresErrors];
+
+export type UsageFiguresResponses = {
+    /**
+     * Response Usage Figures
+     *
+     * Successful Response
+     */
+    200: Array<UsageCountResponse>;
+};
+
+export type UsageFiguresResponse = UsageFiguresResponses[keyof UsageFiguresResponses];
 
 export type ListWalletsData = {
     body?: never;

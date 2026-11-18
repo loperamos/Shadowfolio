@@ -2,21 +2,31 @@
 
 from collections.abc import Callable
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, Response
 
 from shadowfolio.interfaces.web.errors import FORBIDDEN, NOT_FOUND, not_allowed, user_not_found
 from shadowfolio.interfaces.web.schemas import SetTierRequest, UserResponse
+from shadowfolio.usecases.accounts import Accounts
 from shadowfolio.usecases.provider_keys import ProviderKeys
 from shadowfolio.usecases.users import NotAllowedError, Users
 
+NO_CONTENT = 204
 
-def users_router(users: Users, provider_keys: ProviderKeys, current_user: Callable[[Request], str]) -> APIRouter:
+
+def users_router(users: Users, accounts: Accounts, provider_keys: ProviderKeys, current_user: Callable[[Request], str]) -> APIRouter:
     router = APIRouter()
 
     @router.get("/me")
     def get_me(user_id: str = Depends(current_user)) -> UserResponse:
         """The signed-in user: their tier, what their plan allows, and the market-data keys they still need to connect."""
         return UserResponse.from_user(users.user(user_id), provider_keys.missing(user_id))
+
+    @router.delete("/me", status_code=NO_CONTENT)
+    def delete_me(user_id: str = Depends(current_user)) -> Response:
+        """Delete the signed-in user's account and everything that is theirs: wallets, agent tokens, market-data keys
+        and usage counts. It cannot be undone; signing in again starts a new, empty account."""
+        accounts.delete(user_id)
+        return Response(status_code=NO_CONTENT)
 
     @router.get("/users", responses=FORBIDDEN)
     def list_users(user_id: str = Depends(current_user)) -> list[UserResponse]:
