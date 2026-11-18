@@ -18,6 +18,7 @@ from shadowfolio.adapters.fixed_identity import FixedIdentity
 from shadowfolio.adapters.openfigi_security_lookup import OpenFigiSecurityLookup
 from shadowfolio.adapters.sec_edgar_company_data import SecEdgarCompanyData
 from shadowfolio.adapters.sqlite_access_token_repository import SqliteAccessTokenRepository
+from shadowfolio.adapters.sqlite_user_repository import SqliteUserRepository
 from shadowfolio.adapters.sqlite_wallet_repository import SqliteWalletRepository
 from shadowfolio.adapters.system_clock import SystemClock
 from shadowfolio.interfaces.web.app import create_app
@@ -30,6 +31,7 @@ from shadowfolio.usecases.market import Market
 from shadowfolio.usecases.orders import Orders
 from shadowfolio.usecases.securities import Securities
 from shadowfolio.usecases.sync import Sync
+from shadowfolio.usecases.users import Users
 from shadowfolio.usecases.valuation import Valuation
 from shadowfolio.usecases.wallet_changes import WalletChanges
 from shadowfolio.usecases.wallets import UNOWNED, Wallets
@@ -59,6 +61,7 @@ class LocalConfig:
     auth0_audience: str | None = None
     # Who the wallets made before sign-in (owned by no user) go to, with their agents' tokens: the user's id.
     existing_wallets_owner: str | None = None
+    admins: tuple[str, ...] = ()  # the user ids that are admins: no limits, and they set other users' tiers
     # The built web app, served by the backend itself (as when deployed); None in development, where Vite serves it.
     web_dir: Path | None = None
     run_jobs: bool = False  # whether the app runs the system's jobs itself, as when deployed (see interfaces.jobs)
@@ -76,7 +79,8 @@ def build_local_app(config: LocalConfig, acting_as: str | None = None) -> FastAP
     corporate_actions = AlpacaCorporateActions(config.alpaca)
     sync = Sync(wallet_repository, clock, corporate_actions, fx_rates)
     market = Market(prices, clock, corporate_actions)
-    wallets = Wallets(wallet_repository, clock)
+    users = Users(SqliteUserRepository(config.db_path), clock, config.admins)
+    wallets = Wallets(wallet_repository, clock, users)
     access_tokens = AccessTokens(SqliteAccessTokenRepository(config.db_path), wallet_repository, clock)
     if config.existing_wallets_owner:
         # The wallets made before sign-in, and their agents' tokens, go to their user: once, as none are left after.
@@ -102,6 +106,7 @@ def build_local_app(config: LocalConfig, acting_as: str | None = None) -> FastAP
         imports=Imports(wallet_repository, WalletChanges(clock, prices, fx_rates, sync), OpenFigiSecurityLookup(), DegiroStatementReader()),
         mcp_allowed_hosts=config.mcp_allowed_hosts,
         access_tokens=access_tokens,
+        users=users,
         identity=Auth0Identity(config.auth0_domain, config.auth0_audience, clock) if acting_as is None else FixedIdentity(acting_as),
         sign_in=_sign_in(config) if acting_as is None else SignInSettings(provider=FIXED, user_id=acting_as),
         web_dir=config.web_dir,

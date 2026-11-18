@@ -10,18 +10,21 @@ from shadowfolio.domain.rules import Rules
 from shadowfolio.domain.wallet import Wallet
 from shadowfolio.ports.clock import Clock
 from shadowfolio.ports.wallet_repository import WalletRepository
+from shadowfolio.usecases.users import Users
 
 # Who owned the wallets made before sign-in existed: no user (see Wallets.hand_over).
 UNOWNED = "local"
 
 
 class Wallets:
-    def __init__(self, repo: WalletRepository, clock: Clock) -> None:
+    def __init__(self, repo: WalletRepository, clock: Clock, users: Users) -> None:
         self._repo = repo
         self._clock = clock
+        self._users = users
 
     def create(self, owner_id: str, name: str, currency: Currency, cash: Decimal) -> Wallet:
-        """Create a wallet. Non-zero starting cash is recorded as its first deposit."""
+        """Create a wallet, if the owner's plan allows another. Non-zero starting cash is recorded as its first deposit."""
+        self._check_room(owner_id)
         wallet = Wallet(id=uuid4(), owner_id=owner_id, name=name, currency=currency)
         if cash != 0:
             wallet = wallet.deposit(uuid4(), cash, self._clock.now())
@@ -66,10 +69,11 @@ class Wallets:
 
     def copy(self, wallet_id: UUID, name: str, before: datetime | None = None) -> Wallet | None:
         """A new wallet with the same currency and history under another name, or its history up to `before`
-        (see Wallet.copy). Returns None if the wallet does not exist."""
+        (see Wallet.copy), if the owner's plan allows another. Returns None if the wallet does not exist."""
         wallet = self._repo.get(wallet_id)
         if wallet is None:
             return None
+        self._check_room(wallet.owner_id)
         copy = wallet.copy(uuid4(), name, uuid4, before)
         self._repo.add(copy)
         return copy
@@ -86,3 +90,7 @@ class Wallets:
 
     def list(self, owner_id: str) -> list[Wallet]:
         return self._repo.list_by_owner(owner_id)
+
+    def _check_room(self, owner_id: str) -> None:
+        """Raise PlanLimitError if the owner's plan does not allow another wallet."""
+        self._users.user(owner_id).check_new_wallet(len(self._repo.list_by_owner(owner_id)))

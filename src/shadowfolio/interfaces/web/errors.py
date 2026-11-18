@@ -23,6 +23,7 @@ class ErrorResponse(BaseModel):
 
 # Documented responses, attached to the routes that can return them.
 NOT_FOUND: dict[int | str, dict[str, Any]] = {404: {"model": ErrorResponse, "description": "Not found"}}
+FORBIDDEN: dict[int | str, dict[str, Any]] = {403: {"model": ErrorResponse, "description": "Only admins can do this"}}
 INVALID: dict[int | str, dict[str, Any]] = {422: {"model": ErrorResponse, "description": "Malformed request or broken business rule"}}
 
 
@@ -40,6 +41,14 @@ def order_not_found() -> HTTPException:
 
 def token_not_found() -> HTTPException:
     return HTTPException(status_code=404, detail="access token not found")
+
+
+def user_not_found() -> HTTPException:
+    return HTTPException(status_code=404, detail="user not found")
+
+
+def not_allowed(error: Exception) -> HTTPException:
+    return HTTPException(status_code=403, detail=str(error))
 
 
 def rule_violation(error: DomainError) -> HTTPException:

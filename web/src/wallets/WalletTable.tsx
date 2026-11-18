@@ -35,10 +35,11 @@ type Props = {
   onSettings: (wallet: WalletResponse) => void;
   onImport: (wallet: WalletResponse) => void;
   onDuplicate: (wallet: WalletResponse) => void;
+  duplicateBlocked: string | null; // why no copy can be made (the plan's limit), if so
   onDelete: (wallets: WalletResponse[]) => void;
 };
 
-export function WalletTable({ wallets, error, selectedIds, onSelectionChange, onRename, onSettings, onImport, onDuplicate, onDelete }: Props) {
+export function WalletTable({ wallets, error, selectedIds, onSelectionChange, onRename, onSettings, onImport, onDuplicate, duplicateBlocked, onDelete }: Props) {
   const valuations = useWalletValuations((wallets ?? []).map((wallet) => wallet.id));
   const [sort, sortBy] = useSort(Object.values(WalletColumn), DEFAULT_SORT);
   const [params] = useSearchParams();
@@ -142,7 +143,7 @@ export function WalletTable({ wallets, error, selectedIds, onSelectionChange, on
                 .join(", ") || <Text c="dimmed">None</Text>}
             </Table.Td>
             <Table.Td>
-              <WalletActionsMenu wallet={wallet} onRename={onRename} onSettings={onSettings} onImport={onImport} onDuplicate={onDuplicate} onDelete={onDelete} />
+              <WalletActionsMenu wallet={wallet} onRename={onRename} onSettings={onSettings} onImport={onImport} onDuplicate={onDuplicate} duplicateBlocked={duplicateBlocked} onDelete={onDelete} />
             </Table.Td>
           </Table.Tr>
         ))}

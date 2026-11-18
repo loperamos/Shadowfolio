@@ -18,6 +18,7 @@ from shadowfolio.adapters.in_memory_corporate_actions import InMemoryCorporateAc
 from shadowfolio.adapters.in_memory_fx_rates import InMemoryFxRates
 from shadowfolio.adapters.in_memory_price_data import InMemoryPriceData
 from shadowfolio.adapters.in_memory_security_lookup import InMemorySecurityLookup
+from shadowfolio.adapters.in_memory_user_repository import InMemoryUserRepository
 from shadowfolio.adapters.in_memory_wallet_repository import InMemoryWalletRepository
 from shadowfolio.domain.corporate_actions import DividendEvent, SplitEvent
 from shadowfolio.domain.imports import DividendDetails, ImportKind, ImportRecord, TradeDetails
@@ -27,6 +28,7 @@ from shadowfolio.domain.wallet import Wallet
 from shadowfolio.ports.security_lookup import SecurityLookup, SecurityLookupUnavailableError
 from shadowfolio.usecases.imports import ImportReport, Imports
 from shadowfolio.usecases.sync import Sync
+from shadowfolio.usecases.users import Users
 from shadowfolio.usecases.wallet_changes import WalletChanges
 from shadowfolio.usecases.wallets import Wallets
 
@@ -65,7 +67,7 @@ def import_degiro(
     repo, clock, rates = InMemoryWalletRepository(), FixedClock(NOW), InMemoryFxRates(*fx_rates)
     sync = Sync(repo, clock, InMemoryCorporateActions(*corporate_actions), rates)
     changes = WalletChanges(clock, InMemoryPriceData(), rates, sync)
-    wallets = Wallets(repo, clock)
+    wallets = Wallets(repo, clock, Users(InMemoryUserRepository(), clock))
     wallet = wallets.create("owner", "DEGIRO", Currency.EUR, Decimal(0))
 
     records = DegiroStatementReader().read("\n".join([TRANSACTIONS_HEADER, *transactions]), "\n".join([ACCOUNT_HEADER, *account]))

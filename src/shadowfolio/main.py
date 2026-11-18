@@ -23,6 +23,8 @@ FINNHUB_API_KEY_ENV = "FINNHUB_API_KEY"
 MCP_ALLOWED_HOSTS_ENV = "SHADOWFOLIO_MCP_ALLOWED_HOSTS"
 AUTH0_DOMAIN_ENV, AUTH0_CLIENT_ID_ENV, AUTH0_AUDIENCE_ENV = "AUTH0_DOMAIN", "AUTH0_CLIENT_ID", "AUTH0_AUDIENCE"
 EXISTING_WALLETS_OWNER_ENV = "SHADOWFOLIO_EXISTING_WALLETS_OWNER"
+# The user ids that are admins, separated by commas: no plan limits, and they set other users' tiers.
+ADMINS_ENV = "SHADOWFOLIO_ADMINS"
 # Optional: the built web app (web/dist) for the backend to serve, as when deployed; without it, Vite serves it.
 WEB_DIR_ENV = "SHADOWFOLIO_WEB_DIR"
 # Whether the app runs the system's jobs itself (true when deployed), and the secret the jobs' endpoints need.
@@ -61,10 +63,11 @@ def local_config(config_dir: Path) -> LocalConfig:
         auth0_client_id=os.environ.get(AUTH0_CLIENT_ID_ENV) or None,
         auth0_audience=os.environ.get(AUTH0_AUDIENCE_ENV) or None,
         existing_wallets_owner=os.environ.get(EXISTING_WALLETS_OWNER_ENV) or None,
+        admins=_list(os.environ.get(ADMINS_ENV, "")),
         web_dir=resolve_config_path(web_dir, config_dir) if (web_dir := os.environ.get(WEB_DIR_ENV)) else None,
         run_jobs=os.environ.get(RUN_JOBS_ENV, "").strip().lower() == TRUE,
         job_token=os.environ.get(JOB_TOKEN_ENV) or None,
-        mcp_allowed_hosts=tuple(host.strip() for host in os.environ.get(MCP_ALLOWED_HOSTS_ENV, "").split(LIST_SEPARATOR) if host.strip()),
+        mcp_allowed_hosts=_list(os.environ.get(MCP_ALLOWED_HOSTS_ENV, "")),
     )
 
 
@@ -81,6 +84,11 @@ def resolve_config_path(value: str, config_dir: Path) -> Path:
     """A path from the config: absolute paths as given, relative ones from `config_dir`."""
     path = Path(value)
     return path if path.is_absolute() else config_dir / path
+
+
+def _list(value: str) -> tuple[str, ...]:
+    """A list setting's items: separated by commas, blanks dropped."""
+    return tuple(item.strip() for item in value.split(LIST_SEPARATOR) if item.strip())
 
 
 def _require_env(name: str) -> str:

@@ -32,6 +32,128 @@
         }
       }
     },
+    "/api/me": {
+      "get": {
+        "summary": "Get Me",
+        "description": "The signed-in user: their tier, and what their plan allows.",
+        "operationId": "get_me",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/users": {
+      "get": {
+        "summary": "List Users",
+        "description": "Every user, as they first signed in. Admins only.",
+        "operationId": "list_users",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/UserResponse"
+                  },
+                  "type": "array",
+                  "title": "Response List Users"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only admins can do this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/users/{target_id}/tier": {
+      "put": {
+        "summary": "Set User Tier",
+        "description": "Put a user who has signed in on a tier. Admins only.",
+        "operationId": "set_user_tier",
+        "parameters": [
+          {
+            "name": "target_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Target Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SetTierRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only admins can do this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/wallets": {
       "get": {
         "summary": "List Wallets",
@@ -3543,6 +3665,27 @@
         ],
         "title": "ImportResponse"
       },
+      "LimitsResponse": {
+        "properties": {
+          "wallets": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wallets"
+          }
+        },
+        "type": "object",
+        "required": [
+          "wallets"
+        ],
+        "title": "LimitsResponse",
+        "description": "What the user's plan allows; null for no limit."
+      },
       "OperationResponse": {
         "properties": {
           "id": {
@@ -4858,6 +5001,18 @@
         ],
         "title": "SellEdit"
       },
+      "SetTierRequest": {
+        "properties": {
+          "tier": {
+            "$ref": "#/components/schemas/Tier"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tier"
+        ],
+        "title": "SetTierRequest"
+      },
       "SharesSource": {
         "type": "string",
         "enum": [
@@ -4962,6 +5117,15 @@
           "added"
         ],
         "title": "SyncSummaryResponse"
+      },
+      "Tier": {
+        "type": "string",
+        "enum": [
+          "admin",
+          "member",
+          "free"
+        ],
+        "title": "Tier"
       },
       "TradeRequest": {
         "properties": {
@@ -5151,6 +5315,33 @@
         "type": "object",
         "title": "UpdateWalletRequest",
         "description": "Only the fields given change."
+      },
+      "UserResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "tier": {
+            "$ref": "#/components/schemas/Tier"
+          },
+          "limits": {
+            "$ref": "#/components/schemas/LimitsResponse"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "tier",
+          "limits",
+          "created_at"
+        ],
+        "title": "UserResponse"
       },
       "ValidationError": {
         "properties": {
