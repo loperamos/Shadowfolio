@@ -18,6 +18,7 @@ from shadowfolio.adapters.fixed_identity import FixedIdentity
 from shadowfolio.adapters.openfigi_security_lookup import OpenFigiSecurityLookup
 from shadowfolio.adapters.sec_edgar_company_data import SecEdgarCompanyData
 from shadowfolio.adapters.sqlite_access_token_repository import SqliteAccessTokenRepository
+from shadowfolio.adapters.sqlite_provider_key_repository import SqliteProviderKeyRepository
 from shadowfolio.adapters.sqlite_user_repository import SqliteUserRepository
 from shadowfolio.adapters.sqlite_wallet_repository import SqliteWalletRepository
 from shadowfolio.adapters.system_clock import SystemClock
@@ -29,6 +30,7 @@ from shadowfolio.usecases.history import History
 from shadowfolio.usecases.imports import Imports
 from shadowfolio.usecases.market import Market
 from shadowfolio.usecases.orders import Orders
+from shadowfolio.usecases.provider_keys import ProviderKeys
 from shadowfolio.usecases.securities import Securities
 from shadowfolio.usecases.sync import Sync
 from shadowfolio.usecases.users import Users
@@ -52,6 +54,7 @@ AUTH0, FIXED = "auth0", "fixed"
 class LocalConfig:
     db_path: Path
     alpaca: AlpacaConfig
+    keys_secret: str  # the master key users' market-data keys are encrypted with, kept apart from the database
     edgar_contact: str | None = None  # who SEC EDGAR is told is asking; without it, no fundamentals
     finnhub_key: str | None = None  # for the earnings calendar; without it, no earnings dates
     mcp_allowed_hosts: tuple[str, ...] = ()  # besides localhost, the addresses agents may reach the MCP server at
@@ -107,6 +110,7 @@ def build_local_app(config: LocalConfig, acting_as: str | None = None) -> FastAP
         mcp_allowed_hosts=config.mcp_allowed_hosts,
         access_tokens=access_tokens,
         users=users,
+        provider_keys=ProviderKeys(SqliteProviderKeyRepository(config.db_path, config.keys_secret), clock),
         identity=Auth0Identity(config.auth0_domain, config.auth0_audience, clock) if acting_as is None else FixedIdentity(acting_as),
         sign_in=_sign_in(config) if acting_as is None else SignInSettings(provider=FIXED, user_id=acting_as),
         web_dir=config.web_dir,

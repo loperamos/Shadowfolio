@@ -115,3 +115,7 @@ class RateLimitError(PlanLimitError):
     def __init__(self, message: str, retry_after_seconds: int) -> None:
         super().__init__(message)
         self.retry_after_seconds = retry_after_seconds
+
+
+class InvalidProviderKeyError(DomainError):
+    """A market-data provider's key is missing a part it needs, or has one it does not take."""

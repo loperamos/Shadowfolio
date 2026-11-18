@@ -36,3 +36,6 @@ export function securitiesComparePath(symbols: string[]): string {
 
 // The access tokens agents use with the MCP server.
 export const AGENTS_PATH = "/agents";
+
+// The user's settings, e.g. their own market-data keys.
+export const SETTINGS_PATH = "/settings";
