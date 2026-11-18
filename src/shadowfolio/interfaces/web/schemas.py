@@ -29,7 +29,7 @@ from shadowfolio.domain.operations import (
 )
 from shadowfolio.domain.orders import Order, OrderSide, OrderStatus
 from shadowfolio.domain.performance import Performance, TradingActivity
-from shadowfolio.domain.provider_keys import DataProvider, ProviderKey
+from shadowfolio.domain.provider_keys import DataProvider, KeyCheck, ProviderKey
 from shadowfolio.domain.rules import Rules
 from shadowfolio.domain.users import Limits, Tier, User
 from shadowfolio.domain.valuation import DailyValue, Quote, WalletValuation
@@ -1035,3 +1035,14 @@ class ProviderKeyResponse(BaseModel):
     @classmethod
     def from_key(cls, key: ProviderKey) -> "ProviderKeyResponse":
         return cls(provider=key.provider, hint=key.hint, saved_at=key.saved_at)
+
+
+class KeyCheckResponse(BaseModel):
+    """Whether a saved key works with its provider, in words for its owner."""
+
+    works: bool
+    message: str
+
+    @classmethod
+    def from_check(cls, check: KeyCheck) -> "KeyCheckResponse":
+        return cls(works=check.works, message=check.message)

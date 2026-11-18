@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, Request, Response
 from shadowfolio.domain.errors import DomainError
 from shadowfolio.domain.provider_keys import DataProvider
 from shadowfolio.interfaces.web.errors import INVALID, NOT_FOUND, provider_key_not_found, rule_violation
-from shadowfolio.interfaces.web.schemas import ProviderKeyResponse, SaveProviderKeyRequest
+from shadowfolio.interfaces.web.schemas import KeyCheckResponse, ProviderKeyResponse, SaveProviderKeyRequest
 from shadowfolio.usecases.provider_keys import ProviderKeys
 
 NO_CONTENT = 204
@@ -31,6 +31,14 @@ def provider_keys_router(provider_keys: ProviderKeys, current_user: Callable[[Re
         except DomainError as error:
             raise rule_violation(error) from error
         return ProviderKeyResponse.from_key(key)
+
+    @router.post("/provider-keys/{provider}/test", responses=NOT_FOUND)
+    def test_provider_key(provider: DataProvider, user_id: str = Depends(current_user)) -> KeyCheckResponse:
+        """Whether the user's saved key works: one small request to the provider, and if it does not work, why."""
+        check = provider_keys.test(user_id, provider)
+        if check is None:
+            raise provider_key_not_found()
+        return KeyCheckResponse.from_check(check)
 
     @router.delete("/provider-keys/{provider}", status_code=NO_CONTENT, responses=NOT_FOUND)
     def delete_provider_key(provider: DataProvider, user_id: str = Depends(current_user)) -> Response:

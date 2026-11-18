@@ -23,6 +23,8 @@ from shadowfolio.ports.clock import Clock
 from shadowfolio.ports.price_data import PriceData, PriceDataUnavailableError
 
 BASE_URL = "https://data.alpaca.markets"
+# The headers a key is sent in.
+KEY_ID_HEADER, SECRET_KEY_HEADER = "APCA-API-KEY-ID", "APCA-API-SECRET-KEY"
 # The free plan only includes the IEX exchange's feed.
 FEED = "iex"
 # Daily bars come from the consolidated feed (every US exchange): official closes, and whole volumes rather than one
@@ -55,7 +57,7 @@ class AlpacaPriceData(PriceData):
         self._clock = clock
         self._client = httpx2.Client(
             base_url=BASE_URL,
-            headers={"APCA-API-KEY-ID": config.key_id, "APCA-API-SECRET-KEY": config.secret_key},
+            headers={KEY_ID_HEADER: config.key_id, SECRET_KEY_HEADER: config.secret_key},
             timeout=TIMEOUT_SECONDS,
             transport=transport,
         )

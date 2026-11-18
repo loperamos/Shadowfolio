@@ -15,6 +15,7 @@ from shadowfolio.adapters.degiro_statements import DegiroStatementReader
 from shadowfolio.adapters.ecb_fx_rates import EcbFxRates
 from shadowfolio.adapters.finnhub_earnings_calendar import FinnhubEarningsCalendar
 from shadowfolio.adapters.fixed_identity import FixedIdentity
+from shadowfolio.adapters.http_key_checker import HttpKeyChecker
 from shadowfolio.adapters.openfigi_security_lookup import OpenFigiSecurityLookup
 from shadowfolio.adapters.own_key_market_data import OwnKeyMarketData
 from shadowfolio.adapters.sec_edgar_company_data import SecEdgarCompanyData
@@ -123,7 +124,7 @@ def build_local_app(config: LocalConfig, acting_as: str | None = None) -> FastAP
         mcp_allowed_hosts=config.mcp_allowed_hosts,
         access_tokens=access_tokens,
         users=users,
-        provider_keys=ProviderKeys(keys, clock, users),
+        provider_keys=ProviderKeys(keys, clock, users, HttpKeyChecker(clock)),
         identity=Auth0Identity(config.auth0_domain, config.auth0_audience, clock) if acting_as is None else FixedIdentity(acting_as),
         sign_in=_sign_in(config) if acting_as is None else SignInSettings(provider=FIXED, user_id=acting_as),
         web_dir=config.web_dir,

@@ -692,6 +692,22 @@ export type ImportResponse = {
 };
 
 /**
+ * KeyCheckResponse
+ *
+ * Whether a saved key works with its provider, in words for its owner.
+ */
+export type KeyCheckResponse = {
+    /**
+     * Works
+     */
+    works: boolean;
+    /**
+     * Message
+     */
+    message: string;
+};
+
+/**
  * LimitsResponse
  *
  * What the user's plan allows; null for no limit.
@@ -1918,6 +1934,37 @@ export type SaveProviderKeyResponses = {
 };
 
 export type SaveProviderKeyResponse = SaveProviderKeyResponses[keyof SaveProviderKeyResponses];
+
+export type TestProviderKeyData = {
+    body?: never;
+    path: {
+        provider: DataProvider;
+    };
+    query?: never;
+    url: '/api/provider-keys/{provider}/test';
+};
+
+export type TestProviderKeyErrors = {
+    /**
+     * Not found
+     */
+    404: ErrorResponse;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type TestProviderKeyError = TestProviderKeyErrors[keyof TestProviderKeyErrors];
+
+export type TestProviderKeyResponses = {
+    /**
+     * Successful Response
+     */
+    200: KeyCheckResponse;
+};
+
+export type TestProviderKeyResponse = TestProviderKeyResponses[keyof TestProviderKeyResponses];
 
 export type ListWalletsData = {
     body?: never;

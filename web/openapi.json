@@ -266,6 +266,55 @@
         }
       }
     },
+    "/api/provider-keys/{provider}/test": {
+      "post": {
+        "summary": "Test Provider Key",
+        "description": "Whether the user's saved key works: one small request to the provider, and if it does not work, why.",
+        "operationId": "test_provider_key",
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/DataProvider"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KeyCheckResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/wallets": {
       "get": {
         "summary": "List Wallets",
@@ -3784,6 +3833,25 @@
           "holdings"
         ],
         "title": "ImportResponse"
+      },
+      "KeyCheckResponse": {
+        "properties": {
+          "works": {
+            "type": "boolean",
+            "title": "Works"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message"
+          }
+        },
+        "type": "object",
+        "required": [
+          "works",
+          "message"
+        ],
+        "title": "KeyCheckResponse",
+        "description": "Whether a saved key works with its provider, in words for its owner."
       },
       "LimitsResponse": {
         "properties": {

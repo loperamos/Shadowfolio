@@ -1,7 +1,9 @@
 import { Alert, Badge, Button, Card, Group, Loader, Stack, Text, Title } from "@mantine/core";
 import { useCallback, useEffect, useState } from "react";
 
-import { DataProvider, listProviderKeys, type ProviderKeyResponse } from "../api/generated";
+import { apiErrorMessage } from "../api/errors";
+
+import { DataProvider, type KeyCheckResponse, listProviderKeys, type ProviderKeyResponse, testProviderKey } from "../api/generated";
 import { formatDateTime } from "../ui/format";
 import { ExternalLink } from "../ui/ExternalLink";
 import { PROVIDERS } from "./providers";
@@ -17,8 +19,11 @@ export function SettingsPage() {
   const [error, setError] = useState<string | null>(null);
   const [toSave, setToSave] = useState<DataProvider | null>(null);
   const [toRemove, setToRemove] = useState<DataProvider | null>(null);
+  const [testing, setTesting] = useState<DataProvider | null>(null);
+  const [checks, setChecks] = useState<Partial<Record<DataProvider, KeyCheckResponse>>>({});
 
   const load = useCallback(() => {
+    setChecks({}); // a replaced or removed key's last test no longer applies
     listProviderKeys()
       .then(({ data }) => (data ? setKeys(data) : setError("Could not load your keys.")))
       .catch(() => setError("Could not reach the backend."));
@@ -26,6 +31,18 @@ export function SettingsPage() {
   useEffect(load, [load]);
 
   const saved = (provider: DataProvider) => keys?.find((key) => key.provider === provider) ?? null;
+
+  async function test(provider: DataProvider) {
+    setTesting(provider);
+    try {
+      const { data, error } = await testProviderKey({ path: { provider } });
+      setChecks((current) => ({ ...current, [provider]: data ?? { works: false, message: apiErrorMessage(error) } }));
+    } catch {
+      setChecks((current) => ({ ...current, [provider]: { works: false, message: "Could not reach the backend." } }));
+    } finally {
+      setTesting(null);
+    }
+  }
 
   return (
     <Stack gap="lg">
@@ -61,8 +78,21 @@ export function SettingsPage() {
                       Key ending <Text span ff="monospace">{key.hint}</Text>, saved {formatDateTime(key.saved_at)}
                     </Text>
                   )}
+                  {/* Announced when it appears, as the answer to pressing Test. */}
+                  <div role="status">
+                    {key && checks[provider] && (
+                      <Text size="sm" c={checks[provider].works ? "teal" : "red"} fw={500}>
+                        {checks[provider].message}
+                      </Text>
+                    )}
+                  </div>
                 </Stack>
                 <Group gap="xs" wrap="nowrap">
+                  {key && (
+                    <Button variant="default" loading={testing === provider} onClick={() => test(provider)}>
+                      Test
+                    </Button>
+                  )}
                   <Button variant={key ? "default" : "filled"} onClick={() => setToSave(provider)}>
                     {key ? "Replace" : "Connect"}
                   </Button>
