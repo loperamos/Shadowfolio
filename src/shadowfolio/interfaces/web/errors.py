@@ -5,7 +5,7 @@ from typing import Any
 from fastapi import HTTPException
 from pydantic import BaseModel
 
-from shadowfolio.domain.errors import DomainError
+from shadowfolio.domain.errors import DomainError, RateLimitError
 
 
 class FieldError(BaseModel):
@@ -49,6 +49,10 @@ def user_not_found() -> HTTPException:
 
 def not_allowed(error: Exception) -> HTTPException:
     return HTTPException(status_code=403, detail=str(error))
+
+
+def too_many_requests(error: RateLimitError) -> HTTPException:
+    return HTTPException(status_code=429, detail=str(error), headers={"Retry-After": str(error.retry_after_seconds)})
 
 
 def rule_violation(error: DomainError) -> HTTPException:

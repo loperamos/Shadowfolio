@@ -44,7 +44,7 @@ ssh -L 5173:localhost:5173 -L 8000:localhost:8000 <user>@<machine running Shadow
 
 Wallets made before sign-in belong to no user: after your first sign-in, copy your user id from the menu under your name into `SHADOWFOLIO_EXISTING_WALLETS_OWNER` in `.env`, and restart the backend; they become yours, with their agents' tokens.
 
-Signing in for the first time makes an account, on the free plan (3 wallets). Put your own user id in `SHADOWFOLIO_ADMINS` to be an admin: no limits, and you can list users (`GET /api/users`) and put one on another tier (`PUT /api/users/<user id>/tier` with `{"tier": "member"}`; tiers are `free`, `member` and `admin`).
+Signing in for the first time makes an account, on the free plan: 3 wallets, 20 orders a day, 2 agent tokens and 120 requests a minute (members: 10, 100, 10 and 600; `GET /api/me` says which). Put your own user id in `SHADOWFOLIO_ADMINS` to be an admin: no limits, and you can list users (`GET /api/users`) and put one on another tier (`PUT /api/users/<user id>/tier` with `{"tier": "member"}`; tiers are `free`, `member` and `admin`).
 
 ## Self-hosting (Docker)
 

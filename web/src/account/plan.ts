@@ -30,3 +30,12 @@ export function newWalletBlocked(me: UserResponse | null, owned: number | null):
   }
   return `Your plan allows ${allowed} wallets; delete one to make another.`;
 }
+
+/** Why the user may not create another agent token, with `active` ones: null when they may, or while unknown. */
+export function newTokenBlocked(me: UserResponse | null, active: number | null): string | null {
+  const allowed = me?.limits.access_tokens;
+  if (allowed == null || active === null || active < allowed) {
+    return null;
+  }
+  return `Your plan allows ${allowed} agent tokens at once; revoke one to make another.`;
+}

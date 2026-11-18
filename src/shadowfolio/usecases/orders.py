@@ -5,7 +5,7 @@ so it is safe to run at any time; a price that cannot be fetched right now leave
 """
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from decimal import Decimal
 from uuid import UUID, uuid4
 
@@ -14,6 +14,7 @@ from shadowfolio.domain.errors import (
     FxRateUnavailableError,
     InsufficientCashError,
     InsufficientSharesError,
+    PlanLimitError,
     PriceUnavailableError,
     RuleBrokenError,
 )
@@ -27,6 +28,7 @@ from shadowfolio.ports.fx_rates import FxRates, FxRatesUnavailableError
 from shadowfolio.ports.price_data import PriceData, PriceDataUnavailableError
 from shadowfolio.ports.wallet_repository import WalletRepository
 from shadowfolio.usecases.comparison import DEFAULT_BENCHMARK
+from shadowfolio.usecases.users import Users
 from shadowfolio.usecases.valuation import Valuation
 from shadowfolio.usecases.wallet_changes import WalletChanges
 
@@ -54,13 +56,14 @@ class OrderOutcome:
 @dataclass(frozen=True)
 class OrderPreview:
     """What an order would do if placed now, without placing it: its estimate, the buying power and the holding's
-    share of the wallet once it fills (each counted as the buying power counts orders), the rule that would refuse it,
+    share of the wallet once it fills (each counted as the buying power counts orders), the rule or plan limit that
+    would refuse it,
     and why it would be rejected when it fills (not enough cash or shares)."""
 
     estimate: OrderEstimate
     buying_power_after: Decimal | None  # None when the open orders cannot all be priced
     holding_weight_after: Decimal | None  # as a ratio of the wallet's whole value; None for an empty wallet
-    refusal: str | None  # the rule that refuses it now; None when it would be placed
+    refusal: str | None  # the wallet's rule or the plan's limit that refuses it now; None when it would be placed
     warnings: tuple[str, ...]
 
 
@@ -71,8 +74,11 @@ class FillSummary:
 
 
 class Orders:
-    def __init__(self, repo: WalletRepository, clock: Clock, prices: PriceData, fx_rates: FxRates, changes: WalletChanges) -> None:
+    def __init__(
+        self, repo: WalletRepository, clock: Clock, prices: PriceData, fx_rates: FxRates, changes: WalletChanges, users: Users
+    ) -> None:
         self._repo = repo
+        self._users = users
         self._clock = clock
         self._prices = prices
         self._fx_rates = fx_rates
@@ -105,9 +111,10 @@ class Orders:
         quote, rate = self._latest(wallet, order.symbol)
         amount = order_amount(order, quote, rate)
         try:
+            self._check_plan(wallet)
             self._check_rules(wallet, order)
             refusal = None
-        except RuleBrokenError as error:
+        except (PlanLimitError, RuleBrokenError) as error:
             refusal = str(error)
         valuation = self._valuation.current(wallet.id)
         assert valuation is not None
@@ -137,6 +144,18 @@ class Orders:
         weight_after = holding_after / valuation.total if valuation.total else None
         estimate = OrderEstimate(order_price(order, quote), quote.currency, rate, amount)
         return OrderPreview(estimate, buying_power_after, weight_after, refusal, tuple(warnings))
+
+    def _check_plan(self, wallet: Wallet) -> None:
+        """Raise PlanLimitError if the owner's plan allows no more orders today (UTC), counting every order placed in
+        any of their wallets today, cancelled ones too."""
+        today = self._clock.now().astimezone(UTC).date()
+        placed = sum(
+            1
+            for owned in self._repo.list_by_owner(wallet.owner_id)
+            for order in owned.orders
+            if order.placed_at.astimezone(UTC).date() == today
+        )
+        self._users.user(wallet.owner_id).check_new_order(placed)
 
     def _check_rules(self, wallet: Wallet, order: Order) -> None:
         """Raise RuleBrokenError if the order breaks one of the wallet's rules (see domain.rules)."""
@@ -195,6 +214,7 @@ class Orders:
         if wallet is None:
             return None
         order = Order(uuid4(), side, symbol.strip().upper(), quantity, self._clock.now(), reason.strip(), limit_price)
+        self._check_plan(wallet)
         self._check_rules(wallet, order)
         updated = wallet.place_order(order)
         self._repo.update(updated)

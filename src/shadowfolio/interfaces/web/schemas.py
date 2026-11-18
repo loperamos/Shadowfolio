@@ -988,10 +988,18 @@ class LimitsResponse(BaseModel):
     """What the user's plan allows; null for no limit."""
 
     wallets: int | None  # the most wallets they may have at once
+    orders_per_day: int | None  # orders placed in a day (UTC) across their wallets, by them or their agents
+    access_tokens: int | None  # agent tokens at once, not counting revoked ones
+    requests_per_minute: int | None  # to the web API and the MCP server together
 
     @classmethod
     def from_limits(cls, limits: Limits) -> "LimitsResponse":
-        return cls(wallets=limits.wallets)
+        return cls(
+            wallets=limits.wallets,
+            orders_per_day=limits.orders_per_day,
+            access_tokens=limits.access_tokens,
+            requests_per_minute=limits.requests_per_minute,
+        )
 
 
 class UserResponse(BaseModel):

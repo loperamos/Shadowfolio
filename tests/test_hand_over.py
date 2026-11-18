@@ -39,7 +39,8 @@ def repositories(request: pytest.FixtureRequest, tmp_path: Path) -> Repositories
 def test_the_unowned_wallets_and_their_tokens_go_to_the_user_once(repositories: Repositories) -> None:
     wallet_repo, token_repo = repositories()
     clock = FixedClock(NOW)
-    wallets, tokens = Wallets(wallet_repo, clock, Users(InMemoryUserRepository(), clock)), AccessTokens(token_repo, wallet_repo, clock)
+    users = Users(InMemoryUserRepository(), clock)
+    wallets, tokens = Wallets(wallet_repo, clock, users), AccessTokens(token_repo, wallet_repo, clock, users)
     old = wallets.create(UNOWNED, "DEGIRO", Currency.EUR, Decimal(1000))
     others = wallets.create("auth0|ben", "Ben's", Currency.EUR, Decimal(10))
     token, _ = tokens.create(UNOWNED, "Codex", Scope.READ, [old.id])

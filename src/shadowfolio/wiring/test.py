@@ -84,7 +84,7 @@ def build_test_app(
         history=History(wallet_repository, clock, prices, fx_rates, sync),
         valuation=Valuation(wallet_repository, clock, prices, fx_rates),
         comparison=Comparison(wallet_repository, clock, prices, fx_rates, corporate_actions),
-        orders=Orders(wallet_repository, clock, prices, fx_rates, WalletChanges(clock, prices, fx_rates, sync)),
+        orders=Orders(wallet_repository, clock, prices, fx_rates, WalletChanges(clock, prices, fx_rates, sync), users),
         securities=Securities(
             company_data or InMemoryCompanyData(),
             prices,
@@ -103,7 +103,7 @@ def build_test_app(
             DegiroStatementReader(),
         ),
         mcp_allowed_hosts=mcp_allowed_hosts,
-        access_tokens=AccessTokens(InMemoryAccessTokenRepository(), wallet_repository, clock),
+        access_tokens=AccessTokens(InMemoryAccessTokenRepository(), wallet_repository, clock, users),
         users=users,
         identity=identity or InMemoryIdentity({}, anonymous=TEST_USER),
         sign_in=sign_in,

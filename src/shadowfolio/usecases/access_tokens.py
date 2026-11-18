@@ -10,6 +10,7 @@ from shadowfolio.domain.errors import InvalidAccessTokenError
 from shadowfolio.ports.access_token_repository import AccessTokenRepository
 from shadowfolio.ports.clock import Clock
 from shadowfolio.ports.wallet_repository import WalletRepository
+from shadowfolio.usecases.users import Users
 
 # Random bytes in a secret (about 256 bits): too many to guess.
 SECRET_BYTES = 32
@@ -23,15 +24,19 @@ def new_secret() -> str:
 
 class AccessTokens:
     def __init__(
-        self, repo: AccessTokenRepository, wallets: WalletRepository, clock: Clock, secret: Callable[[], str] = new_secret
+        self, repo: AccessTokenRepository, wallets: WalletRepository, clock: Clock, users: Users, secret: Callable[[], str] = new_secret
     ) -> None:
         self._repo = repo
+        self._users = users
         self._wallets = wallets
         self._clock = clock
         self._secret = secret
 
     def create(self, owner_id: str, name: str, scope: Scope, wallet_ids: list[UUID]) -> tuple[AccessToken, str]:
-        """A new token, and its secret: given only now, as only its hash is kept. Each wallet must be the owner's."""
+        """A new token, and its secret: given only now, as only its hash is kept. Each wallet must be the owner's, and
+        their plan must allow another token."""
+        active = sum(1 for token in self._repo.list_by_owner(owner_id) if token.is_active)
+        self._users.user(owner_id).check_new_token(active)
         for wallet_id in wallet_ids:
             wallet = self._wallets.get(wallet_id)
             if wallet is None or wallet.owner_id != owner_id:

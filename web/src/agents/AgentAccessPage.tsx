@@ -3,6 +3,7 @@ import { useDisclosure } from "@mantine/hooks";
 import { IconPlus } from "@tabler/icons-react";
 import { useCallback, useEffect, useState } from "react";
 
+import { newTokenBlocked, useMe } from "../account/plan";
 import { type AccessTokenResponse, listAccessTokens, listWallets, Scope, type WalletResponse } from "../api/generated";
 import { formatDateTime } from "../ui/format";
 import { ICON_SIZE, TABLE_MIN_WIDTH } from "../ui/theme";
@@ -23,6 +24,7 @@ export function AgentAccessPage() {
   const [error, setError] = useState<string | null>(null);
   const [creating, { open: openCreate, close: closeCreate }] = useDisclosure(false);
   const [toRevoke, setToRevoke] = useState<AccessTokenResponse | null>(null);
+  const me = useMe();
 
   const load = useCallback(() => {
     Promise.all([listAccessTokens(), listWallets()])
@@ -39,18 +41,22 @@ export function AgentAccessPage() {
 
   const walletName = (id: string) => loaded?.wallets.find((wallet) => wallet.id === id)?.name ?? "A deleted wallet";
   const noWallets = loaded !== null && loaded.wallets.length === 0;
-  const create = (
-    <Button leftSection={<IconPlus size={ICON_SIZE} />} onClick={openCreate} disabled={loaded === null || noWallets}>
-      Create token
-    </Button>
-  );
+  const activeTokens = loaded && loaded.tokens.filter((token) => token.revoked_at == null).length;
+  const blocked = noWallets ? "Create a wallet first: a token needs one to use." : newTokenBlocked(me, activeTokens);
 
   return (
     <Stack gap="lg">
       <div>
         <Group justify="space-between" align="flex-start">
           <Title order={1}>Agent access</Title>
-          {noWallets ? <Tooltip label="Create a wallet first: a token needs one to use.">{create}</Tooltip> : create}
+          <Tooltip label={blocked} disabled={blocked === null}>
+            {/* The wrapper keeps the tooltip working while the button is disabled. */}
+            <span>
+              <Button leftSection={<IconPlus size={ICON_SIZE} />} onClick={openCreate} disabled={loaded === null || blocked !== null}>
+                Create token
+              </Button>
+            </span>
+          </Tooltip>
         </Group>
         <Text c="dimmed" mt="xs">
           Tokens let agents (Claude Code, Codex and other MCP clients) use your wallets through Shadowfolio&apos;s MCP

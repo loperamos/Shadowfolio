@@ -29,13 +29,19 @@ def test_signing_in_for_the_first_time_makes_an_account_on_the_free_plan(client:
     me = client.get("/api/me", headers=as_user("ben-token"))
 
     assert me.status_code == 200
-    assert me.json() == {"id": BEN, "tier": "free", "limits": {"wallets": FREE_WALLETS}, "created_at": "2026-01-05T15:00:00Z"}
+    assert {**me.json(), "limits": me.json()["limits"]["wallets"]} == {
+        "id": BEN,
+        "tier": "free",
+        "limits": FREE_WALLETS,
+        "created_at": "2026-01-05T15:00:00Z",
+    }
 
 
 def test_an_admin_from_the_configuration_has_no_limits(client: TestClient) -> None:
     me = client.get("/api/me", headers=as_user("admin-token")).json()
 
-    assert (me["tier"], me["limits"]) == ("admin", {"wallets": None})
+    assert me["tier"] == "admin"
+    assert set(me["limits"].values()) == {None}
     assert all(create_wallet(client, "admin-token") == 201 for _ in range(FREE_WALLETS + 1))
 
 
@@ -61,7 +67,7 @@ def test_an_admin_lists_users_and_changes_a_tier(client: TestClient) -> None:
 
     changed = client.put(f"/api/users/{BEN}/tier", json={"tier": "member"}, headers=as_user("admin-token"))
     assert changed.status_code == 200
-    assert client.get("/api/me", headers=as_user("ben-token")).json()["limits"] == {"wallets": MEMBER_WALLETS}
+    assert client.get("/api/me", headers=as_user("ben-token")).json()["limits"]["wallets"] == MEMBER_WALLETS
 
 
 def test_only_admins_see_users_or_change_tiers(client: TestClient) -> None:

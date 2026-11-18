@@ -3677,11 +3677,47 @@
               }
             ],
             "title": "Wallets"
+          },
+          "orders_per_day": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Orders Per Day"
+          },
+          "access_tokens": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Access Tokens"
+          },
+          "requests_per_minute": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requests Per Minute"
           }
         },
         "type": "object",
         "required": [
-          "wallets"
+          "wallets",
+          "orders_per_day",
+          "access_tokens",
+          "requests_per_minute"
         ],
         "title": "LimitsResponse",
         "description": "What the user's plan allows; null for no limit."

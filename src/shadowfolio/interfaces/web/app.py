@@ -105,7 +105,9 @@ def create_app(
     app.include_router(api)
     # Last, so the API's routes are matched first: the MCP server at MCP_PATH (every request to it needs an access
     # token), and the web app at every other path, when it is served from here.
-    app.mount("/", _Site(RequireToken(mcp_app, access_tokens.authenticate), None if web_dir is None else _WebApp(web_dir)))
+    app.mount(
+        "/", _Site(RequireToken(mcp_app, access_tokens.authenticate, users.count_request), None if web_dir is None else _WebApp(web_dir))
+    )
     return app
 
 
