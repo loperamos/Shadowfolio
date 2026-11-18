@@ -24,3 +24,6 @@ class InMemoryAccessTokenRepository(AccessTokenRepository):
 
     def list_by_owner(self, owner_id: str) -> list[AccessToken]:
         return [token for token in self._tokens.values() if token.owner_id == owner_id]
+
+    def delete(self, token_id: UUID) -> None:
+        self._tokens.pop(token_id, None)

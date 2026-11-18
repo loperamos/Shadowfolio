@@ -38,6 +38,7 @@ from shadowfolio.ports.news import News
 from shadowfolio.ports.price_data import PriceData
 from shadowfolio.ports.security_lookup import SecurityLookup
 from shadowfolio.usecases.access_tokens import AccessTokens
+from shadowfolio.usecases.accounts import Accounts
 from shadowfolio.usecases.comparison import Comparison
 from shadowfolio.usecases.history import History
 from shadowfolio.usecases.imports import Imports
@@ -92,7 +93,10 @@ def build_test_app(
     fx_rates = fx_rates or InMemoryFxRates()
     corporate_actions = corporate_actions or InMemoryCorporateActions()
     wallet_repository = wallet_repository or InMemoryWalletRepository()
-    users = Users(InMemoryUserRepository(), clock, admins)
+    user_repository = InMemoryUserRepository()
+    users = Users(user_repository, clock, admins)
+    token_repository = InMemoryAccessTokenRepository()
+    usage = Usage(InMemoryUsageRepository(), clock, users)
     keys = InMemoryProviderKeyRepository()
     shared = MarketData(prices, corporate_actions, news or InMemoryNews(), earnings_calendar or InMemoryEarningsCalendar())
     market_data: MarketDataSource = (
@@ -124,9 +128,10 @@ def build_test_app(
             DegiroStatementReader(),
         ),
         mcp_allowed_hosts=mcp_allowed_hosts,
-        access_tokens=AccessTokens(InMemoryAccessTokenRepository(), wallet_repository, clock, users),
+        access_tokens=AccessTokens(token_repository, wallet_repository, clock, users),
         users=users,
-        usage=Usage(InMemoryUsageRepository(), clock, users),
+        usage=usage,
+        accounts=Accounts(user_repository, wallet_repository, token_repository, keys, usage),
         provider_keys=ProviderKeys(keys, clock, users, key_checker or InMemoryKeyChecker()),
         identity=identity or InMemoryIdentity({}, anonymous=TEST_USER),
         sign_in=sign_in,

@@ -46,3 +46,14 @@ def test_tokens_are_listed_by_owner_in_the_order_they_were_added(make_repository
         make_repository().add(token)
 
     assert make_repository().list_by_owner("owner") == [first, second]
+
+
+def test_a_deleted_token_is_gone(make_repository: RepositoryFactory) -> None:
+    kept, deleted = a_token(), a_token()
+    for token in (kept, deleted):
+        make_repository().add(token)
+
+    make_repository().delete(deleted.id)
+
+    assert make_repository().list_by_owner("owner") == [kept]
+    assert make_repository().find_by_hash(deleted.secret_hash) is None

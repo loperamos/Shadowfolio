@@ -24,3 +24,7 @@ class AccessTokenRepository(ABC):
     @abstractmethod
     def list_by_owner(self, owner_id: str) -> list[AccessToken]:
         """The owner's tokens, in the order they were added."""
+
+    @abstractmethod
+    def delete(self, token_id: UUID) -> None:
+        """Forget the token (e.g. with its owner's account); nothing if there is none."""

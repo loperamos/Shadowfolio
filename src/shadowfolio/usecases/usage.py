@@ -48,6 +48,12 @@ class Usage:
         if pending:
             self._repo.add(pending)
 
+    def forget(self, user_id: str) -> None:
+        """Forget every count of the user, saved or not (with their account)."""
+        with self._lock:
+            self._pending = {key: count for key, count in self._pending.items() if key.user_id != user_id}
+        self._repo.delete_user(user_id)
+
     def report(self, acting_id: str, start: date | None = None, end: date | None = None) -> list[UsageCount]:
         """Every count from `start` (default: a week before `end`) to `end` (default: today), saved first. Raises
         NotAllowedError unless `acting_id` is an admin's."""

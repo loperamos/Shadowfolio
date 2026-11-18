@@ -15,3 +15,7 @@ class UsageRepository(ABC):
     @abstractmethod
     def between(self, start: date, end: date) -> list[UsageCount]:
         """Every count from `start` to `end`, both included."""
+
+    @abstractmethod
+    def delete_user(self, user_id: str) -> None:
+        """Forget every count of the user."""

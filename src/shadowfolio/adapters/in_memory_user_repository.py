@@ -19,3 +19,6 @@ class InMemoryUserRepository(UserRepository):
 
     def list(self) -> list[User]:
         return list(self._users.values())
+
+    def delete(self, user_id: str) -> None:
+        self._users.pop(user_id, None)

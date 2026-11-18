@@ -49,6 +49,16 @@
             }
           }
         }
+      },
+      "delete": {
+        "summary": "Delete Me",
+        "description": "Delete the signed-in user's account and everything that is theirs: wallets, agent tokens, market-data keys\nand usage counts. It cannot be undone; signing in again starts a new, empty account.",
+        "operationId": "delete_me",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          }
+        }
       }
     },
     "/api/users": {
@@ -294,6 +304,85 @@
           },
           "404": {
             "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/usage": {
+      "get": {
+        "summary": "Usage Figures",
+        "description": "Per day (UTC), user and source: requests to Shadowfolio (web, mcp), calls to each provider and their errors,\nand price lookups answered from the cache or not; from `start` (default: a week before `end`) to `end`\n(default: today). Admins only.",
+        "operationId": "usage_figures",
+        "parameters": [
+          {
+            "name": "start",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Start"
+            }
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "End"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/UsageCountResponse"
+                  },
+                  "title": "Response Usage Figures"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only admins can do this",
             "content": {
               "application/json": {
                 "schema": {
@@ -2886,6 +2975,17 @@
           "name"
         ],
         "title": "CopyWalletRequest"
+      },
+      "Counter": {
+        "type": "string",
+        "enum": [
+          "requests",
+          "calls",
+          "errors",
+          "cache_hits",
+          "cache_misses"
+        ],
+        "title": "Counter"
       },
       "CreateAccessTokenRequest": {
         "properties": {
@@ -5587,6 +5687,40 @@
         "type": "object",
         "title": "UpdateWalletRequest",
         "description": "Only the fields given change."
+      },
+      "UsageCountResponse": {
+        "properties": {
+          "day": {
+            "type": "string",
+            "format": "date",
+            "title": "Day"
+          },
+          "user_id": {
+            "type": "string",
+            "title": "User Id"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "counter": {
+            "$ref": "#/components/schemas/Counter"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          }
+        },
+        "type": "object",
+        "required": [
+          "day",
+          "user_id",
+          "source",
+          "counter",
+          "count"
+        ],
+        "title": "UsageCountResponse",
+        "description": "How many of a counter a user (or the server's keys) used in a day, from one source."
       },
       "UserResponse": {
         "properties": {
