@@ -29,6 +29,7 @@ from shadowfolio.domain.operations import (
 )
 from shadowfolio.domain.orders import Order, OrderSide, OrderStatus
 from shadowfolio.domain.performance import Performance, TradingActivity
+from shadowfolio.domain.provider_keys import DataProvider, ProviderKey
 from shadowfolio.domain.rules import Rules
 from shadowfolio.domain.users import Limits, Tier, User
 from shadowfolio.domain.valuation import DailyValue, Quote, WalletValuation
@@ -1015,3 +1016,20 @@ class UserResponse(BaseModel):
 
 class SetTierRequest(BaseModel):
     tier: Tier
+
+
+class SaveProviderKeyRequest(BaseModel):
+    key_id: str | None = None  # for providers whose keys have two parts (Alpaca)
+    secret: str
+
+
+class ProviderKeyResponse(BaseModel):
+    """A saved key, never its secret: only the end of the part its owner can recognise."""
+
+    provider: DataProvider
+    hint: str
+    saved_at: AwareDatetime
+
+    @classmethod
+    def from_key(cls, key: ProviderKey) -> "ProviderKeyResponse":
+        return cls(provider=key.provider, hint=key.hint, saved_at=key.saved_at)

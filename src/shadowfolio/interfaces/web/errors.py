@@ -55,5 +55,9 @@ def too_many_requests(error: RateLimitError) -> HTTPException:
     return HTTPException(status_code=429, detail=str(error), headers={"Retry-After": str(error.retry_after_seconds)})
 
 
+def provider_key_not_found() -> HTTPException:
+    return HTTPException(status_code=404, detail="no key saved for this provider")
+
+
 def rule_violation(error: DomainError) -> HTTPException:
     return HTTPException(status_code=422, detail=str(error))

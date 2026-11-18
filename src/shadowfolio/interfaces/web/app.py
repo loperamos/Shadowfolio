@@ -21,6 +21,7 @@ from shadowfolio.interfaces.web.history import history_router
 from shadowfolio.interfaces.web.imports import imports_router
 from shadowfolio.interfaces.web.market import market_router
 from shadowfolio.interfaces.web.orders import orders_router
+from shadowfolio.interfaces.web.provider_keys import provider_keys_router
 from shadowfolio.interfaces.web.securities import securities_router
 from shadowfolio.interfaces.web.sync import sync_router
 from shadowfolio.interfaces.web.users import users_router
@@ -34,6 +35,7 @@ from shadowfolio.usecases.history import History
 from shadowfolio.usecases.imports import Imports
 from shadowfolio.usecases.market import Market
 from shadowfolio.usecases.orders import Orders
+from shadowfolio.usecases.provider_keys import ProviderKeys
 from shadowfolio.usecases.securities import Securities
 from shadowfolio.usecases.sync import Sync
 from shadowfolio.usecases.users import Users
@@ -56,6 +58,7 @@ def create_app(
     securities: Securities,
     access_tokens: AccessTokens,
     users: Users,
+    provider_keys: ProviderKeys,
     identity: Identity,
     clock: Clock,
     sign_in: SignInSettings | None = None,  # for the frontend; None when sign-in is not set up
@@ -91,6 +94,7 @@ def create_app(
     api = APIRouter(prefix=API_PREFIX, dependencies=[Depends(authorize)])
     api.include_router(auth_router(sign_in))
     api.include_router(users_router(users, current_user))
+    api.include_router(provider_keys_router(provider_keys, current_user))
     api.include_router(wallets_router(wallets, current_user))
     api.include_router(history_router(history))
     api.include_router(valuation_router(valuation))

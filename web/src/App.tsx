@@ -3,9 +3,10 @@ import { Link, Route, Routes } from "react-router";
 
 import { AppHeader } from "./AppHeader";
 import { AgentAccessPage } from "./agents/AgentAccessPage";
-import { AGENTS_PATH, COMPARE_PATH, SECURITIES_COMPARE_PATH, SECURITY_PATH, WALLET_PATH, WALLETS_PATH } from "./routes";
+import { AGENTS_PATH, COMPARE_PATH, SECURITIES_COMPARE_PATH, SECURITY_PATH, SETTINGS_PATH, WALLET_PATH, WALLETS_PATH } from "./routes";
 import { SecuritiesComparePage } from "./securities/SecuritiesComparePage";
 import { SecurityPage } from "./securities/SecurityPage";
+import { SettingsPage } from "./settings/SettingsPage";
 import { ComparePage } from "./wallets/ComparePage";
 import { WalletPage } from "./wallets/WalletPage";
 import { WalletsPage } from "./wallets/WalletsPage";
@@ -19,6 +20,7 @@ export function App() {
         <Route path={WALLET_PATH} element={<WalletPage />} />
         <Route path={COMPARE_PATH} element={<ComparePage />} />
         <Route path={AGENTS_PATH} element={<AgentAccessPage />} />
+        <Route path={SETTINGS_PATH} element={<SettingsPage />} />
         <Route path={SECURITIES_COMPARE_PATH} element={<SecuritiesComparePage />} />
         <Route path={SECURITY_PATH} element={<SecurityPage />} />
         <Route path="*" element={<PageNotFound />} />

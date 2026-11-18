@@ -15,6 +15,8 @@ ENVIRONMENT_ENV = "SHADOWFOLIO_ENV"
 DB_PATH_ENV = "SHADOWFOLIO_DB"
 ALPACA_KEY_ID_ENV = "ALPACA_API_KEY_ID"
 ALPACA_SECRET_KEY_ENV = "ALPACA_API_SECRET_KEY"
+# The master key users' own market-data keys are encrypted with (a Fernet key); losing it loses those keys.
+KEYS_SECRET_ENV = "SHADOWFOLIO_KEYS_SECRET"
 HOST_ENV = "SHADOWFOLIO_HOST"
 PORT_ENV = "SHADOWFOLIO_PORT"
 # Optional: who SEC EDGAR is told is asking (an app name and a contact email); without it, no fundamentals.
@@ -57,6 +59,7 @@ def local_config(config_dir: Path) -> LocalConfig:
     return LocalConfig(
         db_path=resolve_config_path(_require_env(DB_PATH_ENV), config_dir),
         alpaca=alpaca,
+        keys_secret=_require_env(KEYS_SECRET_ENV),
         edgar_contact=os.environ.get(SEC_EDGAR_CONTACT_ENV),
         finnhub_key=os.environ.get(FINNHUB_API_KEY_ENV),
         auth0_domain=os.environ.get(AUTH0_DOMAIN_ENV) or None,

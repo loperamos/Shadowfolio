@@ -309,6 +309,16 @@ export type DailyValueResponse = {
 };
 
 /**
+ * DataProvider
+ */
+export const DataProvider = { ALPACA: 'alpaca', FINNHUB: 'finnhub' } as const;
+
+/**
+ * DataProvider
+ */
+export type DataProvider = typeof DataProvider[keyof typeof DataProvider];
+
+/**
  * DepositEdit
  */
 export type DepositEdit = {
@@ -1034,6 +1044,23 @@ export const PriceSource = {
 export type PriceSource = typeof PriceSource[keyof typeof PriceSource];
 
 /**
+ * ProviderKeyResponse
+ *
+ * A saved key, never its secret: only the end of the part its owner can recognise.
+ */
+export type ProviderKeyResponse = {
+    provider: DataProvider;
+    /**
+     * Hint
+     */
+    hint: string;
+    /**
+     * Saved At
+     */
+    saved_at: string;
+};
+
+/**
  * QuoteResponse
  */
 export type QuoteResponse = {
@@ -1109,6 +1136,20 @@ export type RulesResponse = {
      * Max Orders Per Month
      */
     max_orders_per_month: number | null;
+};
+
+/**
+ * SaveProviderKeyRequest
+ */
+export type SaveProviderKeyRequest = {
+    /**
+     * Key Id
+     */
+    key_id?: string | null;
+    /**
+     * Secret
+     */
+    secret: string;
 };
 
 /**
@@ -1797,6 +1838,82 @@ export type SetUserTierResponses = {
 };
 
 export type SetUserTierResponse = SetUserTierResponses[keyof SetUserTierResponses];
+
+export type ListProviderKeysData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/provider-keys';
+};
+
+export type ListProviderKeysResponses = {
+    /**
+     * Response List Provider Keys
+     *
+     * Successful Response
+     */
+    200: Array<ProviderKeyResponse>;
+};
+
+export type ListProviderKeysResponse = ListProviderKeysResponses[keyof ListProviderKeysResponses];
+
+export type DeleteProviderKeyData = {
+    body?: never;
+    path: {
+        provider: DataProvider;
+    };
+    query?: never;
+    url: '/api/provider-keys/{provider}';
+};
+
+export type DeleteProviderKeyErrors = {
+    /**
+     * Not found
+     */
+    404: ErrorResponse;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type DeleteProviderKeyError = DeleteProviderKeyErrors[keyof DeleteProviderKeyErrors];
+
+export type DeleteProviderKeyResponses = {
+    /**
+     * Successful Response
+     */
+    204: void;
+};
+
+export type DeleteProviderKeyResponse = DeleteProviderKeyResponses[keyof DeleteProviderKeyResponses];
+
+export type SaveProviderKeyData = {
+    body: SaveProviderKeyRequest;
+    path: {
+        provider: DataProvider;
+    };
+    query?: never;
+    url: '/api/provider-keys/{provider}';
+};
+
+export type SaveProviderKeyErrors = {
+    /**
+     * Malformed request or broken business rule
+     */
+    422: ErrorResponse;
+};
+
+export type SaveProviderKeyError = SaveProviderKeyErrors[keyof SaveProviderKeyErrors];
+
+export type SaveProviderKeyResponses = {
+    /**
+     * Successful Response
+     */
+    200: ProviderKeyResponse;
+};
+
+export type SaveProviderKeyResponse = SaveProviderKeyResponses[keyof SaveProviderKeyResponses];
 
 export type ListWalletsData = {
     body?: never;

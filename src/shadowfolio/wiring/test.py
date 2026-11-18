@@ -16,6 +16,7 @@ from shadowfolio.adapters.in_memory_fx_rates import InMemoryFxRates
 from shadowfolio.adapters.in_memory_identity import InMemoryIdentity
 from shadowfolio.adapters.in_memory_news import InMemoryNews
 from shadowfolio.adapters.in_memory_price_data import InMemoryPriceData
+from shadowfolio.adapters.in_memory_provider_key_repository import InMemoryProviderKeyRepository
 from shadowfolio.adapters.in_memory_security_lookup import InMemorySecurityLookup
 from shadowfolio.adapters.in_memory_user_repository import InMemoryUserRepository
 from shadowfolio.adapters.in_memory_wallet_repository import InMemoryWalletRepository
@@ -36,6 +37,7 @@ from shadowfolio.usecases.history import History
 from shadowfolio.usecases.imports import Imports
 from shadowfolio.usecases.market import Market
 from shadowfolio.usecases.orders import Orders
+from shadowfolio.usecases.provider_keys import ProviderKeys
 from shadowfolio.usecases.securities import Securities
 from shadowfolio.usecases.sync import Sync
 from shadowfolio.usecases.users import Users
@@ -105,6 +107,7 @@ def build_test_app(
         mcp_allowed_hosts=mcp_allowed_hosts,
         access_tokens=AccessTokens(InMemoryAccessTokenRepository(), wallet_repository, clock, users),
         users=users,
+        provider_keys=ProviderKeys(InMemoryProviderKeyRepository(), clock),
         identity=identity or InMemoryIdentity({}, anonymous=TEST_USER),
         sign_in=sign_in,
         web_dir=web_dir,

@@ -154,6 +154,118 @@
         }
       }
     },
+    "/api/provider-keys": {
+      "get": {
+        "summary": "List Provider Keys",
+        "description": "The user's saved keys, by a hint: never their secrets.",
+        "operationId": "list_provider_keys",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ProviderKeyResponse"
+                  },
+                  "type": "array",
+                  "title": "Response List Provider Keys"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/provider-keys/{provider}": {
+      "put": {
+        "summary": "Save Provider Key",
+        "description": "Save the user's key for a provider, replacing any earlier one. Kept encrypted.",
+        "operationId": "save_provider_key",
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/DataProvider"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveProviderKeyRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProviderKeyResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Malformed request or broken business rule",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete Provider Key",
+        "description": "Forget the user's key for a provider.",
+        "operationId": "delete_provider_key",
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/DataProvider"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/wallets": {
       "get": {
         "summary": "List Wallets",
@@ -2932,6 +3044,14 @@
         "title": "DailyValueResponse",
         "description": "The wallet at the end of a day, valued at that day's closing prices, in its currency."
       },
+      "DataProvider": {
+        "type": "string",
+        "enum": [
+          "alpaca",
+          "finnhub"
+        ],
+        "title": "DataProvider"
+      },
       "DepositEdit": {
         "properties": {
           "amount": {
@@ -4351,6 +4471,30 @@
         ],
         "title": "PriceSource"
       },
+      "ProviderKeyResponse": {
+        "properties": {
+          "provider": {
+            "$ref": "#/components/schemas/DataProvider"
+          },
+          "hint": {
+            "type": "string",
+            "title": "Hint"
+          },
+          "saved_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Saved At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "provider",
+          "hint",
+          "saved_at"
+        ],
+        "title": "ProviderKeyResponse",
+        "description": "A saved key, never its secret: only the end of the part its owner can recognise."
+      },
       "QuoteResponse": {
         "properties": {
           "symbol": {
@@ -4525,6 +4669,30 @@
           "max_orders_per_month"
         ],
         "title": "RulesResponse"
+      },
+      "SaveProviderKeyRequest": {
+        "properties": {
+          "key_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Key Id"
+          },
+          "secret": {
+            "type": "string",
+            "title": "Secret"
+          }
+        },
+        "type": "object",
+        "required": [
+          "secret"
+        ],
+        "title": "SaveProviderKeyRequest"
       },
       "Scope": {
         "type": "string",

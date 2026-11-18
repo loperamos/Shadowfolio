@@ -1,9 +1,9 @@
 import { Anchor, Avatar, Button, CopyButton, Group, Menu, Text, TextInput } from "@mantine/core";
-import { IconCopy, IconLogout, IconSearch } from "@tabler/icons-react";
+import { IconCopy, IconLogout, IconSearch, IconSettings } from "@tabler/icons-react";
 import { type FormEvent, useState } from "react";
 import { Link, NavLink, useNavigate } from "react-router";
 
-import { AGENTS_PATH, SECURITIES_COMPARE_PATH, securityPath, WALLETS_PATH } from "./routes";
+import { AGENTS_PATH, SECURITIES_COMPARE_PATH, securityPath, SETTINGS_PATH, WALLETS_PATH } from "./routes";
 import { useAuth } from "./auth/useAuth";
 import { Wordmark } from "./ui/Logo";
 import { ICON_SIZE, LOGO_HEADER_SIZE, SEARCH_INPUT_WIDTH } from "./ui/theme";
@@ -71,6 +71,9 @@ function UserMenu() {
       </Menu.Target>
       <Menu.Dropdown>
         {user.email && <Menu.Label>{user.email}</Menu.Label>}
+        <Menu.Item component={Link} to={SETTINGS_PATH} leftSection={<IconSettings size={ICON_SIZE} />}>
+          Settings
+        </Menu.Item>
         <CopyButton value={user.id}>
           {({ copied, copy }) => (
             <Menu.Item leftSection={<IconCopy size={ICON_SIZE} />} onClick={copy} closeMenuOnClick={false}>

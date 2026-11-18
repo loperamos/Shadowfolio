@@ -46,6 +46,10 @@ Wallets made before sign-in belong to no user: after your first sign-in, copy yo
 
 Signing in for the first time makes an account, on the free plan: 3 wallets, 20 orders a day, 2 agent tokens and 120 requests a minute (members: 10, 100, 10 and 600; `GET /api/me` says which). Put your own user id in `SHADOWFOLIO_ADMINS` to be an admin: no limits, and you can list users (`GET /api/users`) and put one on another tier (`PUT /api/users/<user id>/tier` with `{"tier": "member"}`; tiers are `free`, `member` and `admin`).
 
+## Your own market-data keys
+
+Each user saves their own Alpaca and Finnhub keys in Settings, so data fetched with a key is only shown to its owner. They are stored encrypted with `SHADOWFOLIO_KEYS_SECRET` (see `.env.example` to make one). The nightly backups hold the keys only encrypted; keep a copy of that master key apart from them, as without it the saved keys cannot be read.
+
 ## Self-hosting (Docker)
 
 One image runs the backend, which also serves the built web app, so browser, API and MCP share one origin. Its data (the database and the market cache) lives in the `shadowfolio-data` volume, apart from the development servers' `data/`. Configuration comes from `.env` at run time; the container sets its own address, database path and web app.

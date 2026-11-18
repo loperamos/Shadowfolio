@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { BenchmarkDailyData, BenchmarkDailyErrors, BenchmarkDailyResponses, CancelOrderData, CancelOrderErrors, CancelOrderResponses, CopyWalletData, CopyWalletErrors, CopyWalletResponses, CreateAccessTokenData, CreateAccessTokenErrors, CreateAccessTokenResponses, CreateWalletData, CreateWalletErrors, CreateWalletResponses, DailyClosesData, DailyClosesErrors, DailyClosesResponses, DailyValuationData, DailyValuationErrors, DailyValuationResponses, DeleteOperationData, DeleteOperationErrors, DeleteOperationResponses, DeleteWalletData, DeleteWalletErrors, DeleteWalletResponses, DepositData, DepositErrors, DepositResponses, EditOperationData, EditOperationErrors, EditOperationResponses, EstimateOrderData, EstimateOrderErrors, EstimateOrderResponses, FillAllOrdersData, FillAllOrdersResponses, GetMeData, GetMeResponses, GetWalletData, GetWalletErrors, GetWalletResponses, ImportDegiroData, ImportDegiroErrors, ImportDegiroResponses, LatestQuoteData, LatestQuoteErrors, LatestQuoteResponses, ListAccessTokensData, ListAccessTokensResponses, ListOperationsData, ListOperationsErrors, ListOperationsResponses, ListOrdersData, ListOrdersErrors, ListOrdersResponses, ListUsersData, ListUsersErrors, ListUsersResponses, ListWalletsData, ListWalletsResponses, OrderOutcomesData, OrderOutcomesErrors, OrderOutcomesResponses, PlaceOrderData, PlaceOrderErrors, PlaceOrderResponses, PreviewDegiroImportData, PreviewDegiroImportErrors, PreviewDegiroImportResponses, RecordBuyData, RecordBuyErrors, RecordBuyResponses, RecordSellData, RecordSellErrors, RecordSellResponses, RevokeAccessTokenData, RevokeAccessTokenErrors, RevokeAccessTokenResponses, SecurityDividendsData, SecurityDividendsErrors, SecurityDividendsResponses, SecurityEarningsData, SecurityEarningsErrors, SecurityEarningsResponses, SecurityFundamentalsData, SecurityFundamentalsErrors, SecurityFundamentalsResponses, SecurityNewsData, SecurityNewsErrors, SecurityNewsResponses, SecurityRangesData, SecurityRangesErrors, SecurityRangesResponses, SecurityStatisticsData, SecurityStatisticsErrors, SecurityStatisticsResponses, SecuritySummaryData, SecuritySummaryErrors, SecuritySummaryResponses, SetUserTierData, SetUserTierErrors, SetUserTierResponses, SetWalletRulesData, SetWalletRulesErrors, SetWalletRulesResponses, SignInSettingsData, SignInSettingsResponses, SyncAllWalletsData, SyncAllWalletsErrors, SyncAllWalletsResponses, UpdateWalletData, UpdateWalletErrors, UpdateWalletResponses, WalletPerformanceData, WalletPerformanceErrors, WalletPerformanceResponses, WalletValuationData, WalletValuationErrors, WalletValuationResponses, WithdrawData, WithdrawErrors, WithdrawResponses } from './types.gen';
+import type { BenchmarkDailyData, BenchmarkDailyErrors, BenchmarkDailyResponses, CancelOrderData, CancelOrderErrors, CancelOrderResponses, CopyWalletData, CopyWalletErrors, CopyWalletResponses, CreateAccessTokenData, CreateAccessTokenErrors, CreateAccessTokenResponses, CreateWalletData, CreateWalletErrors, CreateWalletResponses, DailyClosesData, DailyClosesErrors, DailyClosesResponses, DailyValuationData, DailyValuationErrors, DailyValuationResponses, DeleteOperationData, DeleteOperationErrors, DeleteOperationResponses, DeleteProviderKeyData, DeleteProviderKeyErrors, DeleteProviderKeyResponses, DeleteWalletData, DeleteWalletErrors, DeleteWalletResponses, DepositData, DepositErrors, DepositResponses, EditOperationData, EditOperationErrors, EditOperationResponses, EstimateOrderData, EstimateOrderErrors, EstimateOrderResponses, FillAllOrdersData, FillAllOrdersResponses, GetMeData, GetMeResponses, GetWalletData, GetWalletErrors, GetWalletResponses, ImportDegiroData, ImportDegiroErrors, ImportDegiroResponses, LatestQuoteData, LatestQuoteErrors, LatestQuoteResponses, ListAccessTokensData, ListAccessTokensResponses, ListOperationsData, ListOperationsErrors, ListOperationsResponses, ListOrdersData, ListOrdersErrors, ListOrdersResponses, ListProviderKeysData, ListProviderKeysResponses, ListUsersData, ListUsersErrors, ListUsersResponses, ListWalletsData, ListWalletsResponses, OrderOutcomesData, OrderOutcomesErrors, OrderOutcomesResponses, PlaceOrderData, PlaceOrderErrors, PlaceOrderResponses, PreviewDegiroImportData, PreviewDegiroImportErrors, PreviewDegiroImportResponses, RecordBuyData, RecordBuyErrors, RecordBuyResponses, RecordSellData, RecordSellErrors, RecordSellResponses, RevokeAccessTokenData, RevokeAccessTokenErrors, RevokeAccessTokenResponses, SaveProviderKeyData, SaveProviderKeyErrors, SaveProviderKeyResponses, SecurityDividendsData, SecurityDividendsErrors, SecurityDividendsResponses, SecurityEarningsData, SecurityEarningsErrors, SecurityEarningsResponses, SecurityFundamentalsData, SecurityFundamentalsErrors, SecurityFundamentalsResponses, SecurityNewsData, SecurityNewsErrors, SecurityNewsResponses, SecurityRangesData, SecurityRangesErrors, SecurityRangesResponses, SecurityStatisticsData, SecurityStatisticsErrors, SecurityStatisticsResponses, SecuritySummaryData, SecuritySummaryErrors, SecuritySummaryResponses, SetUserTierData, SetUserTierErrors, SetUserTierResponses, SetWalletRulesData, SetWalletRulesErrors, SetWalletRulesResponses, SignInSettingsData, SignInSettingsResponses, SyncAllWalletsData, SyncAllWalletsErrors, SyncAllWalletsResponses, UpdateWalletData, UpdateWalletErrors, UpdateWalletResponses, WalletPerformanceData, WalletPerformanceErrors, WalletPerformanceResponses, WalletValuationData, WalletValuationErrors, WalletValuationResponses, WithdrawData, WithdrawErrors, WithdrawResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -46,6 +46,34 @@ export const listUsers = <ThrowOnError extends boolean = false>(options?: Option
  */
 export const setUserTier = <ThrowOnError extends boolean = false>(options: Options<SetUserTierData, ThrowOnError>): RequestResult<SetUserTierResponses, SetUserTierErrors, ThrowOnError> => (options.client ?? client).put<SetUserTierResponses, SetUserTierErrors, ThrowOnError>({
     url: '/api/users/{target_id}/tier',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * List Provider Keys
+ *
+ * The user's saved keys, by a hint: never their secrets.
+ */
+export const listProviderKeys = <ThrowOnError extends boolean = false>(options?: Options<ListProviderKeysData, ThrowOnError>): RequestResult<ListProviderKeysResponses, unknown, ThrowOnError> => (options?.client ?? client).get<ListProviderKeysResponses, unknown, ThrowOnError>({ url: '/api/provider-keys', ...options });
+
+/**
+ * Delete Provider Key
+ *
+ * Forget the user's key for a provider.
+ */
+export const deleteProviderKey = <ThrowOnError extends boolean = false>(options: Options<DeleteProviderKeyData, ThrowOnError>): RequestResult<DeleteProviderKeyResponses, DeleteProviderKeyErrors, ThrowOnError> => (options.client ?? client).delete<DeleteProviderKeyResponses, DeleteProviderKeyErrors, ThrowOnError>({ url: '/api/provider-keys/{provider}', ...options });
+
+/**
+ * Save Provider Key
+ *
+ * Save the user's key for a provider, replacing any earlier one. Kept encrypted.
+ */
+export const saveProviderKey = <ThrowOnError extends boolean = false>(options: Options<SaveProviderKeyData, ThrowOnError>): RequestResult<SaveProviderKeyResponses, SaveProviderKeyErrors, ThrowOnError> => (options.client ?? client).put<SaveProviderKeyResponses, SaveProviderKeyErrors, ThrowOnError>({
+    url: '/api/provider-keys/{provider}',
     ...options,
     headers: {
         'Content-Type': 'application/json',
