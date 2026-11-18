@@ -17,6 +17,7 @@ from shadowfolio.adapters.in_memory_identity import InMemoryIdentity
 from shadowfolio.adapters.in_memory_news import InMemoryNews
 from shadowfolio.adapters.in_memory_price_data import InMemoryPriceData
 from shadowfolio.adapters.in_memory_security_lookup import InMemorySecurityLookup
+from shadowfolio.adapters.in_memory_user_repository import InMemoryUserRepository
 from shadowfolio.adapters.in_memory_wallet_repository import InMemoryWalletRepository
 from shadowfolio.interfaces.web.app import create_app
 from shadowfolio.interfaces.web.auth import SignInSettings
@@ -37,6 +38,7 @@ from shadowfolio.usecases.market import Market
 from shadowfolio.usecases.orders import Orders
 from shadowfolio.usecases.securities import Securities
 from shadowfolio.usecases.sync import Sync
+from shadowfolio.usecases.users import Users
 from shadowfolio.usecases.valuation import Valuation
 from shadowfolio.usecases.wallet_changes import WalletChanges
 from shadowfolio.usecases.wallets import Wallets
@@ -65,9 +67,10 @@ def build_test_app(
     sign_in: SignInSettings | None = None,
     web_dir: Path | None = None,
     job_token: str | None = TEST_JOB_TOKEN,
+    admins: Sequence[str] = (TEST_USER,),
 ) -> FastAPI:
     """Pass fakes to control them (or to prepare stored data); otherwise "now" is DEFAULT_NOW, storage is empty and there
-    are no prices, rates or corporate actions."""
+    are no prices, rates or corporate actions. TEST_USER is an admin, so tests not about plans meet no plan's limits."""
     clock = clock or FixedClock(DEFAULT_NOW)
     prices = prices or InMemoryPriceData()
     fx_rates = fx_rates or InMemoryFxRates()
@@ -75,8 +78,9 @@ def build_test_app(
     wallet_repository = wallet_repository or InMemoryWalletRepository()
     sync = Sync(wallet_repository, clock, corporate_actions, fx_rates)
     market = Market(prices, clock, corporate_actions)
+    users = Users(InMemoryUserRepository(), clock, admins)
     return create_app(
-        wallets=Wallets(wallet_repository, clock),
+        wallets=Wallets(wallet_repository, clock, users),
         history=History(wallet_repository, clock, prices, fx_rates, sync),
         valuation=Valuation(wallet_repository, clock, prices, fx_rates),
         comparison=Comparison(wallet_repository, clock, prices, fx_rates, corporate_actions),
@@ -100,6 +104,7 @@ def build_test_app(
         ),
         mcp_allowed_hosts=mcp_allowed_hosts,
         access_tokens=AccessTokens(InMemoryAccessTokenRepository(), wallet_repository, clock),
+        users=users,
         identity=identity or InMemoryIdentity({}, anonymous=TEST_USER),
         sign_in=sign_in,
         web_dir=web_dir,

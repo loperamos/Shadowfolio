@@ -11,28 +11,30 @@ const MIN_TO_COMPARE = 2;
 
 type Props = {
   selected: WalletResponse[];
+  duplicateBlocked: string | null; // why no copy can be made (the plan's limit), if so
   onDuplicate: (wallet: WalletResponse) => void;
   onDelete: (wallets: WalletResponse[]) => void;
   onClear: () => void;
 };
 
 /** Actions for the selected wallets; shown only while at least one is selected. */
-export function WalletSelectionBar({ selected, onDuplicate, onDelete, onClear }: Props) {
+export function WalletSelectionBar({ selected, duplicateBlocked, onDuplicate, onDelete, onClear }: Props) {
   if (selected.length === 0) {
     return null;
   }
   const single = selected.length === 1 ? selected[0] : null;
   const comparable = selected.length >= MIN_TO_COMPARE;
+  const duplicateReason = single === null ? "Select one wallet to duplicate" : duplicateBlocked;
 
   return (
     <Paper withBorder p="xs" mb="sm">
       <Group justify="space-between">
         <Text fw={500}>{selected.length} selected</Text>
         <Group gap="xs">
-          <Tooltip label="Select one wallet to duplicate" disabled={single !== null}>
+          <Tooltip label={duplicateReason} disabled={duplicateReason === null}>
             {/* The wrapper keeps the tooltip working while the button is disabled. */}
             <span>
-              <Button variant="default" size="xs" leftSection={<IconCopy size={ICON_SIZE} />} disabled={single === null} onClick={() => single && onDuplicate(single)}>
+              <Button variant="default" size="xs" leftSection={<IconCopy size={ICON_SIZE} />} disabled={duplicateReason !== null} onClick={() => single && onDuplicate(single)}>
                 Duplicate
               </Button>
             </span>

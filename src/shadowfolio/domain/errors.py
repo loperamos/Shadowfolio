@@ -103,3 +103,7 @@ class EarningsCalendarUnavailableNowError(DomainError):
 
 class InvalidAccessTokenError(DomainError):
     """An access token is missing what it needs (a name, wallets), or names a wallet that does not exist."""
+
+
+class PlanLimitError(DomainError):
+    """A user's plan does not allow more of something (e.g. wallets)."""

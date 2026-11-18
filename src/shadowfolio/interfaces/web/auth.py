@@ -1,7 +1,7 @@
 """Who is asking: every API request needs a signed-in user, as `Authorization: Bearer <token>` (the token the sign-in
-provider gave them), and a request naming a wallet must be its owner's; another user's wallet answers as one that does
-not exist. Open to all: the sign-in settings the frontend needs to sign in, and the jobs the system runs for every
-wallet (see SPEC.md on protecting them)."""
+provider gave them; signing in for the first time makes their account), and a request naming a wallet must be its
+owner's; another user's wallet answers as one that does not exist. Open to all: the sign-in settings the frontend needs
+to sign in, and the jobs the system runs for every wallet (see SPEC.md on protecting them)."""
 
 import hmac
 from collections.abc import Callable
@@ -12,6 +12,7 @@ from pydantic import BaseModel
 
 from shadowfolio.interfaces.web.errors import wallet_not_found
 from shadowfolio.ports.identity import Identity, IdentityUnavailableError
+from shadowfolio.usecases.users import Users
 from shadowfolio.usecases.wallets import Wallets
 
 BEARER = "bearer"
@@ -34,7 +35,9 @@ class SignInSettings(BaseModel):
     user_id: str | None = None  # for fixed
 
 
-def sign_in_checks(identity: Identity, wallets: Wallets, api_prefix: str) -> tuple[Callable[[Request], str], Callable[[Request], None]]:
+def sign_in_checks(
+    identity: Identity, users: Users, wallets: Wallets, api_prefix: str
+) -> tuple[Callable[[Request], str], Callable[[Request], None]]:
     """`current_user`, the signed-in user's id (for routes that act for them), and `authorize`, which every API route
     runs: it signs the user in, and refuses wallets that are not theirs."""
 
@@ -48,6 +51,7 @@ def sign_in_checks(identity: Identity, wallets: Wallets, api_prefix: str) -> tup
             raise HTTPException(status_code=UNAVAILABLE, detail=str(error)) from error
         if user_id is None:
             raise HTTPException(status_code=UNAUTHORIZED, detail="sign in first", headers=CHALLENGE)
+        users.user(user_id)  # their account, made the first time
         request.state.user_id = user_id
         return user_id
 

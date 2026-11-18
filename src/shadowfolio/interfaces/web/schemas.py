@@ -30,6 +30,7 @@ from shadowfolio.domain.operations import (
 from shadowfolio.domain.orders import Order, OrderSide, OrderStatus
 from shadowfolio.domain.performance import Performance, TradingActivity
 from shadowfolio.domain.rules import Rules
+from shadowfolio.domain.users import Limits, Tier, User
 from shadowfolio.domain.valuation import DailyValue, Quote, WalletValuation
 from shadowfolio.domain.wallet import Wallet
 from shadowfolio.usecases.comparison import PerformanceComparison
@@ -981,3 +982,28 @@ class AccessTokenResponse(BaseModel):
 class CreatedAccessTokenResponse(BaseModel):
     token: AccessTokenResponse
     secret: str  # given only now: only its hash is kept
+
+
+class LimitsResponse(BaseModel):
+    """What the user's plan allows; null for no limit."""
+
+    wallets: int | None  # the most wallets they may have at once
+
+    @classmethod
+    def from_limits(cls, limits: Limits) -> "LimitsResponse":
+        return cls(wallets=limits.wallets)
+
+
+class UserResponse(BaseModel):
+    id: str  # the sign-in provider's
+    tier: Tier
+    limits: LimitsResponse
+    created_at: AwareDatetime  # when they first signed in
+
+    @classmethod
+    def from_user(cls, user: User) -> "UserResponse":
+        return cls(id=user.id, tier=user.tier, limits=LimitsResponse.from_limits(user.limits), created_at=user.created_at)
+
+
+class SetTierRequest(BaseModel):
+    tier: Tier

@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { BenchmarkDailyData, BenchmarkDailyErrors, BenchmarkDailyResponses, CancelOrderData, CancelOrderErrors, CancelOrderResponses, CopyWalletData, CopyWalletErrors, CopyWalletResponses, CreateAccessTokenData, CreateAccessTokenErrors, CreateAccessTokenResponses, CreateWalletData, CreateWalletErrors, CreateWalletResponses, DailyClosesData, DailyClosesErrors, DailyClosesResponses, DailyValuationData, DailyValuationErrors, DailyValuationResponses, DeleteOperationData, DeleteOperationErrors, DeleteOperationResponses, DeleteWalletData, DeleteWalletErrors, DeleteWalletResponses, DepositData, DepositErrors, DepositResponses, EditOperationData, EditOperationErrors, EditOperationResponses, EstimateOrderData, EstimateOrderErrors, EstimateOrderResponses, FillAllOrdersData, FillAllOrdersResponses, GetWalletData, GetWalletErrors, GetWalletResponses, ImportDegiroData, ImportDegiroErrors, ImportDegiroResponses, LatestQuoteData, LatestQuoteErrors, LatestQuoteResponses, ListAccessTokensData, ListAccessTokensResponses, ListOperationsData, ListOperationsErrors, ListOperationsResponses, ListOrdersData, ListOrdersErrors, ListOrdersResponses, ListWalletsData, ListWalletsResponses, OrderOutcomesData, OrderOutcomesErrors, OrderOutcomesResponses, PlaceOrderData, PlaceOrderErrors, PlaceOrderResponses, PreviewDegiroImportData, PreviewDegiroImportErrors, PreviewDegiroImportResponses, RecordBuyData, RecordBuyErrors, RecordBuyResponses, RecordSellData, RecordSellErrors, RecordSellResponses, RevokeAccessTokenData, RevokeAccessTokenErrors, RevokeAccessTokenResponses, SecurityDividendsData, SecurityDividendsErrors, SecurityDividendsResponses, SecurityEarningsData, SecurityEarningsErrors, SecurityEarningsResponses, SecurityFundamentalsData, SecurityFundamentalsErrors, SecurityFundamentalsResponses, SecurityNewsData, SecurityNewsErrors, SecurityNewsResponses, SecurityRangesData, SecurityRangesErrors, SecurityRangesResponses, SecurityStatisticsData, SecurityStatisticsErrors, SecurityStatisticsResponses, SecuritySummaryData, SecuritySummaryErrors, SecuritySummaryResponses, SetWalletRulesData, SetWalletRulesErrors, SetWalletRulesResponses, SignInSettingsData, SignInSettingsResponses, SyncAllWalletsData, SyncAllWalletsErrors, SyncAllWalletsResponses, UpdateWalletData, UpdateWalletErrors, UpdateWalletResponses, WalletPerformanceData, WalletPerformanceErrors, WalletPerformanceResponses, WalletValuationData, WalletValuationErrors, WalletValuationResponses, WithdrawData, WithdrawErrors, WithdrawResponses } from './types.gen';
+import type { BenchmarkDailyData, BenchmarkDailyErrors, BenchmarkDailyResponses, CancelOrderData, CancelOrderErrors, CancelOrderResponses, CopyWalletData, CopyWalletErrors, CopyWalletResponses, CreateAccessTokenData, CreateAccessTokenErrors, CreateAccessTokenResponses, CreateWalletData, CreateWalletErrors, CreateWalletResponses, DailyClosesData, DailyClosesErrors, DailyClosesResponses, DailyValuationData, DailyValuationErrors, DailyValuationResponses, DeleteOperationData, DeleteOperationErrors, DeleteOperationResponses, DeleteWalletData, DeleteWalletErrors, DeleteWalletResponses, DepositData, DepositErrors, DepositResponses, EditOperationData, EditOperationErrors, EditOperationResponses, EstimateOrderData, EstimateOrderErrors, EstimateOrderResponses, FillAllOrdersData, FillAllOrdersResponses, GetMeData, GetMeResponses, GetWalletData, GetWalletErrors, GetWalletResponses, ImportDegiroData, ImportDegiroErrors, ImportDegiroResponses, LatestQuoteData, LatestQuoteErrors, LatestQuoteResponses, ListAccessTokensData, ListAccessTokensResponses, ListOperationsData, ListOperationsErrors, ListOperationsResponses, ListOrdersData, ListOrdersErrors, ListOrdersResponses, ListUsersData, ListUsersErrors, ListUsersResponses, ListWalletsData, ListWalletsResponses, OrderOutcomesData, OrderOutcomesErrors, OrderOutcomesResponses, PlaceOrderData, PlaceOrderErrors, PlaceOrderResponses, PreviewDegiroImportData, PreviewDegiroImportErrors, PreviewDegiroImportResponses, RecordBuyData, RecordBuyErrors, RecordBuyResponses, RecordSellData, RecordSellErrors, RecordSellResponses, RevokeAccessTokenData, RevokeAccessTokenErrors, RevokeAccessTokenResponses, SecurityDividendsData, SecurityDividendsErrors, SecurityDividendsResponses, SecurityEarningsData, SecurityEarningsErrors, SecurityEarningsResponses, SecurityFundamentalsData, SecurityFundamentalsErrors, SecurityFundamentalsResponses, SecurityNewsData, SecurityNewsErrors, SecurityNewsResponses, SecurityRangesData, SecurityRangesErrors, SecurityRangesResponses, SecurityStatisticsData, SecurityStatisticsErrors, SecurityStatisticsResponses, SecuritySummaryData, SecuritySummaryErrors, SecuritySummaryResponses, SetUserTierData, SetUserTierErrors, SetUserTierResponses, SetWalletRulesData, SetWalletRulesErrors, SetWalletRulesResponses, SignInSettingsData, SignInSettingsResponses, SyncAllWalletsData, SyncAllWalletsErrors, SyncAllWalletsResponses, UpdateWalletData, UpdateWalletErrors, UpdateWalletResponses, WalletPerformanceData, WalletPerformanceErrors, WalletPerformanceResponses, WalletValuationData, WalletValuationErrors, WalletValuationResponses, WithdrawData, WithdrawErrors, WithdrawResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -24,6 +24,34 @@ export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends 
  * What the frontend needs to sign users in; null when sign-in is not set up.
  */
 export const signInSettings = <ThrowOnError extends boolean = false>(options?: Options<SignInSettingsData, ThrowOnError>): RequestResult<SignInSettingsResponses, unknown, ThrowOnError> => (options?.client ?? client).get<SignInSettingsResponses, unknown, ThrowOnError>({ url: '/api/auth/config', ...options });
+
+/**
+ * Get Me
+ *
+ * The signed-in user: their tier, and what their plan allows.
+ */
+export const getMe = <ThrowOnError extends boolean = false>(options?: Options<GetMeData, ThrowOnError>): RequestResult<GetMeResponses, unknown, ThrowOnError> => (options?.client ?? client).get<GetMeResponses, unknown, ThrowOnError>({ url: '/api/me', ...options });
+
+/**
+ * List Users
+ *
+ * Every user, as they first signed in. Admins only.
+ */
+export const listUsers = <ThrowOnError extends boolean = false>(options?: Options<ListUsersData, ThrowOnError>): RequestResult<ListUsersResponses, ListUsersErrors, ThrowOnError> => (options?.client ?? client).get<ListUsersResponses, ListUsersErrors, ThrowOnError>({ url: '/api/users', ...options });
+
+/**
+ * Set User Tier
+ *
+ * Put a user who has signed in on a tier. Admins only.
+ */
+export const setUserTier = <ThrowOnError extends boolean = false>(options: Options<SetUserTierData, ThrowOnError>): RequestResult<SetUserTierResponses, SetUserTierErrors, ThrowOnError> => (options.client ?? client).put<SetUserTierResponses, SetUserTierErrors, ThrowOnError>({
+    url: '/api/users/{target_id}/tier',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
 
 /**
  * List Wallets

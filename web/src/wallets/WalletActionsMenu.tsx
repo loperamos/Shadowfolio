@@ -1,4 +1,4 @@
-import { ActionIcon, Menu } from "@mantine/core";
+import { ActionIcon, Menu, Text } from "@mantine/core";
 import { IconCopy, IconDots, IconFileImport, IconPencil, IconSettings, IconTrash } from "@tabler/icons-react";
 
 import type { WalletResponse } from "../api/generated";
@@ -10,11 +10,12 @@ type Props = {
   onSettings: (wallet: WalletResponse) => void;
   onImport: (wallet: WalletResponse) => void;
   onDuplicate: (wallet: WalletResponse) => void;
+  duplicateBlocked?: string | null; // why no copy can be made (the plan's limit), if so
   onDelete: (wallets: WalletResponse[]) => void;
 };
 
 /** The ⋯ menu with a wallet's actions, the same in the wallet list and on the wallet's page. */
-export function WalletActionsMenu({ wallet, onRename, onSettings, onImport, onDuplicate, onDelete }: Props) {
+export function WalletActionsMenu({ wallet, onRename, onSettings, onImport, onDuplicate, duplicateBlocked = null, onDelete }: Props) {
   return (
     <Menu position="bottom-end">
       <Menu.Target>
@@ -32,8 +33,13 @@ export function WalletActionsMenu({ wallet, onRename, onSettings, onImport, onDu
         <Menu.Item leftSection={<IconFileImport size={ICON_SIZE} />} onClick={() => onImport(wallet)}>
           Import from DEGIRO
         </Menu.Item>
-        <Menu.Item leftSection={<IconCopy size={ICON_SIZE} />} onClick={() => onDuplicate(wallet)}>
+        <Menu.Item leftSection={<IconCopy size={ICON_SIZE} />} onClick={() => onDuplicate(wallet)} disabled={duplicateBlocked !== null}>
           Duplicate
+          {duplicateBlocked && (
+            <Text size="xs" c="dimmed">
+              {duplicateBlocked}
+            </Text>
+          )}
         </Menu.Item>
         <Menu.Item color="red" leftSection={<IconTrash size={ICON_SIZE} />} onClick={() => onDelete([wallet])}>
           Delete

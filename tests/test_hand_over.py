@@ -10,6 +10,7 @@ import pytest
 
 from shadowfolio.adapters.fixed_clock import FixedClock
 from shadowfolio.adapters.in_memory_access_token_repository import InMemoryAccessTokenRepository
+from shadowfolio.adapters.in_memory_user_repository import InMemoryUserRepository
 from shadowfolio.adapters.in_memory_wallet_repository import InMemoryWalletRepository
 from shadowfolio.adapters.sqlite_access_token_repository import SqliteAccessTokenRepository
 from shadowfolio.adapters.sqlite_wallet_repository import SqliteWalletRepository
@@ -18,6 +19,7 @@ from shadowfolio.domain.money import Currency
 from shadowfolio.ports.access_token_repository import AccessTokenRepository
 from shadowfolio.ports.wallet_repository import WalletRepository
 from shadowfolio.usecases.access_tokens import AccessTokens
+from shadowfolio.usecases.users import Users
 from shadowfolio.usecases.wallets import UNOWNED, Wallets
 
 NOW = datetime(2026, 11, 16, 12, 0, tzinfo=UTC)
@@ -37,7 +39,7 @@ def repositories(request: pytest.FixtureRequest, tmp_path: Path) -> Repositories
 def test_the_unowned_wallets_and_their_tokens_go_to_the_user_once(repositories: Repositories) -> None:
     wallet_repo, token_repo = repositories()
     clock = FixedClock(NOW)
-    wallets, tokens = Wallets(wallet_repo, clock), AccessTokens(token_repo, wallet_repo, clock)
+    wallets, tokens = Wallets(wallet_repo, clock, Users(InMemoryUserRepository(), clock)), AccessTokens(token_repo, wallet_repo, clock)
     old = wallets.create(UNOWNED, "DEGIRO", Currency.EUR, Decimal(1000))
     others = wallets.create("auth0|ben", "Ben's", Currency.EUR, Decimal(10))
     token, _ = tokens.create(UNOWNED, "Codex", Scope.READ, [old.id])

@@ -682,6 +682,18 @@ export type ImportResponse = {
 };
 
 /**
+ * LimitsResponse
+ *
+ * What the user's plan allows; null for no limit.
+ */
+export type LimitsResponse = {
+    /**
+     * Wallets
+     */
+    wallets: number | null;
+};
+
+/**
  * OperationResponse
  */
 export type OperationResponse = {
@@ -1286,6 +1298,13 @@ export type SellEdit = {
 };
 
 /**
+ * SetTierRequest
+ */
+export type SetTierRequest = {
+    tier: Tier;
+};
+
+/**
  * SharesSource
  *
  * Where a company's share count comes from, the most exact first.
@@ -1360,6 +1379,20 @@ export type SyncSummaryResponse = {
      */
     added: number;
 };
+
+/**
+ * Tier
+ */
+export const Tier = {
+    ADMIN: 'admin',
+    MEMBER: 'member',
+    FREE: 'free'
+} as const;
+
+/**
+ * Tier
+ */
+export type Tier = typeof Tier[keyof typeof Tier];
 
 /**
  * TradeRequest
@@ -1453,6 +1486,22 @@ export type UpdateWalletRequest = {
      * Withholding Rate
      */
     withholding_rate?: number | string | null;
+};
+
+/**
+ * UserResponse
+ */
+export type UserResponse = {
+    /**
+     * Id
+     */
+    id: string;
+    tier: Tier;
+    limits: LimitsResponse;
+    /**
+     * Created At
+     */
+    created_at: string;
 };
 
 /**
@@ -1655,6 +1704,87 @@ export type SignInSettingsResponses = {
 };
 
 export type SignInSettingsResponse = SignInSettingsResponses[keyof SignInSettingsResponses];
+
+export type GetMeData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/me';
+};
+
+export type GetMeResponses = {
+    /**
+     * Successful Response
+     */
+    200: UserResponse;
+};
+
+export type GetMeResponse = GetMeResponses[keyof GetMeResponses];
+
+export type ListUsersData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/users';
+};
+
+export type ListUsersErrors = {
+    /**
+     * Only admins can do this
+     */
+    403: ErrorResponse;
+};
+
+export type ListUsersError = ListUsersErrors[keyof ListUsersErrors];
+
+export type ListUsersResponses = {
+    /**
+     * Response List Users
+     *
+     * Successful Response
+     */
+    200: Array<UserResponse>;
+};
+
+export type ListUsersResponse = ListUsersResponses[keyof ListUsersResponses];
+
+export type SetUserTierData = {
+    body: SetTierRequest;
+    path: {
+        /**
+         * Target Id
+         */
+        target_id: string;
+    };
+    query?: never;
+    url: '/api/users/{target_id}/tier';
+};
+
+export type SetUserTierErrors = {
+    /**
+     * Only admins can do this
+     */
+    403: ErrorResponse;
+    /**
+     * Not found
+     */
+    404: ErrorResponse;
+    /**
+     * Validation Error
+     */
+    422: HttpValidationError;
+};
+
+export type SetUserTierError = SetUserTierErrors[keyof SetUserTierErrors];
+
+export type SetUserTierResponses = {
+    /**
+     * Successful Response
+     */
+    200: UserResponse;
+};
+
+export type SetUserTierResponse = SetUserTierResponses[keyof SetUserTierResponses];
 
 export type ListWalletsData = {
     body?: never;

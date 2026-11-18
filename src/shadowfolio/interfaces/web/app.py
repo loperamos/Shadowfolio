@@ -23,6 +23,7 @@ from shadowfolio.interfaces.web.market import market_router
 from shadowfolio.interfaces.web.orders import orders_router
 from shadowfolio.interfaces.web.securities import securities_router
 from shadowfolio.interfaces.web.sync import sync_router
+from shadowfolio.interfaces.web.users import users_router
 from shadowfolio.interfaces.web.valuation import valuation_router
 from shadowfolio.interfaces.web.wallets import wallets_router
 from shadowfolio.ports.clock import Clock
@@ -35,6 +36,7 @@ from shadowfolio.usecases.market import Market
 from shadowfolio.usecases.orders import Orders
 from shadowfolio.usecases.securities import Securities
 from shadowfolio.usecases.sync import Sync
+from shadowfolio.usecases.users import Users
 from shadowfolio.usecases.valuation import Valuation
 from shadowfolio.usecases.wallets import Wallets
 
@@ -53,6 +55,7 @@ def create_app(
     orders: Orders,
     securities: Securities,
     access_tokens: AccessTokens,
+    users: Users,
     identity: Identity,
     clock: Clock,
     sign_in: SignInSettings | None = None,  # for the frontend; None when sign-in is not set up
@@ -84,9 +87,10 @@ def create_app(
     app.state.mcp = mcp
     app.state.access_tokens = access_tokens
     # Every API route signs the user in first, and refuses wallets that are not theirs (see interfaces.web.auth).
-    current_user, authorize = sign_in_checks(identity, wallets, API_PREFIX)
+    current_user, authorize = sign_in_checks(identity, users, wallets, API_PREFIX)
     api = APIRouter(prefix=API_PREFIX, dependencies=[Depends(authorize)])
     api.include_router(auth_router(sign_in))
+    api.include_router(users_router(users, current_user))
     api.include_router(wallets_router(wallets, current_user))
     api.include_router(history_router(history))
     api.include_router(valuation_router(valuation))

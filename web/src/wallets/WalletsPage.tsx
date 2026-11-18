@@ -1,8 +1,9 @@
-import { Button, Group, Title } from "@mantine/core";
+import { Button, Group, Title, Tooltip } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
 import { IconPlus } from "@tabler/icons-react";
 import { useCallback, useEffect, useState } from "react";
 
+import { newWalletBlocked, useMe } from "../account/plan";
 import { listWallets, type WalletResponse } from "../api/generated";
 import { ICON_SIZE } from "../ui/theme";
 import { CreateWalletModal } from "./CreateWalletModal";
@@ -43,16 +44,22 @@ export function WalletsPage() {
   useEffect(loadWallets, [loadWallets]);
 
   const selected = (wallets ?? []).filter((wallet) => selectedIds.has(wallet.id));
+  const blocked = newWalletBlocked(useMe(), wallets && wallets.length);
 
   return (
     <>
       <Group justify="space-between" mb="lg">
         <Title order={1}>Wallets</Title>
-        <Button leftSection={<IconPlus size={ICON_SIZE} />} onClick={openCreate}>
-          New wallet
-        </Button>
+        <Tooltip label={blocked} disabled={blocked === null}>
+          {/* The wrapper keeps the tooltip working while the button is disabled. */}
+          <span>
+            <Button leftSection={<IconPlus size={ICON_SIZE} />} onClick={openCreate} disabled={blocked !== null}>
+              New wallet
+            </Button>
+          </span>
+        </Tooltip>
       </Group>
-      <WalletSelectionBar selected={selected} onDuplicate={setToDuplicate} onDelete={setToDelete} onClear={() => setSelectedIds(new Set())} />
+      <WalletSelectionBar selected={selected} duplicateBlocked={blocked} onDuplicate={setToDuplicate} onDelete={setToDelete} onClear={() => setSelectedIds(new Set())} />
       <WalletTable
         wallets={wallets}
         error={error}
@@ -62,6 +69,7 @@ export function WalletsPage() {
         onSettings={setToConfigure}
         onImport={setToImportInto}
         onDuplicate={setToDuplicate}
+        duplicateBlocked={blocked}
         onDelete={setToDelete}
       />
       <CreateWalletModal opened={creating} onClose={closeCreate} onCreated={loadWallets} />
