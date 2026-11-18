@@ -11,8 +11,10 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from shadowfolio.domain.errors import RateLimitError
+from shadowfolio.domain.usage import WEB, Counter
 from shadowfolio.interfaces.web.errors import too_many_requests, wallet_not_found
 from shadowfolio.ports.identity import Identity, IdentityUnavailableError
+from shadowfolio.usecases.usage import Usage
 from shadowfolio.usecases.users import Users
 from shadowfolio.usecases.wallets import Wallets
 
@@ -37,10 +39,10 @@ class SignInSettings(BaseModel):
 
 
 def sign_in_checks(
-    identity: Identity, users: Users, wallets: Wallets, api_prefix: str
+    identity: Identity, users: Users, usage: Usage, wallets: Wallets, api_prefix: str
 ) -> tuple[Callable[[Request], str], Callable[[Request], None]]:
     """`current_user`, the signed-in user's id (for routes that act for them), and `authorize`, which every API route
-    runs: it signs the user in, counts the request against their plan, and refuses wallets that are not theirs."""
+    runs: it signs the user in, counts the request (against their plan, and in their usage), and refuses wallets that are not theirs."""
 
     def current_user(request: Request) -> str:
         known: str | None = getattr(request.state, "user_id", None)
@@ -64,6 +66,7 @@ def sign_in_checks(
             users.count_request(user_id)
         except RateLimitError as error:
             raise too_many_requests(error) from error
+        usage.record(user_id, WEB, Counter.REQUESTS)
         wallet_id = request.path_params.get(WALLET_PARAM)
         if wallet_id is None:
             return

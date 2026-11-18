@@ -11,6 +11,7 @@ from starlette.responses import JSONResponse, Response
 from starlette.staticfiles import StaticFiles
 from starlette.types import ASGIApp, Receive, Scope, Send
 
+from shadowfolio.domain.usage import MCP, Counter
 from shadowfolio.interfaces.jobs import Jobs
 from shadowfolio.interfaces.mcp.access import RequireToken
 from shadowfolio.interfaces.mcp.server import MCP_PATH, mcp_server, transport_security
@@ -24,6 +25,7 @@ from shadowfolio.interfaces.web.orders import orders_router
 from shadowfolio.interfaces.web.provider_keys import provider_keys_router
 from shadowfolio.interfaces.web.securities import securities_router
 from shadowfolio.interfaces.web.sync import sync_router
+from shadowfolio.interfaces.web.usage import usage_router
 from shadowfolio.interfaces.web.users import users_router
 from shadowfolio.interfaces.web.valuation import valuation_router
 from shadowfolio.interfaces.web.wallets import wallets_router
@@ -38,6 +40,7 @@ from shadowfolio.usecases.orders import Orders
 from shadowfolio.usecases.provider_keys import ProviderKeys
 from shadowfolio.usecases.securities import Securities
 from shadowfolio.usecases.sync import Sync
+from shadowfolio.usecases.usage import Usage
 from shadowfolio.usecases.users import Users
 from shadowfolio.usecases.valuation import Valuation
 from shadowfolio.usecases.wallets import Wallets
@@ -58,6 +61,7 @@ def create_app(
     securities: Securities,
     access_tokens: AccessTokens,
     users: Users,
+    usage: Usage,
     provider_keys: ProviderKeys,
     identity: Identity,
     clock: Clock,
@@ -84,17 +88,25 @@ def create_app(
             finally:
                 if running is not None:
                     running.cancel()
+                usage.save()  # the counts recorded since the last save
 
     # Operation ids are the route functions' names (e.g. list_wallets), so generated clients get readable names.
     app = FastAPI(title="Shadowfolio", generate_unique_id_function=lambda route: route.name, lifespan=lifespan)
     app.state.mcp = mcp
     app.state.access_tokens = access_tokens
+
+    def agent_request(owner_id: str) -> None:
+        """An agent's request to the MCP server, for its token's owner: against their plan, and in their usage."""
+        users.count_request(owner_id)
+        usage.record(owner_id, MCP, Counter.REQUESTS)
+
     # Every API route signs the user in first, and refuses wallets that are not theirs (see interfaces.web.auth).
-    current_user, authorize = sign_in_checks(identity, users, wallets, API_PREFIX)
+    current_user, authorize = sign_in_checks(identity, users, usage, wallets, API_PREFIX)
     api = APIRouter(prefix=API_PREFIX, dependencies=[Depends(authorize)])
     api.include_router(auth_router(sign_in))
     api.include_router(users_router(users, provider_keys, current_user))
     api.include_router(provider_keys_router(provider_keys, current_user))
+    api.include_router(usage_router(usage, current_user))
     api.include_router(wallets_router(wallets, current_user))
     api.include_router(history_router(history))
     api.include_router(valuation_router(valuation))
@@ -109,9 +121,7 @@ def create_app(
     app.include_router(api)
     # Last, so the API's routes are matched first: the MCP server at MCP_PATH (every request to it needs an access
     # token), and the web app at every other path, when it is served from here.
-    app.mount(
-        "/", _Site(RequireToken(mcp_app, access_tokens.authenticate, users.count_request), None if web_dir is None else _WebApp(web_dir))
-    )
+    app.mount("/", _Site(RequireToken(mcp_app, access_tokens.authenticate, agent_request), None if web_dir is None else _WebApp(web_dir)))
     return app
 
 

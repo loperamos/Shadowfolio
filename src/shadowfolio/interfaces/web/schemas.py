@@ -31,6 +31,7 @@ from shadowfolio.domain.orders import Order, OrderSide, OrderStatus
 from shadowfolio.domain.performance import Performance, TradingActivity
 from shadowfolio.domain.provider_keys import DataProvider, KeyCheck, ProviderKey
 from shadowfolio.domain.rules import Rules
+from shadowfolio.domain.usage import Counter, UsageCount
 from shadowfolio.domain.users import Limits, Tier, User
 from shadowfolio.domain.valuation import DailyValue, Quote, WalletValuation
 from shadowfolio.domain.wallet import Wallet
@@ -1046,3 +1047,18 @@ class KeyCheckResponse(BaseModel):
     @classmethod
     def from_check(cls, check: KeyCheck) -> "KeyCheckResponse":
         return cls(works=check.works, message=check.message)
+
+
+class UsageCountResponse(BaseModel):
+    """How many of a counter a user (or the server's keys) used in a day, from one source."""
+
+    day: date  # in UTC
+    user_id: str  # or "server keys", for calls made with the server's own keys
+    source: str  # "web" or "mcp" for requests to Shadowfolio; a provider's name (e.g. "alpaca") for calls to it
+    counter: Counter
+    count: int
+
+    @classmethod
+    def from_count(cls, count: UsageCount) -> "UsageCountResponse":
+        key = count.key
+        return cls(day=key.day, user_id=key.user_id, source=key.source, counter=key.counter, count=count.count)
