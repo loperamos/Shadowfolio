@@ -39,3 +39,7 @@ export const AGENTS_PATH = "/agents";
 
 // The user's settings, e.g. their own market-data keys.
 export const SETTINGS_PATH = "/settings";
+
+// The public pages about using Shadowfolio (no sign-in needed).
+export const TERMS_PATH = "/terms";
+export const PRIVACY_PATH = "/privacy";
