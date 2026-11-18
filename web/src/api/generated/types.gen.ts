@@ -196,7 +196,8 @@ export const Counter = {
     CALLS: 'calls',
     ERRORS: 'errors',
     CACHE_HITS: 'cache_hits',
-    CACHE_MISSES: 'cache_misses'
+    CACHE_MISSES: 'cache_misses',
+    IMPORTS: 'imports'
 } as const;
 
 /**
@@ -745,6 +746,10 @@ export type LimitsResponse = {
      * Requests Per Minute
      */
     requests_per_minute: number | null;
+    /**
+     * Imports Per Day
+     */
+    imports_per_day: number | null;
 };
 
 /**

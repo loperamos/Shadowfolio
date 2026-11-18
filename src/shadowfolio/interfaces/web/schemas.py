@@ -993,6 +993,7 @@ class LimitsResponse(BaseModel):
     orders_per_day: int | None  # orders placed in a day (UTC) across their wallets, by them or their agents
     access_tokens: int | None  # agent tokens at once, not counting revoked ones
     requests_per_minute: int | None  # to the web API and the MCP server together
+    imports_per_day: int | None  # broker statements imported (saved, not previewed) in a day (UTC)
 
     @classmethod
     def from_limits(cls, limits: Limits) -> "LimitsResponse":
@@ -1001,6 +1002,7 @@ class LimitsResponse(BaseModel):
             orders_per_day=limits.orders_per_day,
             access_tokens=limits.access_tokens,
             requests_per_minute=limits.requests_per_minute,
+            imports_per_day=limits.imports_per_day,
         )
 
 

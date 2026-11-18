@@ -128,7 +128,12 @@ def build_local_app(config: LocalConfig, acting_as: str | None = None) -> FastAP
         market=market,
         sync=sync,
         imports=Imports(
-            wallet_repository, WalletChanges(clock, market_data, fx_rates, sync), OpenFigiSecurityLookup(), DegiroStatementReader()
+            wallet_repository,
+            WalletChanges(clock, market_data, fx_rates, sync),
+            OpenFigiSecurityLookup(),
+            DegiroStatementReader(),
+            users,
+            usage,
         ),
         mcp_allowed_hosts=config.mcp_allowed_hosts,
         access_tokens=access_tokens,

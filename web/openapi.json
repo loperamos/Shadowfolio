@@ -2983,7 +2983,8 @@
           "calls",
           "errors",
           "cache_hits",
-          "cache_misses"
+          "cache_misses",
+          "imports"
         ],
         "title": "Counter"
       },
@@ -3998,6 +3999,17 @@
               }
             ],
             "title": "Requests Per Minute"
+          },
+          "imports_per_day": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Imports Per Day"
           }
         },
         "type": "object",
@@ -4005,7 +4017,8 @@
           "wallets",
           "orders_per_day",
           "access_tokens",
-          "requests_per_minute"
+          "requests_per_minute",
+          "imports_per_day"
         ],
         "title": "LimitsResponse",
         "description": "What the user's plan allows; null for no limit."
