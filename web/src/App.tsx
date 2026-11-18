@@ -1,5 +1,5 @@
 import { Anchor, Container, Stack, Text, Title } from "@mantine/core";
-import { Link, Navigate, Route, Routes } from "react-router";
+import { Link, Route, Routes } from "react-router";
 
 import { AppHeader } from "./AppHeader";
 import { AgentAccessPage } from "./agents/AgentAccessPage";
@@ -15,7 +15,6 @@ export function App() {
     <Container size="xl" py="xl">
       <AppHeader />
       <Routes>
-        <Route path="/" element={<Navigate to={WALLETS_PATH} replace />} />
         <Route path={WALLETS_PATH} element={<WalletsPage />} />
         <Route path={WALLET_PATH} element={<WalletPage />} />
         <Route path={COMPARE_PATH} element={<ComparePage />} />

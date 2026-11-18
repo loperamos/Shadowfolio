@@ -6,12 +6,22 @@ import { useNavigate } from "react-router";
 import { apiErrorMessage } from "../api/errors";
 import { client } from "../api/generated/client.gen";
 import { type SignInSettings, signInSettings } from "../api/generated";
+import { WALLETS_PATH } from "../routes";
 import { AuthContext, type Auth } from "./useAuth";
 
 // The sign-in providers the backend can name: Auth0, or a fixed user it acts as without sign-in (for screenshots on
 // the developer's machine; see the backend's wiring.screenshot).
 const AUTH0 = "auth0";
 const FIXED = "fixed";
+
+// What the provider adds to the site's root when it sends the user back after signing in (the OAuth code and state).
+const SIGN_IN_RETURN_PARAMS = ["code", "state"];
+
+/** Whether the page is the provider sending the user back after signing in, which the app must finish. */
+export function isSignInReturn(search: string): boolean {
+  const params = new URLSearchParams(search);
+  return SIGN_IN_RETURN_PARAMS.every((name) => params.has(name)) || params.has("error");
+}
 
 type SettingsState = { status: "loading" } | { status: "error"; message: string } | { status: "loaded"; settings: SignInSettings | null };
 
@@ -61,7 +71,7 @@ export function AuthBoundary({ children }: { children: ReactNode }) {
       useRefreshTokens
       useRefreshTokensFallback
       // Back to the page that asked to sign in.
-      onRedirectCallback={(appState?: AppState) => navigate(appState?.returnTo ?? "/", { replace: true })}
+      onRedirectCallback={(appState?: AppState) => navigate(appState?.returnTo ?? WALLETS_PATH, { replace: true })}
     >
       <SignedIn>{children}</SignedIn>
     </Auth0Provider>

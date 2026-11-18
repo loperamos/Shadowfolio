@@ -22,6 +22,10 @@ export const TABLE_MIN_WIDTH = rem(900);
 export const TOOLTIP_WIDTH = rem(260);
 export const PERCENT_INPUT_WIDTH = rem(110); // up to 99.99 and the % sign
 // Height of one row of labelled figures (label, value, note), e.g. for its loading placeholder.
+// The logo's sizes: in a page's header, and large on the landing page; and the landing page's feature icons.
+export const LOGO_HEADER_SIZE = 32;
+export const LOGO_HERO_SIZE = 88;
+export const LANDING_ICON_SIZE = 26;
 export const FIGURE_ROW_HEIGHT = rem(72);
 export const COUNT_INPUT_WIDTH = rem(110); // a whole number of a few digits, or a short placeholder
 // Width of a search field above a list: room for a name, without stretching across the page.
