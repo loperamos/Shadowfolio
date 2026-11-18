@@ -10,6 +10,7 @@ from shadowfolio.adapters.daily_cache import FRESH_FOR
 from shadowfolio.adapters.fixed_clock import FixedClock
 from shadowfolio.adapters.in_memory_price_data import InMemoryPriceData
 from shadowfolio.domain.money import Currency
+from shadowfolio.domain.usage import Counter
 from shadowfolio.domain.valuation import Quote
 
 SYMBOL = "NVDA"
@@ -120,3 +121,16 @@ def test_latest_prices_are_kept_for_a_minute_and_only_missing_ones_asked_for(tmp
     prices.latest_prices([SYMBOL])
 
     assert source.requests == 3
+
+
+def test_each_lookup_is_reported_as_answered_from_the_cache_or_fetched(tmp_path: Path) -> None:
+    seen: list[tuple[Counter, int]] = []
+    prices = provider()
+    cached = CachedPriceData(prices, SOURCE, tmp_path / "cache.db", FixedClock(NOW), record=lambda counter, n: seen.append((counter, n)))
+
+    cached.closes_between(SYMBOL, THURSDAY, FRIDAY)
+    cached.closes_between(SYMBOL, THURSDAY, FRIDAY)
+    cached.latest_prices([SYMBOL, "MSFT"])
+    cached.latest_prices([SYMBOL])
+
+    assert seen == [(Counter.CACHE_MISSES, 1), (Counter.CACHE_HITS, 1), (Counter.CACHE_MISSES, 2), (Counter.CACHE_HITS, 1)]

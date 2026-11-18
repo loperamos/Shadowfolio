@@ -3,6 +3,7 @@
 from dataclasses import dataclass, replace
 from pathlib import Path
 
+import httpx2
 from fastapi import FastAPI
 
 from shadowfolio.adapters.alpaca_corporate_actions import AlpacaCorporateActions
@@ -11,6 +12,7 @@ from shadowfolio.adapters.alpaca_price_data import DAILY_FEED, AlpacaConfig, Alp
 from shadowfolio.adapters.auth0_identity import Auth0Identity
 from shadowfolio.adapters.cached_fx_rates import CachedFxRates
 from shadowfolio.adapters.cached_price_data import CachedPriceData
+from shadowfolio.adapters.counting_transport import CountingTransport
 from shadowfolio.adapters.degiro_statements import DegiroStatementReader
 from shadowfolio.adapters.ecb_fx_rates import EcbFxRates
 from shadowfolio.adapters.finnhub_earnings_calendar import FinnhubEarningsCalendar
@@ -21,10 +23,12 @@ from shadowfolio.adapters.own_key_market_data import OwnKeyMarketData
 from shadowfolio.adapters.sec_edgar_company_data import SecEdgarCompanyData
 from shadowfolio.adapters.sqlite_access_token_repository import SqliteAccessTokenRepository
 from shadowfolio.adapters.sqlite_provider_key_repository import SqliteProviderKeyRepository
+from shadowfolio.adapters.sqlite_usage_repository import SqliteUsageRepository
 from shadowfolio.adapters.sqlite_user_repository import SqliteUserRepository
 from shadowfolio.adapters.sqlite_wallet_repository import SqliteWalletRepository
 from shadowfolio.adapters.system_clock import SystemClock
-from shadowfolio.domain.provider_keys import ProviderKey
+from shadowfolio.domain.provider_keys import DataProvider, ProviderKey
+from shadowfolio.domain.usage import SERVER_KEYS, RecordUsage
 from shadowfolio.interfaces.web.app import create_app
 from shadowfolio.interfaces.web.auth import SignInSettings
 from shadowfolio.ports.clock import Clock
@@ -39,6 +43,7 @@ from shadowfolio.usecases.orders import Orders
 from shadowfolio.usecases.provider_keys import ProviderKeys
 from shadowfolio.usecases.securities import Securities
 from shadowfolio.usecases.sync import Sync
+from shadowfolio.usecases.usage import Usage
 from shadowfolio.usecases.users import Users
 from shadowfolio.usecases.valuation import Valuation
 from shadowfolio.usecases.wallet_changes import WalletChanges
@@ -88,17 +93,18 @@ def build_local_app(config: LocalConfig, acting_as: str | None = None) -> FastAP
     fx_rates = CachedFxRates(EcbFxRates(clock), FX_SOURCE, market_cache, clock)
     users = Users(SqliteUserRepository(config.db_path), clock, config.admins)
     keys = SqliteProviderKeyRepository(config.db_path, config.keys_secret)
+    usage = Usage(SqliteUsageRepository(config.db_path), clock, users)
     # Each user's market data comes from their own Alpaca and Finnhub keys; admins without them use the server's
-    # (development plans).
-    finnhub = FinnhubEarningsCalendar(config.finnhub_key, clock)
-    server = replace(_alpaca(config.alpaca, PRICE_SOURCE, market_cache, clock), earnings_calendar=finnhub)
+    # (development plans). Every call to a provider is counted for the key's owner (see usecases.usage).
+    finnhub = _finnhub(config.finnhub_key, clock, usage.recorder(SERVER_KEYS, DataProvider.FINNHUB))
+    server = replace(_alpaca(config.alpaca, PRICE_SOURCE, market_cache, clock, usage, SERVER_KEYS), earnings_calendar=finnhub)
 
     def with_own_key(user_id: str, key: ProviderKey) -> MarketData:
         own = AlpacaConfig(key_id=key.key_id or "", secret_key=key.secret)
-        return _alpaca(own, OWN_KEY_SOURCE.format(user_id=user_id), market_cache, clock)
+        return _alpaca(own, OWN_KEY_SOURCE.format(user_id=user_id), market_cache, clock, usage, user_id)
 
     def with_own_finnhub_key(key: ProviderKey) -> EarningsCalendar:
-        return FinnhubEarningsCalendar(key.secret, clock)
+        return _finnhub(key.secret, clock, usage.recorder(key.owner_id, DataProvider.FINNHUB))
 
     market_data = OwnKeyMarketData(keys, with_own_key, with_own_finnhub_key, server, lambda user_id: users.user(user_id).uses_server_keys)
     sync = Sync(wallet_repository, clock, market_data, fx_rates)
@@ -124,6 +130,7 @@ def build_local_app(config: LocalConfig, acting_as: str | None = None) -> FastAP
         mcp_allowed_hosts=config.mcp_allowed_hosts,
         access_tokens=access_tokens,
         users=users,
+        usage=usage,
         provider_keys=ProviderKeys(keys, clock, users, HttpKeyChecker(clock)),
         identity=Auth0Identity(config.auth0_domain, config.auth0_audience, clock) if acting_as is None else FixedIdentity(acting_as),
         sign_in=_sign_in(config) if acting_as is None else SignInSettings(provider=FIXED, user_id=acting_as),
@@ -134,10 +141,22 @@ def build_local_app(config: LocalConfig, acting_as: str | None = None) -> FastAP
     )
 
 
-def _alpaca(config: AlpacaConfig, price_source: str, market_cache: Path, clock: Clock) -> MarketData:
-    """Market data from Alpaca with one key: its daily closes cached under `price_source`."""
-    prices = CachedPriceData(AlpacaPriceData(config, clock), price_source, market_cache, clock)
-    return MarketData(prices, AlpacaCorporateActions(config), AlpacaNews(config))
+def _alpaca(config: AlpacaConfig, price_source: str, market_cache: Path, clock: Clock, usage: Usage, user_id: str) -> MarketData:
+    """Market data from Alpaca with one key: its daily closes cached under `price_source`, and its calls and cache
+    lookups counted for `user_id`, the key's owner."""
+    record = usage.recorder(user_id, DataProvider.ALPACA)
+    prices = CachedPriceData(AlpacaPriceData(config, clock, _counted(record)), price_source, market_cache, clock, record)
+    return MarketData(prices, AlpacaCorporateActions(config, _counted(record)), AlpacaNews(config, _counted(record)))
+
+
+def _finnhub(key: str | None, clock: Clock, record: RecordUsage) -> EarningsCalendar:
+    """Finnhub's earnings calendar with one key, its calls counted for the key's owner."""
+    return FinnhubEarningsCalendar(key, clock, _counted(record))
+
+
+def _counted(record: RecordUsage) -> CountingTransport:
+    """The network, each call through it counted (see adapters.counting_transport)."""
+    return CountingTransport(httpx2.HTTPTransport(), record)
 
 
 def _sign_in(config: LocalConfig) -> SignInSettings | None:

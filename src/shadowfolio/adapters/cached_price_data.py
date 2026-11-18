@@ -12,6 +12,7 @@ from pathlib import Path
 from shadowfolio.adapters.daily_cache import DailyCache, Fields
 from shadowfolio.domain.market import MinuteBar
 from shadowfolio.domain.money import Currency
+from shadowfolio.domain.usage import Counter, RecordUsage
 from shadowfolio.domain.valuation import Quote
 from shadowfolio.ports.clock import Clock
 from shadowfolio.ports.price_data import PriceData
@@ -21,11 +22,13 @@ LATEST_FRESH_FOR = timedelta(minutes=1)
 
 
 class CachedPriceData(PriceData):
-    def __init__(self, provider: PriceData, source: str, path: Path, clock: Clock) -> None:
-        """`source` names the provider and its plan or feed, e.g. "alpaca/iex"; `path` is the cache file."""
+    def __init__(self, provider: PriceData, source: str, path: Path, clock: Clock, record: RecordUsage | None = None) -> None:
+        """`source` names the provider and its plan or feed, e.g. "alpaca/iex"; `path` is the cache file; `record`, if
+        given, counts the lookups answered from the cache and those that asked the provider (one per symbol)."""
         self._provider = provider
         self._closes = DailyCache(path, source, clock, _encode, _decode)
         self._clock = clock
+        self._record = record
         self._latest: dict[str, tuple[datetime, Quote | None]] = {}  # per symbol: when it was asked for, and its price
 
     def latest_price(self, symbol: str) -> Quote | None:
@@ -34,6 +37,7 @@ class CachedPriceData(PriceData):
     def latest_prices(self, symbols: Collection[str]) -> dict[str, Quote]:
         now = self._clock.now()
         missing = [symbol for symbol in symbols if symbol not in self._latest or now - self._latest[symbol][0] >= LATEST_FRESH_FOR]
+        self._count(len(symbols) - len(missing), len(missing))
         if missing:
             found = self._provider.latest_prices(missing)
             for symbol in missing:  # a symbol without a price is remembered too
@@ -51,7 +55,24 @@ class CachedPriceData(PriceData):
         return self.closes_between(symbol, day, day).get(day)
 
     def closes_between(self, symbol: str, start: date, end: date) -> dict[date, Quote]:
-        return self._closes.between(symbol, start, end, lambda first, last: self._provider.closes_between(symbol, first, last))
+        asked = False
+
+        def fetch(first: date, last: date) -> dict[date, Quote]:
+            nonlocal asked
+            asked = True
+            return self._provider.closes_between(symbol, first, last)
+
+        closes = self._closes.between(symbol, start, end, fetch)
+        self._count(0 if asked else 1, 1 if asked else 0)
+        return closes
+
+    def _count(self, hits: int, misses: int) -> None:
+        if self._record is None:
+            return
+        if hits:
+            self._record(Counter.CACHE_HITS, hits)
+        if misses:
+            self._record(Counter.CACHE_MISSES, misses)
 
 
 def _encode(quote: Quote) -> Fields:

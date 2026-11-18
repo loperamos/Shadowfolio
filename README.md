@@ -50,6 +50,8 @@ Signing in for the first time makes an account, on the free plan: 3 wallets, 20 
 
 Each user saves their own Alpaca and Finnhub keys in Settings, so data fetched with a key is only shown to its owner: each user's prices, dividends, splits and news come from their own Alpaca key (their past closes cached apart from everyone else's), and the daily jobs use each wallet's owner's; earnings dates come from their own Finnhub key, which is optional. Admins without keys of their own use the server's (`ALPACA_API_KEY_ID`, `FINNHUB_API_KEY`); anyone else is asked to connect one. They are stored encrypted with `SHADOWFOLIO_KEYS_SECRET` (see `.env.example` to make one). The nightly backups hold the keys only encrypted; keep a copy of that master key apart from them, as without it the saved keys cannot be read.
 
+Admins see the usage figures at `GET /api/usage` (`start` and `end` dates, default the last week): per day, user and source, requests to Shadowfolio from the web app and agents, calls to each provider (and their errors) with whose key ("server keys" for the server's own), and price lookups answered from the cache or not.
+
 ## Self-hosting (Docker)
 
 One image runs the backend, which also serves the built web app, so browser, API and MCP share one origin. Its data (the database and the market cache) lives in the `shadowfolio-data` volume, apart from the development servers' `data/`. Configuration comes from `.env` at run time; the container sets its own address, database path and web app.

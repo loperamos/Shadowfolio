@@ -45,13 +45,13 @@ class Users:
 
     def list(self, acting_id: str) -> list[User]:
         """Every user, as they first came. Raises NotAllowedError unless `acting_id` is an admin's."""
-        self._require_admin(acting_id)
+        self.require_admin(acting_id)
         return [self._as_configured(user) for user in self._repo.list()]
 
     def set_tier(self, acting_id: str, user_id: str, tier: Tier) -> User | None:
         """Put a user on a tier. None if they have never signed in. Raises NotAllowedError unless `acting_id` is an
         admin's."""
-        self._require_admin(acting_id)
+        self.require_admin(acting_id)
         user = self._repo.get(user_id)
         if user is None:
             return None
@@ -59,7 +59,8 @@ class Users:
         self._repo.update(updated)
         return self._as_configured(updated)
 
-    def _require_admin(self, user_id: str) -> None:
+    def require_admin(self, user_id: str) -> None:
+        """Raise NotAllowedError unless the user is an admin."""
         if self.user(user_id).tier is not Tier.ADMIN:
             raise NotAllowedError("only admins can do this")
 
