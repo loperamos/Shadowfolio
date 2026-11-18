@@ -81,7 +81,7 @@ def build_local_app(config: LocalConfig, acting_as: str | None = None) -> FastAP
     market = Market(prices, clock, corporate_actions)
     users = Users(SqliteUserRepository(config.db_path), clock, config.admins)
     wallets = Wallets(wallet_repository, clock, users)
-    access_tokens = AccessTokens(SqliteAccessTokenRepository(config.db_path), wallet_repository, clock)
+    access_tokens = AccessTokens(SqliteAccessTokenRepository(config.db_path), wallet_repository, clock, users)
     if config.existing_wallets_owner:
         # The wallets made before sign-in, and their agents' tokens, go to their user: once, as none are left after.
         wallets.hand_over(UNOWNED, config.existing_wallets_owner)
@@ -91,7 +91,7 @@ def build_local_app(config: LocalConfig, acting_as: str | None = None) -> FastAP
         history=History(wallet_repository, clock, prices, fx_rates, sync),
         valuation=Valuation(wallet_repository, clock, prices, fx_rates),
         comparison=Comparison(wallet_repository, clock, prices, fx_rates, corporate_actions),
-        orders=Orders(wallet_repository, clock, prices, fx_rates, WalletChanges(clock, prices, fx_rates, sync)),
+        orders=Orders(wallet_repository, clock, prices, fx_rates, WalletChanges(clock, prices, fx_rates, sync), users),
         securities=Securities(
             SecEdgarCompanyData(config.edgar_contact, clock),
             prices,

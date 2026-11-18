@@ -691,6 +691,18 @@ export type LimitsResponse = {
      * Wallets
      */
     wallets: number | null;
+    /**
+     * Orders Per Day
+     */
+    orders_per_day: number | null;
+    /**
+     * Access Tokens
+     */
+    access_tokens: number | null;
+    /**
+     * Requests Per Minute
+     */
+    requests_per_minute: number | null;
 };
 
 /**

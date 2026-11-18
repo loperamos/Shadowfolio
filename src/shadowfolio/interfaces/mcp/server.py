@@ -87,7 +87,7 @@ class OrderPreviewResponse(BaseModel):
     amount: Decimal  # what it would cost (a buy) or bring in (a sell)
     buying_power_after: Decimal | None
     holding_weight_after_percent: Decimal | None  # the symbol's share of the wallet once it fills
-    refusal: str | None  # the wallet's rule that refuses it now; null when place_order would accept it
+    refusal: str | None  # the wallet's rule or the plan's limit that refuses it now; null when place_order would accept it
     warnings: list[str]  # why it would be rejected when it fills, though placed
     fill_rule: str
 

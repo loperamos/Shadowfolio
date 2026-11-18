@@ -4,13 +4,14 @@ A plan's limits are the service's, per user, to keep it within what it can serve
 are the owner's, per wallet. Signing in for the first time makes the account, on the free plan.
 """
 
+import math
 from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from datetime import datetime
 from enum import StrEnum
 from types import MappingProxyType
 
-from shadowfolio.domain.errors import PlanLimitError
+from shadowfolio.domain.errors import PlanLimitError, RateLimitError
 
 
 class Tier(StrEnum):
@@ -24,10 +25,18 @@ class Limits:
     """What a plan allows; None for no limit."""
 
     wallets: int | None  # the most wallets a user may have at once
+    orders_per_day: int | None  # orders placed in a day (UTC) across their wallets, by them or their agents
+    access_tokens: int | None  # agent tokens at once, not counting revoked ones
+    requests_per_minute: int | None  # to the web API and the MCP server together
 
 
+NO_LIMITS = Limits(wallets=None, orders_per_day=None, access_tokens=None, requests_per_minute=None)
 TIER_LIMITS: Mapping[Tier, Limits] = MappingProxyType(
-    {Tier.ADMIN: Limits(wallets=None), Tier.MEMBER: Limits(wallets=10), Tier.FREE: Limits(wallets=3)}
+    {
+        Tier.ADMIN: NO_LIMITS,
+        Tier.MEMBER: Limits(wallets=10, orders_per_day=100, access_tokens=10, requests_per_minute=600),
+        Tier.FREE: Limits(wallets=3, orders_per_day=20, access_tokens=2, requests_per_minute=120),
+    }
 )
 
 
@@ -49,3 +58,23 @@ class User:
         allowed = self.limits.wallets
         if allowed is not None and owned >= allowed:
             raise PlanLimitError(f"your plan allows {allowed} wallets; delete one to make another")
+
+    def check_new_order(self, placed_today: int) -> None:
+        """Raise PlanLimitError if the user, having placed `placed_today` orders today (UTC), may not place another."""
+        allowed = self.limits.orders_per_day
+        if allowed is not None and placed_today >= allowed:
+            raise PlanLimitError(f"your plan allows {allowed} orders a day; place more tomorrow (UTC)")
+
+    def check_new_token(self, active: int) -> None:
+        """Raise PlanLimitError if the user, with `active` agent tokens, may not make another."""
+        allowed = self.limits.access_tokens
+        if allowed is not None and active >= allowed:
+            raise PlanLimitError(f"your plan allows {allowed} agent tokens at once; revoke one to make another")
+
+    def check_request(self, made: int, window_ends: datetime, now: datetime) -> None:
+        """Raise RateLimitError if the user, having made `made` requests in the window ending at `window_ends`, may
+        not make another now."""
+        allowed = self.limits.requests_per_minute
+        if allowed is not None and made >= allowed:
+            wait = max(1, math.ceil((window_ends - now).total_seconds()))
+            raise RateLimitError(f"your plan allows {allowed} requests a minute; try again in {wait} seconds", wait)

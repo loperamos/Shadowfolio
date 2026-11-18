@@ -16,7 +16,8 @@ A hosted, subscription service where people test investing strategies against re
 - US stocks and ETFs, long-only, fractional shares.
 - Wallets in USD or EUR.
 - Multi-user data model from day one: every wallet has an owner, even before login exists.
-- Not in the MVP: plans and limits, billing, non-US exchanges, options, crypto, shorting, running agents for users.
+- Plans without billing: signing in makes a free account; tiers (free, member, admin) limit wallets, orders a day, agent tokens and requests a minute.
+- Not in the MVP: billing, non-US exchanges, options, crypto, shorting, running agents for users.
 
 ## Core concepts
 
@@ -191,7 +192,7 @@ No paid subscription is needed before the licensed-provider slice.
 - Rule strategies: how users define them, and what the rule language is.
 - Withholding by the security's country (one rate per wallet while the MVP is US-only); dividend reinvestment option.
 - Comparison metrics and charts beyond the basics.
-- Plans, limits and pricing.
+- Pricing, and the plans' limits once usage is known.
 - Users' own provider keys: some data needs a provider key (Finnhub for the earnings calendar, today the server's own `FINNHUB_API_KEY`). A free key may not allow showing its data to other users, so users may have to pass their own key (stored as a secret per user) instead of the server's.
 - Hosting provider.
 - Instrument identity: key holdings by ISIN rather than ticker, so one security bought on different exchanges (e.g. Tesla on NASDAQ in USD and on Tradegate in EUR) is one holding; store the venue; value each holding from one listing (the US one in the MVP), converted with `FxRates`. Decide with the import or valuation slice.

@@ -107,3 +107,11 @@ class InvalidAccessTokenError(DomainError):
 
 class PlanLimitError(DomainError):
     """A user's plan does not allow more of something (e.g. wallets)."""
+
+
+class RateLimitError(PlanLimitError):
+    """A user has made as many requests as their plan allows for now."""
+
+    def __init__(self, message: str, retry_after_seconds: int) -> None:
+        super().__init__(message)
+        self.retry_after_seconds = retry_after_seconds
