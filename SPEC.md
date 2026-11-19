@@ -144,6 +144,8 @@ The key requirement is the right to **display data to your own paying users**; p
 | Finnhub | To confirm: the free tier is for personal use | Free tier with an API key | Earnings calendar. The key is the server's for now; see Open questions |
 | ECB, OpenFIGI | Free | Free | FX and identifiers |
 
+**Bring your own data key** (#34): beyond a baseline every user gets from our licensed provider, a user can connect their own market-data plan (e.g. EODHD for non-US listings and deeper history) with their API key; their prices then come from it, at no data cost to us. Needs accounts. Data fetched with a user's key is only ever shown to that user (no shared cache, no public benchmarks from it), keys are kept encrypted and never shown back, and each provider's terms must allow use through a third-party service before it is supported in the hosted service.
+
 ## Market notes
 
 Existing products each cover one piece:
