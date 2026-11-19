@@ -1,11 +1,16 @@
 // The app's single theme. Colours, spacing, typography and radii are set here and nowhere else;
 // components take them from the theme (see AGENTS.md, Frontend).
-import { createTheme, rem } from "@mantine/core";
+import { Badge, createTheme, rem } from "@mantine/core";
 
 export const theme = createTheme({
   primaryColor: "teal",
   defaultRadius: "md",
   fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+  components: {
+    // A badge is a short label: it keeps its whole text instead of shrinking to "…" when space is tight (e.g. a table
+    // column squeezed by a long text next to it), so the column keeps room for it.
+    Badge: Badge.extend({ styles: { root: { overflow: "visible" }, label: { overflow: "visible" } } }),
+  },
 });
 
 // Size of icons inside buttons and menus, in px.
